@@ -1,0 +1,9 @@
+*.jpg
+*.jpeg
+*.json
+img/
+label/
+vis/
+checkpoint/
+.vscode/
+__MACOSX/
