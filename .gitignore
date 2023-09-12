@@ -7,3 +7,5 @@ vis/
 checkpoint/
 .vscode/
 __MACOSX/
+tensorboard/
+__pycache__/
