@@ -38,6 +38,8 @@ def parse_args():
         type=str,
     )
 
+    parser.add_argument("--stop_early", type=int, default=30)
+
     parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
 
     parser.add_argument("--angle", default="F", type=str, choices=["F", "all"])
@@ -135,23 +137,23 @@ def main(args):
 
     model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
     model_list = [copy.deepcopy(model) for _ in range(8)]
+    resume_list = list()
     for idx, item in enumerate(model_num_class):
         if not np.isnan(item):
             model_list[idx].fc = nn.Linear(
                 model_list[idx].fc.in_features, model_num_class[idx]
             )
+            resume_list.append(idx)
     model_dict_path = os.path.join(check_path, "0", "state_dict.bin")
 
     if os.path.isfile(model_dict_path):
         print("Resuming~")
-        model_list = [
-            resume_checkpoint(
+        for idx in resume_list:
+            model_list[idx] = resume_checkpoint(
                 args,
-                model,
+                model_list[idx],
                 os.path.join(check_path, f"{idx}", "state_dict.bin"),
             )
-            for idx, model in enumerate(model_list)
-        ]
 
     train_dataset, val_dataset = build_dataset(args, logger)
 
@@ -190,7 +192,12 @@ def main(args):
         resnet_model.print_total()
         resnet_model.update_e(epoch + 1)
         resnet_model.reset_log()
+
+        if resnet_model.stop_early():
+            break
     writer.close()
+    
+    import cv2
 
 
 if __name__ == "__main__":

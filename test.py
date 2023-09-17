@@ -1,18 +1,17 @@
 import numpy as np
+import torch
 from torchvision import models
 
-from tensorboardX import SummaryWriter
 import os
 import copy
 from torch.utils.data import random_split
-from matplotlib import pyplot as plt
-from logger import setup_logger
 from data_loader import CustomDataset
-from model import Model, resume_checkpoint, mkdir
+from model import resume_checkpoint
+from test_model import Model_test
 from torchvision.models import ResNet50_Weights
 import torch.nn as nn
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import argparse
 from torch.utils import data
 
@@ -37,8 +36,6 @@ def parse_args():
         default="tensorboard",
         type=str,
     )
-
-    parser.add_argument("--stop_early", type=int, default=30)
 
     parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
 
@@ -108,28 +105,25 @@ def parse_args():
 
 
 def build_dataset(args, logger):
-    train_dataset, val_dataset = random_split(CustomDataset(args), [0.9, 0.1])
-    logger.info(
-        f"Train Dataset => {len(train_dataset)} // Valid Dataset => {len(val_dataset)}"
+    train_dataset, val_dataset = random_split(
+        CustomDataset(args), [0.9, 0.1], generator=torch.Generator().manual_seed(523)
     )
 
-    return train_dataset, val_dataset
+    if logger is not None:
+        logger.info(
+            f"Train Dataset => {len(train_dataset)} // Valid Dataset => {len(val_dataset)}"
+        )
 
+    return train_dataset, val_dataset
+ 
 
 def main(args):
-    log_path = os.path.join(args.loss_dir, args.mode, args.name)
     check_path = os.path.join(args.output_dir, args.mode, args.name)
-
-    mkdir(os.path.join(log_path))
-    writer = SummaryWriter(os.path.join(log_path))
-    mkdir(os.path.join(check_path))
-    logger = setup_logger(args.name, os.path.join(check_path), 0)
-    logger.info(args)
 
     model_num_class = (
         [15, 9, 9, 9, 12, 12, 5, 7]
         if args.mode == "class"
-        else [15, np.nan, 8, 8, 16, 16, np.nan, 15]
+        else [4, np.nan, 3, 3, 5, 5, np.nan, 4]
     )
     args.best_loss = (
         [0 for _ in range(8)] if args.mode == "class" else [np.inf for _ in range(8)]
@@ -155,14 +149,11 @@ def main(args):
                 os.path.join(check_path, f"{idx}", "state_dict.bin"),
             )
 
-    train_dataset, val_dataset = build_dataset(args, logger)
+    else:
+        assert 0, "Check the check-point path, there's not any file in that"
 
-    trainset_loader = data.DataLoader(
-        dataset=train_dataset,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        shuffle=True,
-    )
+    _, val_dataset = build_dataset(args, None)
+
     valset_loader = data.DataLoader(
         dataset=val_dataset,
         batch_size=args.batch_size,
@@ -170,32 +161,14 @@ def main(args):
         shuffle=False,
     )
 
-    resnet_model = Model(
-        args, model_list, trainset_loader, valset_loader, logger, writer
-    )
+    resnet_model = Model_test(args, model_list, valset_loader)
 
-    for epoch in range(args.load_epoch, args.epoch):
-        for model_idx in range(8):
-            if np.isnan(model_num_class[model_idx]):
-                continue
-            resnet_model.choice(model_idx)
-            resnet_model.train()
-            resnet_model.valid()
-
-        resnet_model.update_m(model_num_class)
-        for model_idx in range(8):
-            if np.isnan(model_num_class[model_idx]):
-                continue
-            resnet_model.choice(model_idx)
-            resnet_model.test()
-
-        resnet_model.print_total()
-        resnet_model.update_e(epoch + 1)
-        resnet_model.reset_log()
-
-        if resnet_model.stop_early():
-            break
-    writer.close()
+    for model_idx in range(8):
+        if np.isnan(model_num_class[model_idx]):
+            continue
+        resnet_model.choice(model_idx)
+        resnet_model.test()
+    resnet_model.print_test()
 
 
 if __name__ == "__main__":

@@ -206,17 +206,15 @@ class CustomDataset(Dataset):
                                 meta["annotations"]
                                 if args.mode == "class"
                                 else meta["equipment"]
-                            )  ## 순서대로 1, 14 / nan / 8/ 8, 1 / 14, 1 ,1/ 14, 1, 1 /nan/ 14
+                            ) 
                             if label_data == None:
                                 continue
 
                             if args.mode != "class":
                                 item_list = list()
-                                count = 0
                                 for item in meta["equipment"]:
                                     if type(meta["equipment"][item]) == dict:
                                         for items in meta["equipment"][item]:
-                                            count += 1
                                             if not type(
                                                 meta["equipment"][item][items]
                                             ) in [float, int]:
@@ -247,7 +245,6 @@ class CustomDataset(Dataset):
                                             )
 
                                     else:
-                                        count += 1
                                         if not type(meta["equipment"][item]) in [
                                             float,
                                             int,

@@ -9,3 +9,5 @@ checkpoint/
 __MACOSX/
 tensorboard/
 __pycache__/
+*.xlsx
+*.ipynb
