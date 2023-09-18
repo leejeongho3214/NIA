@@ -196,8 +196,7 @@ def main(args):
         if resnet_model.stop_early():
             break
     writer.close()
-    
-    import cv2
+
 
 
 if __name__ == "__main__":

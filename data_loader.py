@@ -149,53 +149,72 @@ class CustomDataset(Dataset):
                                 )
                                 continue
 
-                            patch_img = np.zeros(
-                                [args.res, args.res, 3], dtype=np.uint8
-                            )
                             if args.double:
                                 if idx_area in [1, 7, 8]:
-                                    if n_patch_img.shape[0] * 2 > args.res:
-                                        r_value = n_patch_img.shape[0] / (args.res / 2)
-                                        n_patch_img = cv2.resize(
+                                    patch_img = np.zeros((128, 256, 3), dtype=np.uint8)
+                                    if n_patch_img.shape[0] * 2 > 128:
+                                        reduction_value = 64 / n_patch_img.shape[0]
+                                        patch = cv2.resize(
                                             n_patch_img,
                                             (
-                                                int(n_patch_img.shape[1] / r_value),
-                                                int(n_patch_img.shape[0] / r_value),
+                                                int(128 * 2 * reduction_value),
+                                                int(
+                                                    n_patch_img.shape[0]
+                                                    * 2
+                                                    * reduction_value
+                                                ),
                                             ),
                                         )
-                                    patch_img[
-                                        : n_patch_img.shape[0], : n_patch_img.shape[1]
-                                    ] = n_patch_img
-                                    patch_img[
-                                        n_patch_img.shape[0] : n_patch_img.shape[0] * 2,
-                                        : n_patch_img.shape[1],
-                                    ] = n_patch_img
+                                        patch_img[:, : int(128 * 2 * reduction_value)] = patch
+                                    else:
+                                        patch = cv2.resize(
+                                            n_patch_img,
+                                            (128 * 2, n_patch_img.shape[0] * 2),
+                                        )
+                                        patch_img[: n_patch_img.shape[0] * 2] = patch
+
                                 elif idx_area in [3, 4]:
-                                    if n_patch_img.shape[1] * 2 > args.res:
-                                        r_value = n_patch_img.shape[1] / (args.res / 2)
-                                        n_patch_img = cv2.resize(
+                                    patch_img = np.zeros((256, 128, 3), dtype=np.uint8)
+
+                                    if n_patch_img.shape[1] * 2 > 128:
+                                        reduction_value = 64 / n_patch_img.shape[1]
+                                        patch = cv2.resize(
                                             n_patch_img,
                                             (
-                                                int(n_patch_img.shape[1] / r_value),
-                                                int(n_patch_img.shape[0] / r_value),
+                                                int(
+                                                    n_patch_img.shape[1]
+                                                    * 2
+                                                    * reduction_value
+                                                ),
+                                                int(128 * 2 * reduction_value),
                                             ),
                                         )
+                                        patch_img[: int(128 * 2 * reduction_value)] = patch
+
+                                    else:
+                                        patch = cv2.resize(
+                                            n_patch_img,
+                                            (
+                                                n_patch_img.shape[1] * 2,
+                                                128 * 2,
+                                            ),
+                                        )
+                                        patch_img[:, : n_patch_img.shape[1] * 2] = patch
+
+                                else:
+                                    patch_img = np.zeros((128, 128, 3), dtype=np.uint8)
                                     patch_img[
                                         : n_patch_img.shape[0], : n_patch_img.shape[1]
                                     ] = n_patch_img
 
-                                    patch_img[
-                                        : n_patch_img.shape[0],
-                                        n_patch_img.shape[1] : n_patch_img.shape[1] * 2,
-                                    ] = n_patch_img
-                                    if idx_area == 3:
-                                        plt.imshow(patch_img)
-                                else:
-                                    patch_img[
-                                        : n_patch_img.shape[0], : n_patch_img.shape[1]
-                                    ] = n_patch_img
+                                # plt.imshow(patch_img / 255)
+                                # plt.savefig('aa.jpg')
+                                # pass
 
                             else:
+                                patch_img = np.zeros(
+                                    [args.res, args.res, 3], dtype=np.uint8
+                                )
                                 patch_img[
                                     : n_patch_img.shape[0], : n_patch_img.shape[1]
                                 ] = n_patch_img
@@ -206,7 +225,7 @@ class CustomDataset(Dataset):
                                 meta["annotations"]
                                 if args.mode == "class"
                                 else meta["equipment"]
-                            ) 
+                            )
                             if label_data == None:
                                 continue
 
@@ -221,24 +240,56 @@ class CustomDataset(Dataset):
                                                 meta["equipment"][item][items] = np.nan
                                             else:
                                                 if item == "elasticity":
-                                                    if items == 'R6':
-                                                        meta["equipment"][item][items] = meta["equipment"][item][items] / 2
-                                                    elif items == 'Q0':
-                                                        meta["equipment"][item][items] = meta["equipment"][item][items] / 100
-                                                
-                                                elif item =='wrinkle':
-                                                    if items in ['Rmax', 'Rt']:
-                                                        meta["equipment"][item][items] = meta["equipment"][item][items] / 300
-                                                    else:
-                                                        meta["equipment"][item][items] = meta["equipment"][item][items] / 100
-                                                        
-                                                elif item == 'pigmentaion':
-                                                    meta["equipment"][item][items] = meta["equipment"][item][items] / 300
-                                                    
-                                                elif item == 'pore':
-                                                    meta["equipment"][item][items] = meta["equipment"][item][items] / 3000
-                                                
+                                                    if items == "R6":
+                                                        meta["equipment"][item][
+                                                            items
+                                                        ] = (
+                                                            meta["equipment"][item][
+                                                                items
+                                                            ]
+                                                            / 2
+                                                        )
+                                                    elif items == "Q0":
+                                                        meta["equipment"][item][
+                                                            items
+                                                        ] = (
+                                                            meta["equipment"][item][
+                                                                items
+                                                            ]
+                                                            / 100
+                                                        )
 
+                                                elif item == "wrinkle":
+                                                    if items in ["Rmax", "Rt"]:
+                                                        meta["equipment"][item][
+                                                            items
+                                                        ] = (
+                                                            meta["equipment"][item][
+                                                                items
+                                                            ]
+                                                            / 300
+                                                        )
+                                                    else:
+                                                        meta["equipment"][item][
+                                                            items
+                                                        ] = (
+                                                            meta["equipment"][item][
+                                                                items
+                                                            ]
+                                                            / 100
+                                                        )
+
+                                                elif item == "pigmentaion":
+                                                    meta["equipment"][item][items] = (
+                                                        meta["equipment"][item][items]
+                                                        / 300
+                                                    )
+
+                                                elif item == "pore":
+                                                    meta["equipment"][item][items] = (
+                                                        meta["equipment"][item][items]
+                                                        / 3000
+                                                    )
 
                                             item_list.append(
                                                 meta["equipment"][item][items]
@@ -250,7 +301,7 @@ class CustomDataset(Dataset):
                                             int,
                                         ]:
                                             meta["equipment"][item] = np.nan
-                                            
+
                                         else:
                                             if item == "moisture":
                                                 meta["equipment"][item] = (

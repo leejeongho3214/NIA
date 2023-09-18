@@ -116,14 +116,14 @@ class Model(object):
             "moisture": AverageMeter(),
             "wrinkle": AverageMeter(),
             "elasticity": AverageMeter(),
-            "pore": AverageMeter()
+            "pore": AverageMeter(),
         }
         self.log_acc = {
-            "moisture": AverageMeter(),
-            "elasticity": AverageMeter(),
+            "sagging": AverageMeter(),
             "wrinkle": AverageMeter(),
             "pore": AverageMeter(),
             "pigmentation": AverageMeter(),
+            "dryness": AverageMeter(),
         }
 
         self.equip_loss = {
@@ -171,18 +171,18 @@ class Model(object):
                         self.model_list[idx], self.args, self.epoch, idx, self.best_loss
                     )
                     count += 1
-                    
+
         if count == 0:
             self.update_c += 1
-        
-        else: 
+
+        else:
             self.update_c = 0
 
     def update_e(self, epoch):
         self.epoch = epoch
 
     def print_total(self):
-        if self.args.mode == 'class':
+        if self.args.mode == "class":
             print(
                 f"[{self.phase}] [Not Update -> {self.update_c}] pigmentation: {(self.log_acc['pigmentation'].avg * 100):.2f}% // wrinkle: {(self.log_acc['wrinkle'].avg * 100):.2f}% // sagging: {(self.log_acc['sagging'].avg * 100):.2f}% // pore: {(self.log_acc['pore'].avg * 100):.2f}% // dryness: {(self.log_acc['dryness'].avg * 100):.2f}%"
             )
@@ -190,7 +190,6 @@ class Model(object):
                 f"Epoch: {self.epoch} [Not Update -> {self.update_c}] [{self.phase}] pigmentation: {(self.log_acc['pigmentation'].avg * 100):.2f}% // wrinkle: {(self.log_acc['wrinkle'].avg * 100):.2f}% // sagging: {(self.log_acc['sagging'].avg * 100):.2f}% // pore: {(self.log_acc['pore'].avg * 100):.2f}% // dryness: {(self.log_acc['dryness'].avg * 100):.2f}%"
             )
         else:
-
             print(
                 f"[{self.phase}] [Not Update -> {self.update_c}] moisture: {(self.log_loss_test['moisture'].avg)}// wrinkle: {(self.log_loss_test['wrinkle'].avg)}// elasticity: {(self.log_loss_test['elasticity'].avg)}// pore: {(self.log_loss_test['pore'].avg)}"
             )
@@ -258,6 +257,7 @@ class Model(object):
                 f"\rEpoch: {self.epoch} [Val][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- > loss: {self.val_loss[self.m_idx].avg}",
                 end="",
             )
+
     def stop_early(self):
         if self.update_c > self.args.stop_early:
             return True
@@ -270,16 +270,15 @@ class Model(object):
             "moisture": AverageMeter(),
             "wrinkle": AverageMeter(),
             "elasticity": AverageMeter(),
-            "pore": AverageMeter()
+            "pore": AverageMeter(),
         }
         self.log_acc = {
-            "moisture": AverageMeter(),
-            "elasticity": AverageMeter(),
+            "sagging": AverageMeter(),
             "wrinkle": AverageMeter(),
             "pore": AverageMeter(),
             "pigmentation": AverageMeter(),
+            "dryness": AverageMeter(),
         }
-
 
     def class_loss(self, pred, label):
         num = 0
@@ -301,7 +300,7 @@ class Model(object):
         return loss
 
     def regression(self, pred, label):
-        loss = self.criterion(pred, label)
+        loss = self.criterion(pred, label.to(device))
         if self.phase == "train":
             self.log_loss[self.m_idx].update_train(loss, batch_size=pred.shape[0])
         else:
@@ -309,17 +308,42 @@ class Model(object):
 
         return loss
 
+    def match_img(self, vis_img, img):
+        col = self.num % (self.num_patch // 4)
+        row = self.num // (self.num_patch // 4)
+        vis_img[row * 128 : (row + 1) * 128, col * 128 : (col + 1) * 128] = img
+
+        return vis_img
+
     def save_img(self, iteration, patch_list):
         if iteration == 0 and self.epoch == 0:
-            num_patch = len(patch_list)
-            vis_img = np.zeros([128 * 2, 128 * (num_patch // 2), 3])
+            self.num_patch = len(patch_list) + 5
+            vis_img = np.zeros([128 * 5, 128 * 3, 3])
 
-            for idx, area_num in enumerate(patch_list):
-                col = idx % (num_patch // 2)
-                row = idx // (num_patch // 2)
-                vis_img[
-                    row * 128 : (row + 1) * 128, col * 128 : (col + 1) * 128
-                ] = patch_list[area_num][0][0].permute(1, 2, 0)
+            self.num = 0
+            for area_num in patch_list:
+                img = patch_list[area_num][0][0].permute(1, 2, 0)
+
+                if int(area_num) in [1, 7, 8]:
+                    l_img = img[:, :128]
+                    vis_img = self.match_img(vis_img, l_img)
+                    self.num += 1
+                    r_img = img[:, 128:]
+                    vis_img = self.match_img(vis_img, r_img)
+                    self.num += 1
+
+                elif int(area_num) in [3, 4]:
+                    l_img = img[:128, :]
+                    vis_img = self.match_img(vis_img, l_img)
+                    self.num += 1
+                    r_img = img[128:, :]
+                    vis_img = self.match_img(vis_img, r_img)
+                    self.num += 1
+
+                else:
+                    vis_img = self.match_img(vis_img, img)
+                    self.num += 1
+
             mkdir(f"vis/{self.args.mode}/{self.args.name}/{self.m_idx}")
             cv2.imwrite(
                 f"vis/{self.args.mode}/{self.args.name}/{self.m_idx}/epoch_{self.epoch}.jpg",
@@ -347,12 +371,23 @@ class Model(object):
         self.phase = "train"
         area_num = str(self.m_idx + 1)
         for iteration, patch_list in enumerate(self.train_loader):
-            img, label = patch_list[area_num][0].to(device), patch_list[area_num][1].to(
-                device
-            )
-
+            img, label = patch_list[area_num][0].to(device), patch_list[area_num][1]
             adjust_learning_rate(optimizer, self.epoch, self.args)
-            pred = self.model.to(device)(img)
+
+            if self.m_idx + 1 in [1, 7, 8]:
+                img_l = img[:, :, :, :128]
+                img_r = img[:, :, :, 128:]
+                pred = self.model.to(device)(img_l)
+                pred = self.model.to(device)(img_r) + pred
+
+            elif self.m_idx + 1 in [3, 4]:
+                img_l = img[:, :, :128, :]
+                img_r = img[:, :, 128:, :]
+                pred = self.model.to(device)(img_l)
+                pred = self.model.to(device)(img_r) + pred
+
+            else:
+                pred = self.model.to(device)(img)
 
             if self.args.mode == "class":
                 loss = self.class_loss(pred, label)
@@ -423,10 +458,23 @@ class Model(object):
             for iteration, patch_list in enumerate(self.valid_loader):
                 img, label = (
                     patch_list[area_num][0].to(device),
-                    patch_list[area_num][1].to(device),
+                    patch_list[area_num][1],
                 )
 
-                pred = self.model.to(device)(img)
+                if self.m_idx + 1 in [1, 7, 8]:
+                    img_l = img[:, :, :, :128]
+                    img_r = img[:, :, :, 128:]
+                    pred = self.model.to(device)(img_l)
+                    pred = self.model.to(device)(img_r) + pred
+
+                elif self.m_idx + 1 in [3, 4]:
+                    img_l = img[:, :, :128, :]
+                    img_r = img[:, :, 128:, :]
+                    pred = self.model.to(device)(img_l)
+                    pred = self.model.to(device)(img_r) + pred
+
+                else:
+                    pred = self.model.to(device)(img)
 
                 if self.args.mode == "class":
                     self.get_val_acc(pred, label)
@@ -442,7 +490,6 @@ class Model(object):
                     else:
                         self.valid_loss_print(iteration)
 
-
     def test(self):
         self.phase = "test"
         self.model = copy.deepcopy(self.model_list[self.m_idx])
@@ -452,10 +499,23 @@ class Model(object):
             for _, patch_list in enumerate(self.valid_loader):
                 img, label = (
                     patch_list[area_num][0].to(device),
-                    patch_list[area_num][1].to(device),
+                    patch_list[area_num][1],
                 )
 
-                pred = self.model.to(device)(img)
+                if self.m_idx + 1 in [1, 7, 8]:
+                    img_l = img[:, :, :, :128]
+                    img_r = img[:, :, :, 128:]
+                    pred = self.model.to(device)(img_l)
+                    pred = self.model.to(device)(img_r) + pred
+
+                elif self.m_idx + 1 in [3, 4]:
+                    img_l = img[:, :, :128, :]
+                    img_r = img[:, :, 128:, :]
+                    pred = self.model.to(device)(img_l)
+                    pred = self.model.to(device)(img_r) + pred
+
+                else:
+                    pred = self.model.to(device)(img)
 
                 if self.args.mode == "class":
                     self.get_test_acc(pred, label)
@@ -464,5 +524,4 @@ class Model(object):
                     nan_list = self.nan_detect(label)
                     idx_list = idx_list[idx_list != nan_list]
                     if len(idx_list) > 0:
-                        self.get_test_loss(pred[idx_list], label[idx_list], area_num)
-                
+                        self.get_test_loss(pred[idx_list], label[idx_list].to(device), area_num)
