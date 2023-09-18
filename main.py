@@ -102,6 +102,8 @@ def parse_args():
         type=int,
     )
 
+    parser.add_argument("--reset", action="store_true")
+
     args = parser.parse_args()
 
     return args
@@ -120,12 +122,9 @@ def main(args):
     log_path = os.path.join(args.loss_dir, args.mode, args.name)
     check_path = os.path.join(args.output_dir, args.mode, args.name)
 
-    mkdir(os.path.join(log_path))
-    writer = SummaryWriter(os.path.join(log_path))
-    mkdir(os.path.join(check_path))
-    logger = setup_logger(args.name, os.path.join(check_path), 0)
-    logger.info(args)
-
+    writer = SummaryWriter(log_path)
+    mkdir(log_path)
+    mkdir(check_path)
     model_num_class = (
         [15, 9, 9, 9, 12, 12, 5, 7]
         if args.mode == "class"
@@ -148,12 +147,19 @@ def main(args):
 
     if os.path.isfile(model_dict_path):
         print("Resuming~")
+
         for idx in resume_list:
             model_list[idx] = resume_checkpoint(
                 args,
                 model_list[idx],
                 os.path.join(check_path, f"{idx}", "state_dict.bin"),
             )
+    if args.reset:
+        if os.path.isfile(os.path.join(check_path, "log.txt")):
+            os.remove(os.path.join(check_path, "log.txt"))
+
+    logger = setup_logger(args.name, check_path, 0)
+    logger.info(args)
 
     train_dataset, val_dataset = build_dataset(args, logger)
 
@@ -196,8 +202,6 @@ def main(args):
         if resnet_model.stop_early():
             break
     writer.close()
-    
-    import cv2
 
 
 if __name__ == "__main__":

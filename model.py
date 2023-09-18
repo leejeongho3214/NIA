@@ -119,11 +119,11 @@ class Model(object):
             "pore": AverageMeter()
         }
         self.log_acc = {
-            "moisture": AverageMeter(),
-            "elasticity": AverageMeter(),
+            "sagging": AverageMeter(),
             "wrinkle": AverageMeter(),
             "pore": AverageMeter(),
             "pigmentation": AverageMeter(),
+            "dryness": AverageMeter(),
         }
 
         self.equip_loss = {
@@ -192,20 +192,18 @@ class Model(object):
         else:
 
             print(
-                f"[{self.phase}] [Not Update -> {self.update_c}] moisture: {(self.log_loss_test['moisture'].avg)}// wrinkle: {(self.log_loss_test['wrinkle'].avg)}// elasticity: {(self.log_loss_test['elasticity'].avg)}// pore: {(self.log_loss_test['pore'].avg)}"
+                f"[{self.phase}] [Not Update -> {self.update_c}] moisture: {(self.log_loss_test['moisture'].avg):.4f}// wrinkle: {(self.log_loss_test['wrinkle'].avg):.4f}// elasticity: {(self.log_loss_test['elasticity'].avg):.4f}// pore: {(self.log_loss_test['pore'].avg):.4f}"
             )
             self.logger.debug(
-                f"Epoch: {self.epoch} [Not Update -> {self.update_c}] [{self.phase}] moisture: {(self.log_loss_test['moisture'].avg)}// wrinkle: {(self.log_loss_test['wrinkle'].avg)}// elasticity: {(self.log_loss_test['elasticity'].avg)} // pore: {(self.log_acc['pore'].avg)}"
+                f"Epoch: {self.epoch} [Not Update -> {self.update_c}] [{self.phase}] moisture: {(self.log_loss_test['moisture'].avg):.4f}// wrinkle: {(self.log_loss_test['wrinkle'].avg):.4f}// elasticity: {(self.log_loss_test['elasticity'].avg):.4f} // pore: {(self.log_loss_test['pore'].avg):.4f}"
             )
 
     def train_print(self, iteration):
         if iteration == len(self.train_loader) - 1:
             print(
-                f"\rEpoch: {self.epoch} [Train][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.train_loader)}] ---- >  loss: {self.log_loss[self.m_idx].avg}"
+                f"\rEpoch: {self.epoch} [Train][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.train_loader)}] ---- >  loss: {(self.log_loss[self.m_idx].avg):.04f}"
             )
-            self.logger.debug(
-                f"Epoch: {self.epoch} [Train][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.train_loader)}] ---- >  loss: {self.log_loss[self.m_idx].avg}"
-            )
+
             self.writer.add_scalar(
                 f"train/{area_naming[f'{self.m_idx}']}",
                 self.log_loss[self.m_idx].avg,
@@ -215,7 +213,7 @@ class Model(object):
 
         else:
             print(
-                f"\rEpoch: {self.epoch} [Train][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.train_loader)}] ---- >  loss: {self.log_loss[self.m_idx].avg}",
+                f"\rEpoch: {self.epoch} [Train][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.train_loader)}] ---- >  loss: {(self.log_loss[self.m_idx].avg):.04f}",
                 end="",
             )
 
@@ -224,9 +222,7 @@ class Model(object):
             print(
                 f"\rEpoch: {self.epoch} [Val][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- >  acc: {(self.val_acc[self.m_idx].avg * 100):.2f}%"
             )
-            self.logger.debug(
-                f"Epoch: {self.epoch} [Val][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- >  acc: {(self.val_acc[self.m_idx].avg * 100):.2f}%"
-            )
+
             self.writer.add_scalar(
                 f"val/{area_naming[f'{self.m_idx}']}",
                 self.val_acc[self.m_idx].avg * 100,
@@ -242,10 +238,7 @@ class Model(object):
     def valid_loss_print(self, iteration):
         if iteration == len(self.valid_loader) - 1:
             print(
-                f"\rEpoch: {self.epoch} [Val][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- > loss: {self.val_loss[self.m_idx].avg}"
-            )
-            self.logger.debug(
-                f"Epoch: {self.epoch} [Val][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- > loss: {self.val_loss[self.m_idx].avg}"
+                f"\rEpoch: {self.epoch} [Val][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- > loss: {(self.val_loss[self.m_idx].avg):.04f}"
             )
             self.writer.add_scalar(
                 f"val/{area_naming[f'{self.m_idx}']}",
@@ -255,7 +248,7 @@ class Model(object):
 
         else:
             print(
-                f"\rEpoch: {self.epoch} [Val][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- > loss: {self.val_loss[self.m_idx].avg}",
+                f"\rEpoch: {self.epoch} [Val][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- > loss: {(self.val_loss[self.m_idx].avg):.04f}",
                 end="",
             )
     def stop_early(self):
@@ -273,11 +266,11 @@ class Model(object):
             "pore": AverageMeter()
         }
         self.log_acc = {
-            "moisture": AverageMeter(),
-            "elasticity": AverageMeter(),
+            "sagging": AverageMeter(),
             "wrinkle": AverageMeter(),
             "pore": AverageMeter(),
             "pigmentation": AverageMeter(),
+            "dryness": AverageMeter(),
         }
 
 
@@ -347,10 +340,14 @@ class Model(object):
         self.phase = "train"
         area_num = str(self.m_idx + 1)
         for iteration, patch_list in enumerate(self.train_loader):
-            img, label = patch_list[area_num][0].to(device), patch_list[area_num][1].to(
-                device
-            )
-
+            if type(patch_list[area_num][1]) == torch.Tensor:
+                label = patch_list[area_num][1].to(device)
+            else:
+                for name in patch_list[area_num][1]:
+                    patch_list[area_num][1][name] = patch_list[area_num][1][name].to(device)
+                label = patch_list[area_num][1]
+                
+            img= patch_list[area_num][0].to(device)
             adjust_learning_rate(optimizer, self.epoch, self.args)
             pred = self.model.to(device)(img)
 
@@ -374,7 +371,7 @@ class Model(object):
 
     def get_val_acc(self, pred, label):
         gt = (
-            torch.tensor(np.array([label[value].numpy() for value in label]))
+            torch.tensor(np.array([label[value].detach().cpu().numpy() for value in label]))
             .permute(1, 0)
             .to(device)
         )
@@ -390,7 +387,7 @@ class Model(object):
 
     def get_test_acc(self, pred, label):
         gt = (
-            torch.tensor(np.array([label[value].numpy() for value in label]))
+            torch.tensor(np.array([label[value].detach().cpu().numpy() for value in label]))
             .permute(1, 0)
             .to(device)
         )
@@ -421,11 +418,14 @@ class Model(object):
         area_num = str(self.m_idx + 1)
         with torch.no_grad():
             for iteration, patch_list in enumerate(self.valid_loader):
-                img, label = (
-                    patch_list[area_num][0].to(device),
-                    patch_list[area_num][1].to(device),
-                )
-
+                if type(patch_list[area_num][1]) == torch.Tensor:
+                    label = patch_list[area_num][1].to(device)
+                else:
+                    for name in patch_list[area_num][1]:
+                        patch_list[area_num][1][name] = patch_list[area_num][1][name].to(device)
+                    label = patch_list[area_num][1]
+                    
+                img= patch_list[area_num][0].to(device)
                 pred = self.model.to(device)(img)
 
                 if self.args.mode == "class":
@@ -450,11 +450,14 @@ class Model(object):
         self.model.eval()
         with torch.no_grad():
             for _, patch_list in enumerate(self.valid_loader):
-                img, label = (
-                    patch_list[area_num][0].to(device),
-                    patch_list[area_num][1].to(device),
-                )
-
+                if type(patch_list[area_num][1]) == torch.Tensor:
+                    label = patch_list[area_num][1].to(device)
+                else:
+                    for name in patch_list[area_num][1]:
+                        patch_list[area_num][1][name] = patch_list[area_num][1][name].to(device)
+                    label = patch_list[area_num][1]
+                    
+                img= patch_list[area_num][0].to(device)
                 pred = self.model.to(device)(img)
 
                 if self.args.mode == "class":
