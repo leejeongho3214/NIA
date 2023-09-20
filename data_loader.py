@@ -270,7 +270,7 @@ class CustomDataset(Dataset):
                         self.sub_path.append(area_list)
 
                 else:
-                    print(f"{os.path.join(self.img_path, equ_name, sub_fold)}는 제외됨")
+                    print(f"\033[94m{os.path.join(self.img_path, equ_name, sub_fold)}는 제외됨\033[0m")
 
     def __len__(self):
         return len(self.sub_path)
