@@ -28,7 +28,7 @@ def parse_args():
 
     parser.add_argument(
         "--img_path",
-        default="img",
+        default="dataset/img",
         type=str,
     )
 
@@ -53,7 +53,7 @@ def parse_args():
 
     parser.add_argument(
         "--json_path",
-        default="label",
+        default="dataset/label",
         type=str,
     )
 
@@ -102,6 +102,8 @@ def parse_args():
         type=int,
     )
 
+    parser.add_argument("--reset", action="store_true")
+
     args = parser.parse_args()
 
     return args
@@ -120,23 +122,24 @@ def main(args):
     log_path = os.path.join(args.loss_dir, args.mode, args.name)
     check_path = os.path.join(args.output_dir, args.mode, args.name)
 
-    mkdir(os.path.join(log_path))
-    writer = SummaryWriter(os.path.join(log_path))
-    mkdir(os.path.join(check_path))
-    logger = setup_logger(args.name, os.path.join(check_path), 0)
-    logger.info(args)
+    writer = SummaryWriter(log_path)
+    mkdir(log_path)
+    mkdir(check_path)
+    ## Make the directories for save
 
-    model_num_class = (
-        [15, 9, 9, 9, 12, 12, 5, 7]
-        if args.mode == "class"
-        else [15, np.nan, 8, 8, 16, 16, np.nan, 15]
-    )
     args.best_loss = (
         [0 for _ in range(8)] if args.mode == "class" else [np.inf for _ in range(8)]
     )
 
     model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
     model_list = [copy.deepcopy(model) for _ in range(8)]
+    # Define 8 resnet models for each region
+
+    model_num_class = (
+        [15, 9, 9, 9, 12, 12, 5, 7]
+        if args.mode == "class"
+        else [15, np.nan, 8, 8, 16, 16, np.nan, 15]
+    )
     resume_list = list()
     for idx, item in enumerate(model_num_class):
         if not np.isnan(item):
@@ -144,16 +147,32 @@ def main(args):
                 model_list[idx].fc.in_features, model_num_class[idx]
             )
             resume_list.append(idx)
+
+        model_num_class = (
+            [15, 9, 9, 9, 12, 12, 5, 7]
+            if args.mode == "class"
+            else [15, np.nan, 8, 8, 16, 16, np.nan, 15]
+        )
+    ## Adjust the number of output in model for each region image
+
     model_dict_path = os.path.join(check_path, "0", "state_dict.bin")
 
     if os.path.isfile(model_dict_path):
-        print("Resuming~")
+        print(f"\033[92mResuming......{model_dict_path}\033[0m")
+
         for idx in resume_list:
             model_list[idx] = resume_checkpoint(
                 args,
                 model_list[idx],
                 os.path.join(check_path, f"{idx}", "state_dict.bin"),
             )
+    if args.reset:
+        if os.path.isfile(os.path.join(check_path, "log.txt")):
+            os.remove(os.path.join(check_path, "log.txt"))
+    # If there is check-point, load that
+
+    logger = setup_logger(args.name, check_path)
+    logger.info(args)
 
     train_dataset, val_dataset = build_dataset(args, logger)
 
@@ -169,20 +188,27 @@ def main(args):
         num_workers=args.num_workers,
         shuffle=False,
     )
+    # Data Loader
 
     resnet_model = Model(
         args, model_list, trainset_loader, valset_loader, logger, writer
     )
 
     for epoch in range(args.load_epoch, args.epoch):
+        resnet_model.update_e(epoch + 1) if args.load_epoch else None
+
         for model_idx in range(8):
             if np.isnan(model_num_class[model_idx]):
                 continue
+            # In regression task, there are no images for 미간, 입술, 턱
+
             resnet_model.choice(model_idx)
+            # Change the model for each region
             resnet_model.train()
             resnet_model.valid()
 
         resnet_model.update_m(model_num_class)
+        # If the model's acc is higher than best acc, it saves this model
         for model_idx in range(8):
             if np.isnan(model_num_class[model_idx]):
                 continue
@@ -190,13 +216,13 @@ def main(args):
             resnet_model.test()
 
         resnet_model.print_total()
+        # Show the result for each value, such as pigmentation and pore, by averaging all of them
         resnet_model.update_e(epoch + 1)
         resnet_model.reset_log()
 
         if resnet_model.stop_early():
             break
     writer.close()
-
 
 
 if __name__ == "__main__":

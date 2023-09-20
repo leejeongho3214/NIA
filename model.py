@@ -77,9 +77,13 @@ def save_checkpoint(model, args, epoch, m_idx, best_loss):
             "epoch": epoch,
             "best_loss": best_loss,
         },
-        os.path.join(checkpoint_dir, "state_dict.bin"),
+        os.path.join(checkpoint_dir, "temp_file.bin"),
     )
 
+    os.rename(
+        os.path.join(checkpoint_dir, "temp_file.bin"),
+        os.path.join(checkpoint_dir, "state_dict.bin"),
+    )
     return checkpoint_dir
 
 
@@ -90,6 +94,7 @@ def resume_checkpoint(args, model, path):
     model.load_state_dict(state_dict["model_state"], strict=False)
     del state_dict
     args.load_epoch = epoch
+
     args.best_loss = best_loss
 
     return model
@@ -126,6 +131,21 @@ class Model(object):
             "dryness": AverageMeter(),
         }
 
+        self.keep_acc = {
+            "sagging": 0,
+            "wrinkle": 0,
+            "pore": 0,
+            "pigmentation": 0,
+            "dryness": 0,
+        }
+
+        self.keep_loss = {
+            "moisture": 0,
+            "wrinkle": 0,
+            "elasticity": 0,
+            "pore": 0,
+        }
+
         self.equip_loss = {
             "1": {"moisture": 1, "elasticity": 14},
             "3": {"wrinkle": 8},
@@ -154,7 +174,7 @@ class Model(object):
         if self.args.mode == "class":
             for idx in range(8):
                 if self.best_acc[idx] < self.val_acc[idx].avg:
-                    self.best_acc[idx] = self.val_acc[idx].avg
+                    self.best_acc[idx] = round(self.val_acc[idx].avg, 2)
                     self.model_list[idx] = copy.deepcopy(self.temp_model_list[idx])
                     save_checkpoint(
                         self.model_list[idx], self.args, self.epoch, idx, self.best_acc
@@ -165,7 +185,7 @@ class Model(object):
                 if np.isnan(value):
                     continue
                 if self.best_loss[idx] > self.val_loss[idx].avg:
-                    self.best_loss[idx] = self.val_loss[idx].avg
+                    self.best_loss[idx] = round(self.val_loss[idx].avg.item(), 4)
                     self.model_list[idx] = copy.deepcopy(self.temp_model_list[idx])
                     save_checkpoint(
                         self.model_list[idx], self.args, self.epoch, idx, self.best_loss
@@ -181,30 +201,51 @@ class Model(object):
     def update_e(self, epoch):
         self.epoch = epoch
 
+    def acc_avg(self, name):
+        return round(self.log_acc[name].avg * 100, 2)
+
+    def loss_avg(self, name):
+        return round(self.log_loss_test[name].avg, 4)
+
+    def up_and_down(self, name, color="\033[95m", c_color="\033[0m"):
+        if self.args.mode == "class":
+            sub = (self.log_acc[name].avg * 100) - self.keep_acc[name]
+            value = round(sub, 2)
+            result = f"{color}+{value}%{c_color}" if value != 0 else "No change"
+
+        else:
+            sub = (self.log_loss_test[name].avg) - self.keep_loss[name]
+            value = round(sub, 4)
+            result = f"{color}-{value}{c_color}" if value != 0 else "No change"
+
+        return result
+
     def print_total(self):
         if self.args.mode == "class":
             print(
-                f"[{self.phase}] [Not Update -> {self.update_c}] pigmentation: {(self.log_acc['pigmentation'].avg * 100):.2f}% // wrinkle: {(self.log_acc['wrinkle'].avg * 100):.2f}% // sagging: {(self.log_acc['sagging'].avg * 100):.2f}% // pore: {(self.log_acc['pore'].avg * 100):.2f}% // dryness: {(self.log_acc['dryness'].avg * 100):.2f}%"
+                f"[{self.phase}] [Early Stop: {self.update_c}/{self.args.stop_early}] pigmentation: {self.acc_avg('pigmentation')}%({self.up_and_down('pigmentation')}) // wrinkle: {self.acc_avg('wrinkle')}%({self.up_and_down('wrinkle')}) // sagging: {self.acc_avg('sagging')}%({self.up_and_down('sagging')}) // pore: {self.acc_avg('pore')}%({self.up_and_down('pore')}) // dryness: {self.acc_avg('dryness')}%({self.up_and_down('dryness')})"
             )
             self.logger.debug(
-                f"Epoch: {self.epoch} [Not Update -> {self.update_c}] [{self.phase}] pigmentation: {(self.log_acc['pigmentation'].avg * 100):.2f}% // wrinkle: {(self.log_acc['wrinkle'].avg * 100):.2f}% // sagging: {(self.log_acc['sagging'].avg * 100):.2f}% // pore: {(self.log_acc['pore'].avg * 100):.2f}% // dryness: {(self.log_acc['dryness'].avg * 100):.2f}%"
+                f"Epoch: {self.epoch} [Early Stop: {self.update_c}/{self.args.stop_early}] pigmentation: {self.acc_avg('pigmentation')}%({self.up_and_down('pigmentation', color ='', c_color='')}) // wrinkle: {self.acc_avg('wrinkle')}%({self.up_and_down('wrinkle', color ='', c_color='')}) // sagging: {self.acc_avg('sagging')}%({self.up_and_down('sagging', color ='', c_color='')}) // pore: {self.acc_avg('pore')}%({self.up_and_down('pore', color ='', c_color='')}) // dryness: {self.acc_avg('dryness')}%({self.up_and_down('dryness', color ='', c_color='')})"
             )
+            for name in self.log_acc:
+                self.keep_acc[name] = self.log_acc[name].avg * 100
         else:
             print(
-                f"[{self.phase}] [Not Update -> {self.update_c}] moisture: {(self.log_loss_test['moisture'].avg)}// wrinkle: {(self.log_loss_test['wrinkle'].avg)}// elasticity: {(self.log_loss_test['elasticity'].avg)}// pore: {(self.log_loss_test['pore'].avg)}"
+                f"[{self.phase}] [Early Stop: {self.update_c}/{self.args.stop_early}] moisture: {self.loss_avg('moisture')}({self.up_and_down('moisture')}) // wrinkle: {self.loss_avg('wrinkle')}({self.up_and_down('wrinkle')}) // elasticity: {self.loss_avg('elasticity')}({self.up_and_down('elasticity')}) // pore: {self.loss_avg('pore')}({self.up_and_down('pore')})"
             )
             self.logger.debug(
-                f"Epoch: {self.epoch} [Not Update -> {self.update_c}] [{self.phase}] moisture: {(self.log_loss_test['moisture'].avg)}// wrinkle: {(self.log_loss_test['wrinkle'].avg)}// elasticity: {(self.log_loss_test['elasticity'].avg)} // pore: {(self.log_acc['pore'].avg)}"
+                f"Epoch: {self.epoch} [Early Stop: {self.update_c}/{self.args.stop_early}] moisture: {self.loss_avg('moisture')}({self.up_and_down('moisture', color = '', c_color='')}) // wrinkle: {self.loss_avg('wrinkle')}({self.up_and_down('wrinkle', color = '', c_color='')}) // elasticity: {self.loss_avg('elasticity')}({self.up_and_down('elasticity', color = '', c_color='')}) // pore: {self.loss_avg('pore')} ({self.up_and_down('pore', color = '', c_color='')})"
             )
+            for name in self.log_loss_test:
+                self.keep_loss[name] = self.log_loss_test[name].avg
 
     def train_print(self, iteration):
         if iteration == len(self.train_loader) - 1:
             print(
-                f"\rEpoch: {self.epoch} [Train][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.train_loader)}] ---- >  loss: {self.log_loss[self.m_idx].avg}"
+                f"\rEpoch: {self.epoch} [Train][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.train_loader)}] ---- >  loss: {(self.log_loss[self.m_idx].avg):.04f}"
             )
-            self.logger.debug(
-                f"Epoch: {self.epoch} [Train][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.train_loader)}] ---- >  loss: {self.log_loss[self.m_idx].avg}"
-            )
+
             self.writer.add_scalar(
                 f"train/{area_naming[f'{self.m_idx}']}",
                 self.log_loss[self.m_idx].avg,
@@ -214,7 +255,7 @@ class Model(object):
 
         else:
             print(
-                f"\rEpoch: {self.epoch} [Train][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.train_loader)}] ---- >  loss: {self.log_loss[self.m_idx].avg}",
+                f"\rEpoch: {self.epoch} [Train][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.train_loader)}] ---- >  loss: {(self.log_loss[self.m_idx].avg):.04f}",
                 end="",
             )
 
@@ -223,9 +264,7 @@ class Model(object):
             print(
                 f"\rEpoch: {self.epoch} [Val][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- >  acc: {(self.val_acc[self.m_idx].avg * 100):.2f}%"
             )
-            self.logger.debug(
-                f"Epoch: {self.epoch} [Val][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- >  acc: {(self.val_acc[self.m_idx].avg * 100):.2f}%"
-            )
+
             self.writer.add_scalar(
                 f"val/{area_naming[f'{self.m_idx}']}",
                 self.val_acc[self.m_idx].avg * 100,
@@ -241,10 +280,7 @@ class Model(object):
     def valid_loss_print(self, iteration):
         if iteration == len(self.valid_loader) - 1:
             print(
-                f"\rEpoch: {self.epoch} [Val][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- > loss: {self.val_loss[self.m_idx].avg}"
-            )
-            self.logger.debug(
-                f"Epoch: {self.epoch} [Val][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- > loss: {self.val_loss[self.m_idx].avg}"
+                f"\rEpoch: {self.epoch} [Val][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- > loss: {(self.val_loss[self.m_idx].avg):.04f}"
             )
             self.writer.add_scalar(
                 f"val/{area_naming[f'{self.m_idx}']}",
@@ -254,7 +290,7 @@ class Model(object):
 
         else:
             print(
-                f"\rEpoch: {self.epoch} [Val][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- > loss: {self.val_loss[self.m_idx].avg}",
+                f"\rEpoch: {self.epoch} [Val][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- > loss: {(self.val_loss[self.m_idx].avg):.04f}",
                 end="",
             )
 
@@ -286,12 +322,10 @@ class Model(object):
         for name in label:
             gt = F.one_hot(
                 label[name].type(torch.int64), num_classes=class_num_list[name]
-            )
+            ).to(device)
             pred_p = softmax(pred[:, num : num + class_num_list[name]])
             num += class_num_list[name]
-            loss += self.criterion(
-                pred_p.type(torch.float), gt.type(torch.float).to(device)
-            )
+            loss += self.criterion(pred_p.type(torch.float), gt.type(torch.float))
 
         self.log_loss[self.m_idx].update_train(
             loss, batch_size=gt.shape[0]
@@ -371,7 +405,16 @@ class Model(object):
         self.phase = "train"
         area_num = str(self.m_idx + 1)
         for iteration, patch_list in enumerate(self.train_loader):
-            img, label = patch_list[area_num][0].to(device), patch_list[area_num][1]
+            if type(patch_list[area_num][1]) == torch.Tensor:
+                label = patch_list[area_num][1].to(device)
+            else:
+                for name in patch_list[area_num][1]:
+                    patch_list[area_num][1][name] = patch_list[area_num][1][name].to(
+                        device
+                    )
+                label = patch_list[area_num][1]
+
+            img = patch_list[area_num][0].to(device)
             adjust_learning_rate(optimizer, self.epoch, self.args)
 
             if self.m_idx + 1 in [1, 7, 8]:
@@ -409,7 +452,9 @@ class Model(object):
 
     def get_val_acc(self, pred, label):
         gt = (
-            torch.tensor(np.array([label[value].numpy() for value in label]))
+            torch.tensor(
+                np.array([label[value].detach().cpu().numpy() for value in label])
+            )
             .permute(1, 0)
             .to(device)
         )
@@ -425,7 +470,9 @@ class Model(object):
 
     def get_test_acc(self, pred, label):
         gt = (
-            torch.tensor(np.array([label[value].numpy() for value in label]))
+            torch.tensor(
+                np.array([label[value].detach().cpu().numpy() for value in label])
+            )
             .permute(1, 0)
             .to(device)
         )

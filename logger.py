@@ -79,24 +79,23 @@ class FileHandler(StreamHandler):
         return '<%s %s (%s)>' % (self.__class__.__name__, self.baseFilename, level)
 
 
-def setup_logger(name, save_dir, distributed_rank, filename="log.txt"):
+def setup_logger(name, save_dir, filename="log.txt"):
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
-    # don't log results for the non-master process
-    if distributed_rank > 0:
-        return logger
+
     ch = logging.StreamHandler(stream=sys.stdout)
-    # ch.terminator = ''
     ch.setLevel(logging.INFO)
-    formatter = logging.Formatter('\r\033[95m'+"%(asctime)s\033[0m  %(message)s") ## Remove "%(name)s %(levelname)s:"
-    ch.setFormatter(formatter)
+    formatter1 = logging.Formatter('\r\033[95m'+"%(asctime)s\033[0m  %(message)s") 
+    formatter2 = logging.Formatter("%(asctime)s %(message)s")
+    ch.setFormatter(formatter1)
     logger.propagate = False
     logger.addHandler(ch)
     
     if save_dir:
-        fh = FileHandler(os.path.join(save_dir, filename))
+        fh = FileHandler(os.path.join(save_dir, filename), encoding='utf-8', mode = 'at')
         fh.setLevel(logging.DEBUG)
-        fh.setFormatter(formatter)
+        fh.setFormatter(formatter2)
         logger.addHandler(fh)
+
 
     return logger
