@@ -101,13 +101,14 @@ def resume_checkpoint(args, model, path):
 
 
 class Model(object):
-    def __init__(self, args, model_list, train_loader, valid_loader, logger, writer):
+    def __init__(self, args, model_list, train_loader, valid_loader, testset_loader, logger, writer):
         super(Model, self).__init__()
         self.args = args
         self.model_list = model_list
         self.temp_model_list = [None for _ in range(8)]
         self.train_loader = train_loader
         self.valid_loader = valid_loader
+        self.test_loader = testset_loader
         self.best_acc = args.best_loss.copy()
         self.best_loss = args.best_loss.copy()
 
@@ -211,12 +212,11 @@ class Model(object):
         if self.args.mode == "class":
             sub = (self.log_acc[name].avg * 100) - self.keep_acc[name]
             value = round(sub, 2)
-            result = f"{color}+{value}%{c_color}" if value != 0 else "No change"
-
+            result = f"{color}+{value}{c_color}%" if value > 0 else "No change" if value == 0 else f"{color}{value}{c_color}%"
         else:
             sub = (self.log_loss_test[name].avg) - self.keep_loss[name]
             value = round(sub, 4)
-            result = f"{color}-{value}{c_color}" if value != 0 else "No change"
+            result = f"{color}+{value}{c_color}" if value > 0 else "No change" if value == 0 else f"{color}{value}{c_color}"
 
         return result
 
@@ -496,7 +496,7 @@ class Model(object):
         area_num = str(self.m_idx + 1)
         self.model.eval()
         with torch.no_grad():
-            for _, patch_list in enumerate(self.valid_loader):
+            for _, patch_list in enumerate(self.test_loader):
                 if type(patch_list[area_num][1]) == torch.Tensor:
                     label = patch_list[area_num][1].to(device)
                 else:

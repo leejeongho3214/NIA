@@ -105,16 +105,16 @@ def parse_args():
 
 
 def build_dataset(args, logger):
-    train_dataset, val_dataset = random_split(
-        CustomDataset(args), [0.9, 0.1], generator=torch.Generator().manual_seed(523)
+    _, _, test_dataset = random_split(
+        CustomDataset(args), [0.8, 0.1, 0.1], generator=torch.Generator().manual_seed(523)
     )
 
     if logger is not None:
         logger.info(
-            f"Train Dataset => {len(train_dataset)} // Valid Dataset => {len(val_dataset)}"
+            f"Train Dataset => {len(test_dataset)} // Valid Dataset => {len(test_dataset)}"
         )
 
-    return train_dataset, val_dataset
+    return test_dataset
  
 
 def main(args):
@@ -152,16 +152,16 @@ def main(args):
     else:
         assert 0, "Check the check-point path, there's not any file in that"
 
-    _, val_dataset = build_dataset(args, None)
+    _, _, test_dataset = build_dataset(args, None)
 
-    valset_loader = data.DataLoader(
-        dataset=val_dataset,
+    testset_loader = data.DataLoader(
+        dataset=test_dataset,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         shuffle=False,
     )
 
-    resnet_model = Model_test(args, model_list, valset_loader)
+    resnet_model = Model_test(args, model_list, testset_loader)
 
     for model_idx in range(8):
         if np.isnan(model_num_class[model_idx]):
