@@ -158,7 +158,7 @@ def main(args):
 
     model_dict_path = os.path.join(check_path, "0", "state_dict.bin")
 
-    if os.path.isfile(model_dict_path) or not args.reset:
+    if os.path.isfile(model_dict_path) or args.reset:
         print(f"\033[92mResuming......{model_dict_path}\033[0m")
 
         for idx in resume_list:
