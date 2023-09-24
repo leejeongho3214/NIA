@@ -30,14 +30,14 @@ class_num_list = {
 
 
 area_naming = {
-    "0": "이마",
-    "1": "미간",
-    "2": "왼쪽눈가",
-    "3": "오른쪽눈가",
-    "4": "왼쪽볼",
-    "5": "오른쪽볼",
-    "6": "입술",
-    "7": "턱",
+    "0": "forearm",
+    "1": "glabellus",
+    "2": "l_peroucular",
+    "3": "r_peroucular",
+    "4": "l_cheek",
+    "5": "r_cheek",
+    "6": "lip",
+    "7": "chin",
 }
 
 
@@ -116,17 +116,15 @@ class CustomDataset(Dataset):
                                 )
                                 continue
 
-                            patch_img = np.zeros(
-                                [args.res, args.res, 3], dtype=np.uint8
-                            )
+                            # if args.double:
+                            patch_img = self.make_double(idx_area, args, n_patch_img)
 
-                            if args.double:
-                                patch_img = self.make_double(idx_area, args, patch_img)
-
-                            else:
-                                patch_img[
-                                    : n_patch_img.shape[0], : n_patch_img.shape[1]
-                                ] = n_patch_img
+                            # else:
+                            #     patch_img = np.zeros(
+                            #         [args.res, args.res, 3], dtype=np.uint8
+                            #     )
+                            #     patch_img[
+                            #         : n_patch_img.shape[0], : n_patch_img.shape[1]] = n_patch_img
 
                             pil_img = Image.fromarray(patch_img)
                             patch_img = self.transform["train"](pil_img)
@@ -144,7 +142,7 @@ class CustomDataset(Dataset):
                                 label_data = torch.tensor(item_list)
 
                             area_list[f"{idx_area}"] = [patch_img, label_data]
-
+                        
                         self.sub_path.append(area_list)
 
                 else:
@@ -158,42 +156,55 @@ class CustomDataset(Dataset):
     def __getitem__(self, idx):
         return self.sub_path[idx]
 
-    def make_double(self, idx_area, args, patch_img):
+    def make_double(self, idx_area, args, n_patch_img):
         if idx_area in [1, 7, 8]:
-            if n_patch_img.shape[0] * 2 > args.res:
-                r_value = n_patch_img.shape[0] / (args.res / 2)
-                n_patch_img = cv2.resize(
+            patch_img = np.zeros((128, 256, 3), dtype=np.uint8)
+            if n_patch_img.shape[0] * 2 > 128:
+                reduction_value = 64 / n_patch_img.shape[0]
+                patch = cv2.resize(
                     n_patch_img,
                     (
-                        int(n_patch_img.shape[1] / r_value),
-                        int(n_patch_img.shape[0] / r_value),
+                        int(128 * 2 * reduction_value),
+                        int(n_patch_img.shape[0] * 2 * reduction_value),
                     ),
                 )
-            patch_img[: n_patch_img.shape[0], : n_patch_img.shape[1]] = n_patch_img
-            patch_img[
-                n_patch_img.shape[0] : n_patch_img.shape[0] * 2,
-                : n_patch_img.shape[1],
-            ] = n_patch_img
+                patch_img[:, : int(128 * 2 * reduction_value)] = patch
+            else:
+                patch = cv2.resize(
+                    n_patch_img,
+                    (128 * 2, n_patch_img.shape[0] * 2),
+                )
+                patch_img[: n_patch_img.shape[0] * 2] = patch
+
         elif idx_area in [3, 4]:
-            if n_patch_img.shape[1] * 2 > args.res:
-                r_value = n_patch_img.shape[1] / (args.res / 2)
-                n_patch_img = cv2.resize(
+            patch_img = np.zeros((256, 128, 3), dtype=np.uint8)
+
+            if n_patch_img.shape[1] * 2 > 128:
+                reduction_value = 64 / n_patch_img.shape[1]
+                patch = cv2.resize(
                     n_patch_img,
                     (
-                        int(n_patch_img.shape[1] / r_value),
-                        int(n_patch_img.shape[0] / r_value),
+                        int(n_patch_img.shape[1] * 2 * reduction_value),
+                        int(128 * 2 * reduction_value),
                     ),
                 )
+                patch_img[: int(128 * 2 * reduction_value)] = patch
+
+            else:
+                patch = cv2.resize(
+                    n_patch_img,
+                    (
+                        n_patch_img.shape[1] * 2,
+                        128 * 2,
+                    ),
+                )
+                patch_img[:, : n_patch_img.shape[1] * 2] = patch
+
+        else:
+            patch_img = np.zeros((128, 128, 3), dtype=np.uint8)
             patch_img[: n_patch_img.shape[0], : n_patch_img.shape[1]] = n_patch_img
 
-            patch_img[
-                : n_patch_img.shape[0],
-                n_patch_img.shape[1] : n_patch_img.shape[1] * 2,
-            ] = n_patch_img
-            if idx_area == 3:
-                plt.imshow(patch_img)
-        else:
-            patch_img[: n_patch_img.shape[0], : n_patch_img.shape[1]] = n_patch_img
+        return patch_img
 
     def load_img(self, img_name, angle, idx_area, equ_name, img, args):
         json_name = "_".join(img_name.split("_")[:2]) + f"_{angle}_{idx_area:02d}.json"
@@ -248,7 +259,6 @@ class CustomDataset(Dataset):
                         meta["equipment"][item][items] = np.nan
 
                     else:
-
                         if item == "wrinkle":
                             meta["equipment"][item][items] = (
                                 meta["equipment"][item][items] / 100

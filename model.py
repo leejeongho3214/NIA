@@ -176,6 +176,12 @@ class Model(object):
         self.update_c = 0
 
     def choice(self, m_idx):
+        if m_idx in [3, 5]:
+            m_idx -= 1
+            self.flag = True    
+        else:
+            self.flag = False
+        
         self.model = copy.deepcopy(self.model_list[m_idx])
         self.m_idx = m_idx
 
@@ -262,56 +268,60 @@ class Model(object):
                 self.keep_loss[name] = self.log_loss_test[name].avg
 
     def train_print(self, iteration):
+        
+        area_num = self.m_idx + 1 if self.flag else self.m_idx
         if iteration == len(self.train_loader) - 1:
             print(
-                f"\rEpoch: {self.epoch} [Train][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.train_loader)}] ---- >  loss: {(self.log_loss[self.m_idx].avg):.04f}"
+                f"\rEpoch: {self.epoch} [Train][{area_naming[f'{area_num}']}][{iteration}/{len(self.train_loader)}] ---- >  loss: {(self.log_loss[area_num].avg):.04f}"
             )
 
             self.writer.add_scalar(
-                f"train/{area_naming[f'{self.m_idx}']}",
-                self.log_loss[self.m_idx].avg,
+                f"train/{area_naming[f'{area_num}']}",
+                self.log_loss[area_num].avg,
                 self.epoch,
             )
-            self.temp_model_list[self.m_idx] = self.model
+            self.temp_model_list[area_num] = self.model
 
         else:
             print(
-                f"\rEpoch: {self.epoch} [Train][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.train_loader)}] ---- >  loss: {(self.log_loss[self.m_idx].avg):.04f}",
+                f"\rEpoch: {self.epoch} [Train][{area_naming[f'{area_num}']}][{iteration}/{len(self.train_loader)}] ---- >  loss: {(self.log_loss[area_num].avg):.04f}",
                 end="",
             )
 
     def valid_acc_print(self, iteration):
+        area_num = self.m_idx + 1 if self.flag else self.m_idx
         if iteration == len(self.valid_loader) - 1:
             print(
-                f"\rEpoch: {self.epoch} [Val][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- >  acc: {(self.val_acc[self.m_idx].avg * 100):.2f}%"
+                f"\rEpoch: {self.epoch} [Val][{area_naming[f'{area_num}']}][{iteration}/{len(self.valid_loader)}] ---- >  acc: {(self.val_acc[area_num].avg * 100):.2f}%"
             )
 
             self.writer.add_scalar(
-                f"val/{area_naming[f'{self.m_idx}']}",
-                self.val_acc[self.m_idx].avg * 100,
+                f"val/{area_naming[f'{area_num}']}",
+                self.val_acc[area_num].avg * 100,
                 self.epoch,
             )
 
         else:
             print(
-                f"\rEpoch: {self.epoch} [Val][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- >  acc: {(self.val_acc[self.m_idx].avg * 100):.2f}%",
+                f"\rEpoch: {self.epoch} [Val][{area_naming[f'{area_num}']}][{iteration}/{len(self.valid_loader)}] ---- >  acc: {(self.val_acc[area_num].avg * 100):.2f}%",
                 end="",
             )
 
     def valid_loss_print(self, iteration):
+        area_num = self.m_idx + 1 if self.flag else self.m_idx
         if iteration == len(self.valid_loader) - 1:
             print(
-                f"\rEpoch: {self.epoch} [Val][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- > loss: {(self.val_loss[self.m_idx].avg):.04f}"
+                f"\rEpoch: {self.epoch} [Val][{area_naming[f'{area_num}']}][{iteration}/{len(self.valid_loader)}] ---- > loss: {(self.val_loss[area_num].avg):.04f}"
             )
             self.writer.add_scalar(
-                f"val/{area_naming[f'{self.m_idx}']}",
-                self.val_loss[self.m_idx].avg,
+                f"val/{area_naming[f'{area_num}']}",
+                self.val_loss[area_num].avg,
                 self.epoch,
             )
 
         else:
             print(
-                f"\rEpoch: {self.epoch} [Val][{area_naming[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- > loss: {(self.val_loss[self.m_idx].avg):.04f}",
+                f"\rEpoch: {self.epoch} [Val][{area_naming[f'{area_num}']}][{iteration}/{len(self.valid_loader)}] ---- > loss: {(self.val_loss[area_num].avg):.04f}",
                 end="",
             )
 
@@ -355,7 +365,7 @@ class Model(object):
         return loss
 
     def regression(self, pred, label):
-        loss = self.criterion(pred, label)
+        loss = self.criterion(pred, label.to(device))
         if self.phase == "train":
             self.log_loss[self.m_idx].update_train(loss, batch_size=pred.shape[0])
         else:
@@ -363,17 +373,101 @@ class Model(object):
 
         return loss
 
+    def match_img(self, vis_img, img):
+        col = self.num % (self.num_patch // 4)
+        row = self.num // (self.num_patch // 4)
+        vis_img[row * 256 : (row + 1) * 256, col * 256 : (col + 1) * 256] = img
+
+        return vis_img
+
     def save_img(self, iteration, patch_list):
         if iteration == 0 and self.epoch == 0:
-            num_patch = len(patch_list)
-            vis_img = np.zeros([128 * 2, 128 * (num_patch // 2), 3])
+            self.num_patch = len(patch_list) + 5
+            if self.args.mode == "class":
+                vis_img = np.zeros([256 * 5, 256 * 3, 3])
+            else:
+                vis_img = np.zeros([256 * 5, 256 * 2, 3])
 
-            for idx, area_num in enumerate(patch_list):
-                col = idx % (num_patch // 2)
-                row = idx // (num_patch // 2)
-                vis_img[
-                    row * 128 : (row + 1) * 128, col * 128 : (col + 1) * 128
-                ] = patch_list[area_num][0][0].permute(1, 2, 0)
+            self.num = 0
+            for area_num in patch_list:
+                img = patch_list[area_num][0][0].permute(1, 2, 0)
+
+                if int(area_num) in [1, 7, 8]:
+                    l_img = (img[:, :128] * 255).numpy().astype("uint8")
+                    l_img = cv2.resize(l_img, (256, 256))
+                    cv2.putText(
+                        l_img,
+                        f"{area_naming[str(int(area_num)-1)]}",
+                        (10, 25),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.7,
+                        (0, 255, 0),
+                        2,
+                    )
+                    l_img = l_img / 255.0
+                    vis_img = self.match_img(vis_img, l_img)
+                    self.num += 1
+                    r_img = (img[:, 128:] * 255).numpy().astype("uint8")
+                    r_img = cv2.resize(r_img, (256, 256))
+                    r_img = r_img / 255.0
+                    cv2.putText(
+                        r_img,
+                        f"{area_naming[str(int(area_num)-1)]}",
+                        (10, 25),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.7,
+                        (0, 255, 0),
+                        2,
+                    )
+                    vis_img = self.match_img(vis_img, r_img)
+                    self.num += 1
+
+                elif int(area_num) in [3, 4]:
+                    l_img = (img[:128] * 255).numpy().astype("uint8")
+                    l_img = cv2.resize(l_img, (256, 256))
+                    l_img = l_img / 255.0
+                    cv2.putText(
+                        l_img,
+                        f"{area_naming[str(int(area_num)-1)]}",
+                        (10, 25),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.7,
+                        (0, 255, 0),
+                        2,
+                    )
+                    vis_img = self.match_img(vis_img, l_img)
+                    self.num += 1
+                    r_img = (img[128:] * 255).numpy().astype("uint8")
+                    r_img = cv2.resize(r_img, (256, 256))
+                    r_img = r_img / 255.0
+                    cv2.putText(
+                        r_img,
+                        f"{area_naming[str(int(area_num)-1)]}",
+                        (10, 25),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.7,
+                        (0, 255, 0),
+                        2,
+                    )
+                    vis_img = self.match_img(vis_img, r_img)
+                    self.num += 1
+
+                else:
+                    img = (img[:, :128] * 255).numpy().astype("uint8")
+                    img = cv2.resize(img, (256, 256))
+                    img = img / 255.0
+                    cv2.putText(
+                        img,
+                        f"{area_naming[str(int(area_num)-1)]}",
+                        (10, 25),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.7,
+                        (0, 255, 0),
+                        2,
+                    )
+                    vis_img = self.match_img(vis_img, img)
+                    self.num += 1
+
             mkdir(f"vis/{self.args.mode}/{self.args.name}/{self.m_idx}")
             cv2.imwrite(
                 f"vis/{self.args.mode}/{self.args.name}/{self.m_idx}/epoch_{self.epoch}.jpg",
@@ -399,7 +493,7 @@ class Model(object):
             weight_decay=0,
         )
         self.phase = "train"
-        area_num = str(self.m_idx + 1)
+        area_num = str(self.m_idx + 2) if self.flag else str(self.m_idx + 1)
         for iteration, patch_list in enumerate(self.train_loader):
             if type(patch_list[area_num][1]) == torch.Tensor:
                 label = patch_list[area_num][1].to(device)
@@ -412,7 +506,21 @@ class Model(object):
 
             img = patch_list[area_num][0].to(device)
             adjust_learning_rate(optimizer, self.epoch, self.args)
-            pred = self.model.to(device)(img)
+
+            if self.m_idx + 1 in [1, 7, 8]:
+                img_l = img[:, :, :, :128]
+                img_r = img[:, :, :, 128:]
+                pred = self.model.to(device)(img_l)
+                pred = self.model.to(device)(img_r) + pred
+
+            elif self.m_idx + 1 in [3, 4]:
+                img_l = img[:, :, :128, :]
+                img_r = img[:, :, 128:, :]
+                pred = self.model.to(device)(img_l)
+                pred = self.model.to(device)(img_r) + pred
+
+            else:
+                pred = self.model.to(device)(img)
 
             if self.args.mode == "class":
                 loss = self.class_loss(pred, label)
@@ -482,20 +590,28 @@ class Model(object):
         self.phase = "valid"
         self.model = self.temp_model_list[self.m_idx]
         self.model.eval()
-        area_num = str(self.m_idx + 1)
+        area_num = str(self.m_idx + 2) if self.flag else str(self.m_idx + 1)
         with torch.no_grad():
             for iteration, patch_list in enumerate(self.valid_loader):
-                if type(patch_list[area_num][1]) == torch.Tensor:
-                    label = patch_list[area_num][1].to(device)
-                else:
-                    for name in patch_list[area_num][1]:
-                        patch_list[area_num][1][name] = patch_list[area_num][1][
-                            name
-                        ].to(device)
-                    label = patch_list[area_num][1]
+                img, label = (
+                    patch_list[area_num][0].to(device),
+                    patch_list[area_num][1],
+                )
 
-                img = patch_list[area_num][0].to(device)
-                pred = self.model.to(device)(img)
+                if self.m_idx + 1 in [1, 7, 8]:
+                    img_l = img[:, :, :, :128]
+                    img_r = img[:, :, :, 128:]
+                    pred = self.model.to(device)(img_l)
+                    pred = self.model.to(device)(img_r) + pred
+
+                elif self.m_idx + 1 in [3, 4]:
+                    img_l = img[:, :, :128, :]
+                    img_r = img[:, :, 128:, :]
+                    pred = self.model.to(device)(img_l)
+                    pred = self.model.to(device)(img_r) + pred
+
+                else:
+                    pred = self.model.to(device)(img)
 
                 if self.args.mode == "class":
                     self.get_val_acc(pred, label)
@@ -514,21 +630,29 @@ class Model(object):
     def test(self):
         self.phase = "test"
         self.model = copy.deepcopy(self.model_list[self.m_idx])
-        area_num = str(self.m_idx + 1)
+        area_num = str(self.m_idx + 2) if self.flag else str(self.m_idx + 1)
         self.model.eval()
         with torch.no_grad():
             for _, patch_list in enumerate(self.test_loader):
-                if type(patch_list[area_num][1]) == torch.Tensor:
-                    label = patch_list[area_num][1].to(device)
-                else:
-                    for name in patch_list[area_num][1]:
-                        patch_list[area_num][1][name] = patch_list[area_num][1][
-                            name
-                        ].to(device)
-                    label = patch_list[area_num][1]
+                img, label = (
+                    patch_list[area_num][0].to(device),
+                    patch_list[area_num][1],
+                )
 
-                img = patch_list[area_num][0].to(device)
-                pred = self.model.to(device)(img)
+                if area_num in [1, 7, 8]:
+                    img_l = img[:, :, :, :128]
+                    img_r = img[:, :, :, 128:]
+                    pred = self.model.to(device)(img_l)
+                    pred = self.model.to(device)(img_r) + pred
+
+                elif area_num in [3, 4]:
+                    img_l = img[:, :, :128, :]
+                    img_r = img[:, :, 128:, :]
+                    pred = self.model.to(device)(img_l)
+                    pred = self.model.to(device)(img_r) + pred
+
+                else:
+                    pred = self.model.to(device)(img)
 
                 if self.args.mode == "class":
                     self.get_test_acc(pred, label)
@@ -537,4 +661,6 @@ class Model(object):
                     nan_list = self.nan_detect(label)
                     idx_list = idx_list[idx_list != nan_list]
                     if len(idx_list) > 0:
-                        self.get_test_loss(pred[idx_list], label[idx_list], area_num)
+                        self.get_test_loss(
+                            pred[idx_list], label[idx_list].to(device), area_num
+                        )

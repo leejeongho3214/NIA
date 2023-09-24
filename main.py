@@ -169,7 +169,7 @@ def main(args):
         if os.path.isfile(os.path.join(check_path, "log.txt")):
             os.remove(os.path.join(check_path, "log.txt"))
     # If there is check-point, load that
- 
+
     logger = setup_logger(args.name, check_path)
     logger.info(args)
 

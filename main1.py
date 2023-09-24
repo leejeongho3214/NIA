@@ -139,7 +139,7 @@ def main(args):
     model_num_class = (
         [15, 9, 9, 9, 12, 12, 5, 7]
         if args.mode == "class"
-        else [15, np.nan, 8, 8, 16, 16, np.nan, 15]
+        else [2, np.nan, 1, 1, 3, 3, np.nan, 2]
     )
     resume_list = list()
     for idx, item in enumerate(model_num_class):
@@ -149,11 +149,6 @@ def main(args):
             )
             resume_list.append(idx)
 
-        model_num_class = (
-            [15, 9, 9, 9, 12, 12, 5, 7]
-            if args.mode == "class"
-            else [15, np.nan, 8, 8, 16, 16, np.nan, 15]
-        )
     ## Adjust the number of output in model for each region image
 
     model_dict_path = os.path.join(check_path, "0", "state_dict.bin")
