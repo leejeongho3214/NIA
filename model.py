@@ -101,7 +101,16 @@ def resume_checkpoint(args, model, path):
 
 
 class Model(object):
-    def __init__(self, args, model_list, train_loader, valid_loader, testset_loader, logger, writer):
+    def __init__(
+        self,
+        args,
+        model_list,
+        train_loader,
+        valid_loader,
+        testset_loader,
+        logger,
+        writer,
+    ):
         super(Model, self).__init__()
         self.args = args
         self.model_list = model_list
@@ -148,12 +157,12 @@ class Model(object):
         }
 
         self.equip_loss = {
-            "1": {"moisture": 1, "elasticity": 14},
-            "3": {"wrinkle": 8},
-            "4": {"wrinkle": 8},
-            "5": {"moisture": 1, "elasticity": 14, "pore": 1},
-            "6": {"moisture": 1, "elasticity": 14, "pore": 1},
-            "8": {"moisture": 1, "elasticity": 14},
+            "1": {"moisture": 1, "elasticity": 1},
+            "3": {"wrinkle": 1},
+            "4": {"wrinkle": 1},
+            "5": {"moisture": 1, "elasticity": 1, "pore": 1},
+            "6": {"moisture": 1, "elasticity": 1, "pore": 1},
+            "8": {"moisture": 1, "elasticity": 1},
         }
 
         self.epoch = 0
@@ -212,11 +221,23 @@ class Model(object):
         if self.args.mode == "class":
             sub = (self.log_acc[name].avg * 100) - self.keep_acc[name]
             value = round(sub, 2)
-            result = f"{color}+{value}{c_color}%" if value > 0 else "No change" if value == 0 else f"{color}{value}{c_color}%"
+            result = (
+                f"{color}+{value}{c_color}%"
+                if value > 0
+                else "No change"
+                if value == 0
+                else f"{color}{value}{c_color}%"
+            )
         else:
             sub = (self.log_loss_test[name].avg) - self.keep_loss[name]
             value = round(sub, 4)
-            result = f"{color}+{value}{c_color}" if value > 0 else "No change" if value == 0 else f"{color}{value}{c_color}"
+            result = (
+                f"{color}+{value}{c_color}"
+                if value > 0
+                else "No change"
+                if value == 0
+                else f"{color}{value}{c_color}"
+            )
 
         return result
 

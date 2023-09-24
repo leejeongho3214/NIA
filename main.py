@@ -112,8 +112,9 @@ def parse_args():
 
 def build_dataset(args, logger):
     train_dataset, val_dataset, test_dataset = random_split(CustomDataset(args), [0.8, 0.1, 0.1], generator= torch.Generator().manual_seed(523))
+    ## For consistent results, we have set a seed number
     logger.info(
-        f"Train Dataset => {len(train_dataset)} // Valid Dataset => {len(val_dataset)}"
+        f"Train Dataset => {len(train_dataset)} // Valid Dataset => {len(val_dataset)} // Test Dataset => {len(test_dataset)}"
     )
 
     return train_dataset, val_dataset, test_dataset
@@ -139,7 +140,7 @@ def main(args):
     model_num_class = (
         [15, 9, 9, 9, 12, 12, 5, 7]
         if args.mode == "class"
-        else [15, np.nan, 8, 8, 16, 16, np.nan, 15]
+        else [2, np.nan, 1, 1, 3, 3, np.nan, 2]
     )
     resume_list = list()
     for idx, item in enumerate(model_num_class):
@@ -149,16 +150,11 @@ def main(args):
             )
             resume_list.append(idx)
 
-        model_num_class = (
-            [15, 9, 9, 9, 12, 12, 5, 7]
-            if args.mode == "class"
-            else [15, np.nan, 8, 8, 16, 16, np.nan, 15]
-        )
     ## Adjust the number of output in model for each region image
 
     model_dict_path = os.path.join(check_path, "0", "state_dict.bin")
 
-    if os.path.isfile(model_dict_path) or args.reset:
+    if os.path.isfile(model_dict_path) and not args.reset:
         print(f"\033[92mResuming......{model_dict_path}\033[0m")
 
         for idx in resume_list:
