@@ -11,3 +11,4 @@ tensorboard/
 __pycache__/
 *.xlsx
 *.ipynb
+*.pyc

@@ -101,13 +101,23 @@ def resume_checkpoint(args, model, path):
 
 
 class Model(object):
-    def __init__(self, args, model_list, train_loader, valid_loader, logger, writer):
+    def __init__(
+        self,
+        args,
+        model_list,
+        train_loader,
+        valid_loader,
+        testset_loader,
+        logger,
+        writer,
+    ):
         super(Model, self).__init__()
         self.args = args
         self.model_list = model_list
         self.temp_model_list = [None for _ in range(8)]
         self.train_loader = train_loader
         self.valid_loader = valid_loader
+        self.test_loader = testset_loader
         self.best_acc = args.best_loss.copy()
         self.best_loss = args.best_loss.copy()
 
@@ -147,12 +157,12 @@ class Model(object):
         }
 
         self.equip_loss = {
-            "1": {"moisture": 1, "elasticity": 14},
-            "3": {"wrinkle": 8},
-            "4": {"wrinkle": 8},
-            "5": {"moisture": 1, "elasticity": 14, "pore": 1},
-            "6": {"moisture": 1, "elasticity": 14, "pore": 1},
-            "8": {"moisture": 1, "elasticity": 14},
+            "1": {"moisture": 1, "elasticity": 1},
+            "3": {"wrinkle": 1},
+            "4": {"wrinkle": 1},
+            "5": {"moisture": 1, "elasticity": 1, "pore": 1},
+            "6": {"moisture": 1, "elasticity": 1, "pore": 1},
+            "8": {"moisture": 1, "elasticity": 1},
         }
 
         self.epoch = 0
@@ -211,12 +221,24 @@ class Model(object):
         if self.args.mode == "class":
             sub = (self.log_acc[name].avg * 100) - self.keep_acc[name]
             value = round(sub, 2)
-            result = f"{color}+{value}%{c_color}" if value != 0 else "No change"
+            result = (
+                f"{color}+{value}{c_color}%"
+                if value > 0
+                else "No change"
+                if value == 0
+                else f"{color}{value}{c_color}%"
+            )
 
         else:
             sub = (self.log_loss_test[name].avg) - self.keep_loss[name]
             value = round(sub, 4)
-            result = f"{color}-{value}{c_color}" if value != 0 else "No change"
+            result = (
+                f"{color}+{value}{c_color}"
+                if value > 0
+                else "No change"
+                if value == 0
+                else f"{color}{value}{c_color}"
+            )
 
         return result
 
@@ -345,36 +367,57 @@ class Model(object):
     def match_img(self, vis_img, img):
         col = self.num % (self.num_patch // 4)
         row = self.num // (self.num_patch // 4)
-        vis_img[row * 128 : (row + 1) * 128, col * 128 : (col + 1) * 128] = img
+        vis_img[row * 256 : (row + 1) * 256, col * 256 : (col + 1) * 256] = img
 
         return vis_img
 
     def save_img(self, iteration, patch_list):
         if iteration == 0 and self.epoch == 0:
             self.num_patch = len(patch_list) + 5
-            vis_img = np.zeros([128 * 5, 128 * 3, 3])
+            if self.args.mode == 'class':
+                vis_img = np.zeros([256 * 5, 256 * 3, 3])
+            else:
+                vis_img = np.zeros([256 * 5, 256 * 2, 3])
+            
 
             self.num = 0
             for area_num in patch_list:
                 img = patch_list[area_num][0][0].permute(1, 2, 0)
 
                 if int(area_num) in [1, 7, 8]:
-                    l_img = img[:, :128]
+                    l_img = (img[:, :128] * 255).numpy().astype('uint8')
+                    l_img = cv2.resize(l_img, (256, 256))
+                    cv2.putText(l_img, f"{area_naming[str(int(area_num)-1)]}", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7,  (0, 255, 0), 2)
+                    l_img= l_img / 255.0
                     vis_img = self.match_img(vis_img, l_img)
                     self.num += 1
-                    r_img = img[:, 128:]
+                    r_img = (img[:, 128:] * 255).numpy().astype('uint8')
+                    r_img = cv2.resize(r_img, (256, 256))
+                    r_img= r_img / 255.0
+                    cv2.putText(r_img, f"{area_naming[str(int(area_num)-1)]}", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7,  (0, 255, 0), 2)
                     vis_img = self.match_img(vis_img, r_img)
                     self.num += 1
 
+
                 elif int(area_num) in [3, 4]:
-                    l_img = img[:128, :]
+                    l_img = (img[:128] * 255).numpy().astype('uint8')
+                    l_img = cv2.resize(l_img, (256, 256))
+                    l_img= l_img / 255.0
+                    cv2.putText(l_img, f"{area_naming[str(int(area_num)-1)]}", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7,  (0, 255, 0), 2)
                     vis_img = self.match_img(vis_img, l_img)
                     self.num += 1
-                    r_img = img[128:, :]
+                    r_img = (img[128:] * 255).numpy().astype('uint8')
+                    r_img = cv2.resize(r_img, (256, 256))
+                    r_img= r_img / 255.0
+                    cv2.putText(r_img, f"{area_naming[str(int(area_num)-1)]}", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7,  (0, 255, 0), 2)
                     vis_img = self.match_img(vis_img, r_img)
                     self.num += 1
 
                 else:
+                    img = (img[:, :128] * 255).numpy().astype('uint8')
+                    img = cv2.resize(img, (256, 256))
+                    img= img / 255.0
+                    cv2.putText(img, f"{area_naming[str(int(area_num)-1)]}", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7,  (0, 255, 0), 2)
                     vis_img = self.match_img(vis_img, img)
                     self.num += 1
 
@@ -543,7 +586,7 @@ class Model(object):
         area_num = str(self.m_idx + 1)
         self.model.eval()
         with torch.no_grad():
-            for _, patch_list in enumerate(self.valid_loader):
+            for _, patch_list in enumerate(self.test_loader):
                 img, label = (
                     patch_list[area_num][0].to(device),
                     patch_list[area_num][1],
@@ -571,4 +614,6 @@ class Model(object):
                     nan_list = self.nan_detect(label)
                     idx_list = idx_list[idx_list != nan_list]
                     if len(idx_list) > 0:
-                        self.get_test_loss(pred[idx_list], label[idx_list].to(device), area_num)
+                        self.get_test_loss(
+                            pred[idx_list], label[idx_list].to(device), area_num
+                        )

@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 from torchvision import models
 
 from tensorboardX import SummaryWriter
@@ -12,7 +13,7 @@ from model import Model, resume_checkpoint, mkdir
 from torchvision.models import ResNet50_Weights
 import torch.nn as nn
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 import argparse
 from torch.utils import data
 
@@ -110,12 +111,17 @@ def parse_args():
 
 
 def build_dataset(args, logger):
-    train_dataset, val_dataset = random_split(CustomDataset(args), [0.9, 0.1])
+    train_dataset, val_dataset, test_dataset = random_split(
+        CustomDataset(args),
+        [0.8, 0.1, 0.1],
+        generator=torch.Generator().manual_seed(523),
+    )
+    ## For consistent results, we have set a seed number
     logger.info(
-        f"Train Dataset => {len(train_dataset)} // Valid Dataset => {len(val_dataset)}"
+        f"Train Dataset => {len(train_dataset)} // Valid Dataset => {len(val_dataset)} // Test Dataset => {len(test_dataset)}"
     )
 
-    return train_dataset, val_dataset
+    return train_dataset, val_dataset, test_dataset
 
 
 def main(args):
@@ -138,7 +144,7 @@ def main(args):
     model_num_class = (
         [15, 9, 9, 9, 12, 12, 5, 7]
         if args.mode == "class"
-        else [15, np.nan, 8, 8, 16, 16, np.nan, 15]
+        else [2, np.nan, 1, 1, 3, 3, np.nan, 2]
     )
     resume_list = list()
     for idx, item in enumerate(model_num_class):
@@ -148,16 +154,11 @@ def main(args):
             )
             resume_list.append(idx)
 
-        model_num_class = (
-            [15, 9, 9, 9, 12, 12, 5, 7]
-            if args.mode == "class"
-            else [15, np.nan, 8, 8, 16, 16, np.nan, 15]
-        )
     ## Adjust the number of output in model for each region image
 
     model_dict_path = os.path.join(check_path, "0", "state_dict.bin")
 
-    if os.path.isfile(model_dict_path):
+    if os.path.isfile(model_dict_path) and not args.reset:
         print(f"\033[92mResuming......{model_dict_path}\033[0m")
 
         for idx in resume_list:
@@ -167,6 +168,7 @@ def main(args):
                 os.path.join(check_path, f"{idx}", "state_dict.bin"),
             )
     if args.reset:
+        print(f"\033[90mReseting......{model_dict_path}\033[0m")
         if os.path.isfile(os.path.join(check_path, "log.txt")):
             os.remove(os.path.join(check_path, "log.txt"))
     # If there is check-point, load that
@@ -174,7 +176,7 @@ def main(args):
     logger = setup_logger(args.name, check_path)
     logger.info(args)
 
-    train_dataset, val_dataset = build_dataset(args, logger)
+    train_dataset, val_dataset, test_dataset = build_dataset(args, logger)
 
     trainset_loader = data.DataLoader(
         dataset=train_dataset,
@@ -188,10 +190,17 @@ def main(args):
         num_workers=args.num_workers,
         shuffle=False,
     )
+
+    testset_loader = data.DataLoader(
+        dataset=test_dataset,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        shuffle=False,
+    )
     # Data Loader
 
     resnet_model = Model(
-        args, model_list, trainset_loader, valset_loader, logger, writer
+        args, model_list, trainset_loader, valset_loader, testset_loader, logger, writer
     )
 
     for epoch in range(args.load_epoch, args.epoch):
