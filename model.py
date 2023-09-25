@@ -388,11 +388,11 @@ class Model(object):
             self.num = 0
             for area_num in patch_list:
                 img = patch_list[area_num][0][0].permute(1, 2, 0)
-                if self.args.normalize:
-                    img = (img+1)/2
+                # if self.args.normalize:
+                #     img = (img+1)/2
 
                 if int(area_num) in [1, 7, 8]:
-                    l_img = (img[:, :128] * 255).numpy().astype("uint8")
+                    l_img = (img[:, :128]).numpy()
                     l_img = cv2.resize(l_img, (256, 256))
                     cv2.putText(
                         l_img,
@@ -400,68 +400,63 @@ class Model(object):
                         (10, 25),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.7,
-                        (0, 255, 0),
+                        (0, 244, 0),
                         2,
                     )
-                    l_img = l_img / 255.0
                     vis_img = self.match_img(vis_img, l_img)
                     self.num += 1
-                    r_img = (img[:, 128:] * 255).numpy().astype("uint8")
+                    r_img = (img[:, 128:]).numpy()
                     r_img = cv2.resize(r_img, (256, 256))
-                    r_img = r_img / 255.0
                     cv2.putText(
                         r_img,
                         f"{area_naming[str(int(area_num)-1)]}",
                         (10, 25),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.7,
-                        (0, 255, 0),
+                        (0, 244, 0),
                         2,
                     )
                     vis_img = self.match_img(vis_img, r_img)
                     self.num += 1
 
                 elif int(area_num) in [3, 4]:
-                    l_img = (img[:128] * 255).numpy().astype("uint8")
+                    l_img = (img[:128]).numpy()
                     l_img = cv2.resize(l_img, (256, 256))
-                    l_img = l_img / 255.0
                     cv2.putText(
                         l_img,
                         f"{area_naming[str(int(area_num)-1)]}",
                         (10, 25),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.7,
-                        (0, 255, 0),
+                        (0, 244, 0),
                         2,
                     )
                     vis_img = self.match_img(vis_img, l_img)
                     self.num += 1
-                    r_img = (img[128:] * 255).numpy().astype("uint8")
+                    r_img = (img[128:]).numpy()
                     r_img = cv2.resize(r_img, (256, 256))
-                    r_img = r_img / 255.0
                     cv2.putText(
                         r_img,
                         f"{area_naming[str(int(area_num)-1)]}",
                         (10, 25),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.7,
-                        (0, 255, 0),
+                        (0, 244, 0),
                         2,
                     )
                     vis_img = self.match_img(vis_img, r_img)
                     self.num += 1
 
                 else:
-                    img = (img[:, :128] * 255).numpy().astype("uint8")
+                    img = (img[:, :128]).numpy()
                     img = cv2.resize(img, (256, 256))
-                    img = img / 255.0
                     cv2.putText(
                         img,
                         f"{area_naming[str(int(area_num)-1)]}",
                         (10, 25),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.7,
-                        (0, 255, 0),
+                        (0, 244, 0),
                         2,
                     )
                     vis_img = self.match_img(vis_img, img)
@@ -470,7 +465,7 @@ class Model(object):
             mkdir(f"vis/{self.args.mode}/{self.args.name}/{self.m_idx}")
             cv2.imwrite(
                 f"vis/{self.args.mode}/{self.args.name}/{self.m_idx}/epoch_{self.epoch}.jpg",
-                vis_img,
+                vis_img ,
             )
 
     def nan_detect(self, label):
