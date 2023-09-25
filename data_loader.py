@@ -40,6 +40,16 @@ area_naming = {
     "7": "chin",
 }
 
+area_name = {
+    "0": "forearm",
+    "1": "glabellus",
+    "2": "peroucular",
+    "3": "_",
+    "4": "cheek",
+    "5": "_",
+    "6": "lip",
+    "7": "chin",
+}
 
 regression_name = {}
 

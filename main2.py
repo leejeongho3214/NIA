@@ -111,11 +111,7 @@ def parse_args():
 
 
 def build_dataset(args, logger):
-    train_dataset, val_dataset, test_dataset = random_split(
-        CustomDataset(args),
-        [0.8, 0.1, 0.1],
-        generator=torch.Generator().manual_seed(523),
-    )
+    train_dataset, val_dataset, test_dataset = random_split(CustomDataset(args), [0.8, 0.1, 0.1], generator= torch.Generator().manual_seed(523))
     ## For consistent results, we have set a seed number
     logger.info(
         f"Train Dataset => {len(train_dataset)} // Valid Dataset => {len(val_dataset)} // Test Dataset => {len(test_dataset)}"

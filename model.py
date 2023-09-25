@@ -7,7 +7,7 @@ import torch.nn as nn
 import numpy as np
 import copy
 import torch.nn.functional as F
-from data_loader import folder_name, class_num_list, area_naming
+from data_loader import folder_name, class_num_list, area_naming, area_name
 
 
 if torch.cuda.is_available():
@@ -189,6 +189,7 @@ class Model(object):
         count = 0
         if self.args.mode == "class":
             for idx in range(8):
+                if idx in [3, 5]: continue
                 if self.best_acc[idx] < self.val_acc[idx].avg:
                     self.best_acc[idx] = round(self.val_acc[idx].avg, 2)
                     self.model_list[idx] = copy.deepcopy(self.temp_model_list[idx])
@@ -198,7 +199,7 @@ class Model(object):
                     count += 1
         else:
             for idx, value in enumerate(model_num_class):
-                if np.isnan(value):
+                if np.isnan(value) or idx in [3, 5]:
                     continue
                 if self.best_loss[idx] > self.val_loss[idx].avg:
                     self.best_loss[idx] = round(self.val_loss[idx].avg.item(), 4)
@@ -268,60 +269,56 @@ class Model(object):
                 self.keep_loss[name] = self.log_loss_test[name].avg
 
     def train_print(self, iteration):
-        
-        area_num = self.m_idx + 1 if self.flag else self.m_idx
         if iteration == len(self.train_loader) - 1:
             print(
-                f"\rEpoch: {self.epoch} [Train][{area_naming[f'{area_num}']}][{iteration}/{len(self.train_loader)}] ---- >  loss: {(self.log_loss[area_num].avg):.04f}"
+                f"\rEpoch: {self.epoch} [Train][{area_name[f'{self.m_idx}']}][{iteration}/{len(self.train_loader)}] ---- >  loss: {(self.log_loss[self.m_idx].avg):.04f}"
             )
 
             self.writer.add_scalar(
-                f"train/{area_naming[f'{area_num}']}",
-                self.log_loss[area_num].avg,
+                f"train/{area_name[f'{self.m_idx}']}",
+                self.log_loss[self.m_idx].avg,
                 self.epoch,
             )
-            self.temp_model_list[area_num] = self.model
+            self.temp_model_list[self.m_idx] = self.model
 
         else:
             print(
-                f"\rEpoch: {self.epoch} [Train][{area_naming[f'{area_num}']}][{iteration}/{len(self.train_loader)}] ---- >  loss: {(self.log_loss[area_num].avg):.04f}",
+                f"\rEpoch: {self.epoch} [Train][{area_name[f'{self.m_idx}']}][{iteration}/{len(self.train_loader)}] ---- >  loss: {(self.log_loss[self.m_idx].avg):.04f}",
                 end="",
             )
 
     def valid_acc_print(self, iteration):
-        area_num = self.m_idx + 1 if self.flag else self.m_idx
         if iteration == len(self.valid_loader) - 1:
             print(
-                f"\rEpoch: {self.epoch} [Val][{area_naming[f'{area_num}']}][{iteration}/{len(self.valid_loader)}] ---- >  acc: {(self.val_acc[area_num].avg * 100):.2f}%"
+                f"\rEpoch: {self.epoch} [Val][{area_name[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- >  acc: {(self.val_acc[self.m_idx].avg * 100):.2f}%"
             )
 
             self.writer.add_scalar(
-                f"val/{area_naming[f'{area_num}']}",
-                self.val_acc[area_num].avg * 100,
+                f"val/{area_name[f'{self.m_idx}']}",
+                self.val_acc[self.m_idx].avg * 100,
                 self.epoch,
             )
 
         else:
             print(
-                f"\rEpoch: {self.epoch} [Val][{area_naming[f'{area_num}']}][{iteration}/{len(self.valid_loader)}] ---- >  acc: {(self.val_acc[area_num].avg * 100):.2f}%",
+                f"\rEpoch: {self.epoch} [Val][{area_name[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- >  acc: {(self.val_acc[self.m_idx].avg * 100):.2f}%",
                 end="",
             )
 
     def valid_loss_print(self, iteration):
-        area_num = self.m_idx + 1 if self.flag else self.m_idx
         if iteration == len(self.valid_loader) - 1:
             print(
-                f"\rEpoch: {self.epoch} [Val][{area_naming[f'{area_num}']}][{iteration}/{len(self.valid_loader)}] ---- > loss: {(self.val_loss[area_num].avg):.04f}"
+                f"\rEpoch: {self.epoch} [Val][{area_name[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- > loss: {(self.val_loss[self.m_idx].avg):.04f}"
             )
             self.writer.add_scalar(
-                f"val/{area_naming[f'{area_num}']}",
-                self.val_loss[area_num].avg,
+                f"val/{area_name[f'{self.m_idx}']}",
+                self.val_loss[self.m_idx].avg,
                 self.epoch,
             )
 
         else:
             print(
-                f"\rEpoch: {self.epoch} [Val][{area_naming[f'{area_num}']}][{iteration}/{len(self.valid_loader)}] ---- > loss: {(self.val_loss[area_num].avg):.04f}",
+                f"\rEpoch: {self.epoch} [Val][{area_name[f'{self.m_idx}']}][{iteration}/{len(self.valid_loader)}] ---- > loss: {(self.val_loss[self.m_idx].avg):.04f}",
                 end="",
             )
 
@@ -391,6 +388,8 @@ class Model(object):
             self.num = 0
             for area_num in patch_list:
                 img = patch_list[area_num][0][0].permute(1, 2, 0)
+                if self.args.normalize:
+                    img = (img+1)/2
 
                 if int(area_num) in [1, 7, 8]:
                     l_img = (img[:, :128] * 255).numpy().astype("uint8")
@@ -471,7 +470,7 @@ class Model(object):
             mkdir(f"vis/{self.args.mode}/{self.args.name}/{self.m_idx}")
             cv2.imwrite(
                 f"vis/{self.args.mode}/{self.args.name}/{self.m_idx}/epoch_{self.epoch}.jpg",
-                vis_img * 256,
+                vis_img,
             )
 
     def nan_detect(self, label):
@@ -507,13 +506,13 @@ class Model(object):
             img = patch_list[area_num][0].to(device)
             adjust_learning_rate(optimizer, self.epoch, self.args)
 
-            if self.m_idx + 1 in [1, 7, 8]:
+            if area_num in [1, 7, 8]:
                 img_l = img[:, :, :, :128]
                 img_r = img[:, :, :, 128:]
                 pred = self.model.to(device)(img_l)
                 pred = self.model.to(device)(img_r) + pred
 
-            elif self.m_idx + 1 in [3, 4]:
+            elif area_num in [3, 4]:
                 img_l = img[:, :, :128, :]
                 img_r = img[:, :, 128:, :]
                 pred = self.model.to(device)(img_l)
@@ -598,13 +597,13 @@ class Model(object):
                     patch_list[area_num][1],
                 )
 
-                if self.m_idx + 1 in [1, 7, 8]:
+                if area_num in [1, 7, 8]:
                     img_l = img[:, :, :, :128]
                     img_r = img[:, :, :, 128:]
                     pred = self.model.to(device)(img_l)
                     pred = self.model.to(device)(img_r) + pred
 
-                elif self.m_idx + 1 in [3, 4]:
+                elif area_num in [3, 4]:
                     img_l = img[:, :, :128, :]
                     img_r = img[:, :, 128:, :]
                     pred = self.model.to(device)(img_l)
