@@ -355,7 +355,7 @@ class Model(object):
         if (
             self.epoch == 0
             and iteration == len(self.train_loader) - 1
-            and self.m_idx == 0
+            and self.m_idx == 1
         ):
             if self.args.mode == "class":
                 vis_img = np.zeros([256 * 5, 256 * 3, 3])

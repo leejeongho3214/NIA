@@ -1,3 +1,4 @@
+import datetime
 import errno
 import os
 import cv2
@@ -161,12 +162,19 @@ class Model_test(object):
     def print_total(self):
         if self.args.mode == "class":
             print(
-                f"[{self.phase}] pigmentation: {self.acc_avg('pigmentation')}% // wrinkle: {self.acc_avg('wrinkle')}% // sagging: {self.acc_avg('sagging')}% // pore: {self.acc_avg('pore')}% // dryness: {self.acc_avg('dryness')}%"
+                f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] pigmentation: {self.acc_avg('pigmentation')}% // wrinkle: {self.acc_avg('wrinkle')}% // sagging: {self.acc_avg('sagging')}% // pore: {self.acc_avg('pore')}% // dryness: {self.acc_avg('dryness')}%"
+            )
+
+            print(
+                f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Total Average Acc => {((self.acc_avg('pigmentation') + self.acc_avg('wrinkle') + self.acc_avg('sagging') + self.acc_avg('pore') + self.acc_avg('dryness') ) / 5):.2f}%"
             )
 
         else:
             print(
-                f"[{self.phase}] moisture: {self.loss_avg('moisture')} // wrinkle: {self.loss_avg('wrinkle')} // elasticity: {self.loss_avg('elasticity')} // pore: {self.loss_avg('pore')}"
+                f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] moisture: {self.loss_avg('moisture')} // wrinkle: {self.loss_avg('wrinkle')} // elasticity: {self.loss_avg('elasticity')} // pore: {self.loss_avg('pore')}"
+            )
+            print(
+                f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Total Average MAE => {((self.loss_avg('moisture') + self.loss_avg('wrinkle') +self.loss_avg('elasticity') + self.loss_avg('pore')) / 4):.3f}"
             )
 
     def match_img(self, vis_img, img):
@@ -208,9 +216,8 @@ class Model_test(object):
 
     def save_img(self, patch_list, iteration):
         self.num_patch = len(patch_list) + 5
-        self.col = 4 if self.args.mode == 'class' else 3
+        self.col = 4 if self.args.mode == "class" else 3
         vis_img = np.zeros([256 * 4, 256 * self.col, 3])
-
 
         self.num = 0
         for area_num in patch_list:
@@ -364,11 +371,11 @@ class Model_test(object):
             self.test_regresion_mae[name].update(
                 self.criterion(pred, gt).item(), batch_size=pred.shape[0]
             )
-            if dig == 'moisture':
+            if dig == "moisture":
                 gt, pred = gt * 100, pred * 100
-            elif dig == 'count':
+            elif dig == "count":
                 gt, pred = gt * 300, pred * 300
-            elif dig == 'pore':
+            elif dig == "pore":
                 gt, pred = gt * 3000, pred * 3000
             patch_list[area_num][2][dig] = [round(gt.item(), 3), round(pred.item(), 3)]
 
