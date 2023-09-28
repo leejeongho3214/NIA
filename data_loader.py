@@ -30,26 +30,17 @@ class_num_list = {
 
 
 area_naming = {
-    "0": "forearm",
-    "1": "glabellus",
-    "2": "l_peroucular",
-    "3": "r_peroucular",
-    "4": "l_cheek",
-    "5": "r_cheek",
-    "6": "lip",
-    "7": "chin",
+    "0": "all",
+    "1": "forearm",
+    "2": "glabellus",
+    "3": "l_peroucular",
+    "4": "r_peroucular",
+    "5": "l_cheek",
+    "6": "r_cheek",
+    "7": "lip",
+    "8": "chin",
 }
 
-area_name = {
-    "0": "forearm",
-    "1": "glabellus",
-    "2": "peroucular",
-    "3": "_",
-    "4": "cheek",
-    "5": "_",
-    "6": "lip",
-    "7": "chin",
-}
 
 regression_name = {}
 
@@ -101,7 +92,8 @@ class CustomDataset(Dataset):
 
                         img = cv2.imread(os.path.join(folder_path, img_name))
                         area_list = dict()
-                        for idx_area in range(1, 9):
+                        start_idx = 1 if args.mode == "class" else 0
+                        for idx_area in range(start_idx, 9):
                             (
                                 reduction_value,
                                 bbox_x,
@@ -112,29 +104,25 @@ class CustomDataset(Dataset):
                             ) = self.load_img(
                                 img_name, angle, idx_area, equ_name, img, args
                             )
-                            try:
-                                n_patch_img = cv2.resize(
-                                    patch_img,
-                                    (
-                                        int(patch_img.shape[1] / reduction_value),
-                                        int(patch_img.shape[0] / reduction_value),
-                                    ),
-                                )
-                            except:
-                                print(
-                                    f"Sub No: {json_name.split('_')[0]} & Angle: {angle} & Area: {area_naming[area_name]} , w: {bbox_x[1]- bbox_x[0]}"
-                                )
-                                continue
+                            if idx_area != 0:
+                                try:
+                                    n_patch_img = cv2.resize(
+                                        patch_img,
+                                        (
+                                            int(patch_img.shape[1] / reduction_value),
+                                            int(patch_img.shape[0] / reduction_value),
+                                        ),
+                                    )
+                                except:
+                                    print(
+                                        f"Sub No: {json_name.split('_')[0]} & Angle: {angle} & Area: {area_naming[area_name]} , w: {bbox_x[1]- bbox_x[0]}"
+                                    )
+                                    continue
 
-                            # if args.double:
-                            patch_img = self.make_double(idx_area, args, n_patch_img)
+                                patch_img = self.make_double(idx_area, n_patch_img)
 
-                            # else:
-                            #     patch_img = np.zeros(
-                            #         [args.res, args.res, 3], dtype=np.uint8
-                            #     )
-                            #     patch_img[
-                            #         : n_patch_img.shape[0], : n_patch_img.shape[1]] = n_patch_img
+                            else:
+                                patch_img = cv2.resize(patch_img, (args.res, args.res))
 
                             pil_img = Image.fromarray(patch_img)
                             patch_img = self.transform["train"](pil_img)
@@ -143,16 +131,15 @@ class CustomDataset(Dataset):
                                 if args.mode == "class"
                                 else meta["equipment"]
                             )
-                            if label_data == None:
+                            if type(label_data) != dict:
                                 continue
 
                             if args.mode != "class":
-                                item_list = self.norm_reg(meta)
-
+                                item_list = self.norm_reg(meta, idx_area)
                                 label_data = torch.tensor(item_list)
 
                             area_list[f"{idx_area}"] = [patch_img, label_data]
-                        
+
                         self.sub_path.append(area_list)
 
                 else:
@@ -166,7 +153,7 @@ class CustomDataset(Dataset):
     def __getitem__(self, idx):
         return self.sub_path[idx]
 
-    def make_double(self, idx_area, args, n_patch_img):
+    def make_double(self, idx_area, n_patch_img):
         if idx_area in [1, 7, 8]:
             patch_img = np.zeros((128, 256, 3), dtype=np.uint8)
             if n_patch_img.shape[0] * 2 > 128:
@@ -222,7 +209,6 @@ class CustomDataset(Dataset):
             os.path.join(
                 self.json_path,
                 equ_name,
-                folder_name[angle],
                 json_name.split("_")[0],
                 json_name,
             ),
@@ -231,7 +217,7 @@ class CustomDataset(Dataset):
         ) as f:
             meta = json.load(f)
 
-        bbox_point = meta["images"]["bbox"]
+        bbox_point = [int(item) for item in meta["images"]["bbox"]]
         bbox_x = [
             min(bbox_point[0], bbox_point[2]),
             max(bbox_point[0], bbox_point[2]),
@@ -252,53 +238,34 @@ class CustomDataset(Dataset):
 
         return reduction_value, bbox_x, json_name, area_name, meta, patch_img
 
-    def norm_reg(self, meta):
+    def norm_reg(self, meta, idx_area):
         item_list = list()
-        for item in meta["equipment"]:
-            if type(meta["equipment"][item]) == dict:
-                if item == "elasticity":
-                    meta["equipment"]["elasticity"] = {
-                        "R2": meta["equipment"][item]["R2"]
-                    }
+        type_class = {
+            "0": ["pigmentation_count"],
+            "1": ["forehead_moisture", "forehead_elasticity_R2"],
+            "3": ["l_perocular_wrinkle_Ra"],
+            "4": ["r_perocular_wrinkle_Ra"],
+            "5": ["l_cheek_moisture", "l_cheek_elasticity_R2", "l_cheek_pore"],
+            "6": ["r_cheek_moisture", "r_cheek_elasticity_R2", "r_cheek_pore"],
+            "8": ["chin_moisture", "chin_elasticity_R2"],
+        }
 
-                if item == "wrinkle":
-                    meta["equipment"]["wrinkle"] = {"Ra": meta["equipment"][item]["Ra"]}
+        for item in type_class[f"{idx_area}"]:
+            item_class = item.split("_")[-1]
 
-                for items in meta["equipment"][item]:
-                    if not type(meta["equipment"][item][items]) in [float, int]:
-                        meta["equipment"][item][items] = np.nan
+            if item_class == "R2":
+                item_list.append(meta["equipment"][item])
 
-                    else:
-                        if item == "wrinkle":
-                            meta["equipment"][item][items] = (
-                                meta["equipment"][item][items] / 100
-                            )
+            elif item_class in ["moisture", "Ra"]:
+                item_list.append(meta["equipment"][item] / 100)
 
-                        elif item == "pigmentaion":
-                            meta["equipment"][item][items] = (
-                                meta["equipment"][item][items] / 300
-                            )
+            elif item_class == "count":
+                item_list.append(meta["equipment"][item] / 300)
 
-                        elif item == "pore":
-                            meta["equipment"][item][items] = (
-                                meta["equipment"][item][items] / 3000
-                            )
-
-                    item_list.append(meta["equipment"][item][items])
+            elif item_class == "pore":
+                item_list.append(meta["equipment"][item] / 3000)
 
             else:
-                if not type(meta["equipment"][item]) in [
-                    float,
-                    int,
-                ]:
-                    meta["equipment"][item] = np.nan
-
-                else:
-                    if item == "moisture":
-                        meta["equipment"][item] = meta["equipment"][item] / 100
-                    elif item == "pore":
-                        meta["equipment"][item] = meta["equipment"][item] / 3000
-
-                item_list.append(meta["equipment"][item])
+                assert 0, "item_class is not here"
 
         return item_list
