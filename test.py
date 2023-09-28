@@ -1,12 +1,16 @@
+import shutil
 import numpy as np
 import torch
 from torchvision import models
 
+from tensorboardX import SummaryWriter
 import os
 import copy
 from torch.utils.data import random_split
+from matplotlib import pyplot as plt
+from logger import setup_logger
 from data_loader import CustomDataset
-from model import resume_checkpoint
+from model import Model, resume_checkpoint, mkdir
 from test_model import Model_test
 from torchvision.models import ResNet50_Weights
 import torch.nn as nn
@@ -27,7 +31,7 @@ def parse_args():
 
     parser.add_argument(
         "--img_path",
-        default="img",
+        default="dataset/img",
         type=str,
     )
 
@@ -36,6 +40,8 @@ def parse_args():
         default="tensorboard",
         type=str,
     )
+
+    parser.add_argument("--stop_early", type=int, default=30)
 
     parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
 
@@ -50,7 +56,7 @@ def parse_args():
 
     parser.add_argument(
         "--json_path",
-        default="label",
+        default="dataset/label",
         type=str,
     )
 
@@ -89,7 +95,7 @@ def parse_args():
 
     parser.add_argument(
         "--batch_size",
-        default=8,
+        default=1,
         type=int,
     )
 
@@ -99,38 +105,43 @@ def parse_args():
         type=int,
     )
 
+    parser.add_argument("--reset", action="store_true")
+
     args = parser.parse_args()
 
     return args
 
 
 def build_dataset(args, logger):
-    _, _, test_dataset = random_split(
-        CustomDataset(args), [0.8, 0.1, 0.1], generator=torch.Generator().manual_seed(523)
+    train_dataset, val_dataset, test_dataset = random_split(
+        CustomDataset(args),
+        [0.8, 0.1, 0.1],
+        generator=torch.Generator().manual_seed(523),
     )
+    ## For consistent results, we have set a seed number
 
-    if logger is not None:
-        logger.info(
-            f"Train Dataset => {len(test_dataset)} // Valid Dataset => {len(test_dataset)}"
-        )
+    return train_dataset, val_dataset, test_dataset
 
-    return test_dataset
- 
 
 def main(args):
+    log_path = os.path.join(args.loss_dir, args.mode, args.name)
     check_path = os.path.join(args.output_dir, args.mode, args.name)
 
-    model_num_class = (
-        [15, 9, 9, 9, 12, 12, 5, 7]
-        if args.mode == "class"
-        else [4, np.nan, 3, 3, 5, 5, np.nan, 4]
-    )
-    args.best_loss = (
-        [0 for _ in range(8)] if args.mode == "class" else [np.inf for _ in range(8)]
-    )
+    mkdir(log_path)
+    mkdir(check_path)
+    ## Make the directories for save
+
 
     model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
-    model_list = [copy.deepcopy(model) for _ in range(8)]
+    model_list = [copy.deepcopy(model) for _ in range(9)]
+    # Define 8 resnet models for each region
+
+    model_num_class = (
+        [np.nan, 15, 9, 9, 0, 12, 0, 5, 7]
+        if args.mode == "class"
+        else [1, 2, np.nan, 1, 0, 3, 0, np.nan, 2]
+    )
+
     resume_list = list()
     for idx, item in enumerate(model_num_class):
         if not np.isnan(item):
@@ -138,21 +149,27 @@ def main(args):
                 model_list[idx].fc.in_features, model_num_class[idx]
             )
             resume_list.append(idx)
-    model_dict_path = os.path.join(check_path, "0", "state_dict.bin")
+
+    ## Adjust the number of output in model for each region image
+
+    model_dict_path = os.path.join(check_path, "1", "state_dict.bin")
+
 
     if os.path.isfile(model_dict_path):
-        print("Resuming~")
+        print(f"\033[92mResuming......{model_dict_path}\033[0m")
+
         for idx in resume_list:
+            if idx in [4, 6]: continue
             model_list[idx] = resume_checkpoint(
                 args,
                 model_list[idx],
                 os.path.join(check_path, f"{idx}", "state_dict.bin"),
             )
-
     else:
         assert 0, "Check the check-point path, there's not any file in that"
 
     _, _, test_dataset = build_dataset(args, None)
+
 
     testset_loader = data.DataLoader(
         dataset=test_dataset,
@@ -160,15 +177,16 @@ def main(args):
         num_workers=args.num_workers,
         shuffle=False,
     )
+    # Data Loader
 
     resnet_model = Model_test(args, model_list, testset_loader)
+    # If the model's acc is higher than best acc, it saves this model
 
-    for model_idx in range(8):
-        if np.isnan(model_num_class[model_idx]):
-            continue
-        resnet_model.choice(model_idx)
-        resnet_model.test()
-    resnet_model.print_test()
+    resnet_model.test(model_num_class, testset_loader)
+
+    resnet_model.print_total()
+    # Show the result for each value, such as pigmentation and pore, by averaging all of them
+
 
 
 if __name__ == "__main__":

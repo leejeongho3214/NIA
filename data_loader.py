@@ -30,14 +30,15 @@ class_num_list = {
 
 
 area_naming = {
-    "0": "이마",
-    "1": "미간",
-    "2": "왼쪽눈가",
-    "3": "오른쪽눈가",
-    "4": "왼쪽볼",
-    "5": "오른쪽볼",
-    "6": "입술",
-    "7": "턱",
+    "0": "all",
+    "1": "forearm",
+    "2": "glabellus",
+    "3": "l_peroucular",
+    "4": "r_peroucular",
+    "5": "l_cheek",
+    "6": "r_cheek",
+    "7": "lip",
+    "8": "chin",
 }
 
 
@@ -87,118 +88,41 @@ class CustomDataset(Dataset):
                         if args.angle == "F":
                             if not img_name.endswith(("F.jpg")):
                                 continue
+                        angle = img_name.split(".")[0].split("_")[-1]
 
                         img = cv2.imread(os.path.join(folder_path, img_name))
-
-                        angle = img_name.split(".")[0].split("_")[-1]
                         area_list = dict()
-                        for idx_area in range(1, 9):
-                            json_name = (
-                                "_".join(img_name.split("_")[:2])
-                                + f"_{angle}_{idx_area:02d}.json"
+                        start_idx = 1 if args.mode == "class" else 0
+                        for idx_area in range(start_idx, 9):
+                            (
+                                reduction_value,
+                                bbox_x,
+                                json_name,
+                                area_name,
+                                meta,
+                                patch_img,
+                            ) = self.load_img(
+                                img_name, angle, idx_area, equ_name, img, args
                             )
-                            with open(
-                                os.path.join(
-                                    self.json_path,
-                                    equ_name,
-                                    folder_name[angle],
-                                    json_name.split("_")[0],
-                                    json_name,
-                                ),
-                                "r",
-                                encoding="utf8",
-                            ) as f:
-                                meta = json.load(f)
+                            if idx_area != 0:
+                                try:
+                                    n_patch_img = cv2.resize(
+                                        patch_img,
+                                        (
+                                            int(patch_img.shape[1] / reduction_value),
+                                            int(patch_img.shape[0] / reduction_value),
+                                        ),
+                                    )
+                                except:
+                                    print(
+                                        f"Sub No: {json_name.split('_')[0]} & Angle: {angle} & Area: {area_naming[area_name]} , w: {bbox_x[1]- bbox_x[0]}"
+                                    )
+                                    continue
 
-                            bbox_point = meta["images"]["bbox"]
-                            bbox_x = [
-                                min(bbox_point[0], bbox_point[2]),
-                                max(bbox_point[0], bbox_point[2]),
-                            ]
-                            bbox_y = [
-                                min(bbox_point[1], bbox_point[3]),
-                                max(bbox_point[1], bbox_point[3]),
-                            ]
-
-                            if (bbox_point[0] > bbox_point[2]) or (
-                                bbox_point[1] > bbox_point[3]
-                            ):
-                                area_name = str(
-                                    int(json_name.split("_")[-1].split(".")[0])
-                                )
-                                print(
-                                    f"Sub No: {json_name.split('_')[0]} & Angle: {angle} & Area: {area_naming[area_name]}// 위치 반전"
-                                )
-
-                            patch_img = img[
-                                bbox_y[0] : bbox_y[1], bbox_x[0] : bbox_x[1]
-                            ]
-
-                            reduction_value = max(patch_img.shape) / args.res
-                            try:
-                                n_patch_img = cv2.resize(
-                                    patch_img,
-                                    (
-                                        int(patch_img.shape[1] / reduction_value),
-                                        int(patch_img.shape[0] / reduction_value),
-                                    ),
-                                )
-                            except:
-                                print(
-                                    f"Sub No: {json_name.split('_')[0]} & Angle: {angle} & Area: {area_naming[area_name]} , w: {bbox_x[1]- bbox_x[0]}"
-                                )
-                                continue
-
-                            patch_img = np.zeros(
-                                [args.res, args.res, 3], dtype=np.uint8
-                            )
-                            if args.double:
-                                if idx_area in [1, 7, 8]:
-                                    if n_patch_img.shape[0] * 2 > args.res:
-                                        r_value = n_patch_img.shape[0] / (args.res / 2)
-                                        n_patch_img = cv2.resize(
-                                            n_patch_img,
-                                            (
-                                                int(n_patch_img.shape[1] / r_value),
-                                                int(n_patch_img.shape[0] / r_value),
-                                            ),
-                                        )
-                                    patch_img[
-                                        : n_patch_img.shape[0], : n_patch_img.shape[1]
-                                    ] = n_patch_img
-                                    patch_img[
-                                        n_patch_img.shape[0] : n_patch_img.shape[0] * 2,
-                                        : n_patch_img.shape[1],
-                                    ] = n_patch_img
-                                elif idx_area in [3, 4]:
-                                    if n_patch_img.shape[1] * 2 > args.res:
-                                        r_value = n_patch_img.shape[1] / (args.res / 2)
-                                        n_patch_img = cv2.resize(
-                                            n_patch_img,
-                                            (
-                                                int(n_patch_img.shape[1] / r_value),
-                                                int(n_patch_img.shape[0] / r_value),
-                                            ),
-                                        )
-                                    patch_img[
-                                        : n_patch_img.shape[0], : n_patch_img.shape[1]
-                                    ] = n_patch_img
-
-                                    patch_img[
-                                        : n_patch_img.shape[0],
-                                        n_patch_img.shape[1] : n_patch_img.shape[1] * 2,
-                                    ] = n_patch_img
-                                    if idx_area == 3:
-                                        plt.imshow(patch_img)
-                                else:
-                                    patch_img[
-                                        : n_patch_img.shape[0], : n_patch_img.shape[1]
-                                    ] = n_patch_img
+                                patch_img = self.make_double(idx_area, n_patch_img)
 
                             else:
-                                patch_img[
-                                    : n_patch_img.shape[0], : n_patch_img.shape[1]
-                                ] = n_patch_img
+                                patch_img = cv2.resize(patch_img, (args.res, args.res))
 
                             pil_img = Image.fromarray(patch_img)
                             patch_img = self.transform["train"](pil_img)
@@ -206,63 +130,12 @@ class CustomDataset(Dataset):
                                 meta["annotations"]
                                 if args.mode == "class"
                                 else meta["equipment"]
-                            ) 
-                            if label_data == None:
+                            )
+                            if type(label_data) != dict:
                                 continue
 
                             if args.mode != "class":
-                                item_list = list()
-                                for item in meta["equipment"]:
-                                    if type(meta["equipment"][item]) == dict:
-                                        for items in meta["equipment"][item]:
-                                            if not type(
-                                                meta["equipment"][item][items]
-                                            ) in [float, int]:
-                                                meta["equipment"][item][items] = np.nan
-                                            else:
-                                                if item == "elasticity":
-                                                    if items == 'R6':
-                                                        meta["equipment"][item][items] = meta["equipment"][item][items] / 2
-                                                    elif items == 'Q0':
-                                                        meta["equipment"][item][items] = meta["equipment"][item][items] / 100
-                                                
-                                                elif item =='wrinkle':
-                                                    if items in ['Rmax', 'Rt']:
-                                                        meta["equipment"][item][items] = meta["equipment"][item][items] / 300
-                                                    else:
-                                                        meta["equipment"][item][items] = meta["equipment"][item][items] / 100
-                                                        
-                                                elif item == 'pigmentaion':
-                                                    meta["equipment"][item][items] = meta["equipment"][item][items] / 300
-                                                    
-                                                elif item == 'pore':
-                                                    meta["equipment"][item][items] = meta["equipment"][item][items] / 3000
-                                                
-
-
-                                            item_list.append(
-                                                meta["equipment"][item][items]
-                                            )
-
-                                    else:
-                                        if not type(meta["equipment"][item]) in [
-                                            float,
-                                            int,
-                                        ]:
-                                            meta["equipment"][item] = np.nan
-                                            
-                                        else:
-                                            if item == "moisture":
-                                                meta["equipment"][item] = (
-                                                    meta["equipment"][item] / 100
-                                                )
-                                            elif item == "pore":
-                                                meta["equipment"][item] = (
-                                                    meta["equipment"][item] / 3000
-                                                )
-
-                                        item_list.append(meta["equipment"][item])
-
+                                item_list = self.norm_reg(meta, idx_area)
                                 label_data = torch.tensor(item_list)
 
                             area_list[f"{idx_area}"] = [patch_img, label_data]
@@ -270,10 +143,129 @@ class CustomDataset(Dataset):
                         self.sub_path.append(area_list)
 
                 else:
-                    print(f"\033[94m{os.path.join(self.img_path, equ_name, sub_fold)}는 제외됨\033[0m")
+                    print(
+                        f"\033[94m{os.path.join(self.img_path, equ_name, sub_fold)}는 제외됨\033[0m"
+                    )
 
     def __len__(self):
         return len(self.sub_path)
 
     def __getitem__(self, idx):
         return self.sub_path[idx]
+
+    def make_double(self, idx_area, n_patch_img):
+        if idx_area in [1, 7, 8]:
+            patch_img = np.zeros((128, 256, 3), dtype=np.uint8)
+            if n_patch_img.shape[0] * 2 > 128:
+                reduction_value = 64 / n_patch_img.shape[0]
+                patch = cv2.resize(
+                    n_patch_img,
+                    (
+                        int(128 * 2 * reduction_value),
+                        int(n_patch_img.shape[0] * 2 * reduction_value),
+                    ),
+                )
+                patch_img[:, : int(128 * 2 * reduction_value)] = patch
+            else:
+                patch = cv2.resize(
+                    n_patch_img,
+                    (128 * 2, n_patch_img.shape[0] * 2),
+                )
+                patch_img[: n_patch_img.shape[0] * 2] = patch
+
+        elif idx_area in [3, 4]:
+            patch_img = np.zeros((256, 128, 3), dtype=np.uint8)
+
+            if n_patch_img.shape[1] * 2 > 128:
+                reduction_value = 64 / n_patch_img.shape[1]
+                patch = cv2.resize(
+                    n_patch_img,
+                    (
+                        int(n_patch_img.shape[1] * 2 * reduction_value),
+                        int(128 * 2 * reduction_value),
+                    ),
+                )
+                patch_img[: int(128 * 2 * reduction_value)] = patch
+
+            else:
+                patch = cv2.resize(
+                    n_patch_img,
+                    (
+                        n_patch_img.shape[1] * 2,
+                        128 * 2,
+                    ),
+                )
+                patch_img[:, : n_patch_img.shape[1] * 2] = patch
+
+        else:
+            patch_img = np.zeros((128, 128, 3), dtype=np.uint8)
+            patch_img[: n_patch_img.shape[0], : n_patch_img.shape[1]] = n_patch_img
+
+        return patch_img
+
+    def load_img(self, img_name, angle, idx_area, equ_name, img, args):
+        json_name = "_".join(img_name.split("_")[:2]) + f"_{angle}_{idx_area:02d}.json"
+        with open(
+            os.path.join(
+                self.json_path,
+                equ_name,
+                json_name.split("_")[0],
+                json_name,
+            ),
+            "r",
+            encoding="utf8",
+        ) as f:
+            meta = json.load(f)
+
+        bbox_point = [int(item) for item in meta["images"]["bbox"]]
+        bbox_x = [
+            min(bbox_point[0], bbox_point[2]),
+            max(bbox_point[0], bbox_point[2]),
+        ]
+        bbox_y = [
+            min(bbox_point[1], bbox_point[3]),
+            max(bbox_point[1], bbox_point[3]),
+        ]
+        area_name = str(int(json_name.split("_")[-1].split(".")[0]))
+        if (bbox_point[0] > bbox_point[2]) or (bbox_point[1] > bbox_point[3]):
+            print(
+                f"Sub No: {json_name.split('_')[0]} & Angle: {angle} & Area: {area_naming[area_name]}// 위치 반전"
+            )
+
+        patch_img = img[bbox_y[0] : bbox_y[1], bbox_x[0] : bbox_x[1]]
+
+        reduction_value = max(patch_img.shape) / args.res
+
+        return reduction_value, bbox_x, json_name, area_name, meta, patch_img
+
+    def norm_reg(self, meta, idx_area):
+        item_list = list()
+        type_class = {
+            "0": ["pigmentation_count"],
+            "1": ["forehead_moisture", "forehead_elasticity_R2"],
+            "3": ["l_perocular_wrinkle_Ra"],
+            "4": ["r_perocular_wrinkle_Ra"],
+            "5": ["l_cheek_moisture", "l_cheek_elasticity_R2", "l_cheek_pore"],
+            "6": ["r_cheek_moisture", "r_cheek_elasticity_R2", "r_cheek_pore"],
+            "8": ["chin_moisture", "chin_elasticity_R2"],
+        }
+
+        for item in type_class[f"{idx_area}"]:
+            item_class = item.split("_")[-1]
+
+            if item_class == "R2":
+                item_list.append(meta["equipment"][item])
+
+            elif item_class in ["moisture", "Ra"]:
+                item_list.append(meta["equipment"][item] / 100)
+
+            elif item_class == "count":
+                item_list.append(meta["equipment"][item] / 300)
+
+            elif item_class == "pore":
+                item_list.append(meta["equipment"][item] / 3000)
+
+            else:
+                assert 0, "item_class is not here"
+
+        return item_list
