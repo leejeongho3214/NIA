@@ -30,7 +30,7 @@ def parse_args():
 
     parser.add_argument(
         "--img_path",
-        default="dataset/img",
+        default="/Users/jeongho/Desktop/dataset/img",
         type=str,
     )
 
@@ -44,7 +44,7 @@ def parse_args():
 
     parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
 
-    parser.add_argument("--angle", default="F", type=str, choices=["F", "all"])
+    parser.add_argument("--angle", default="all", type=str, choices=["F", "all"])
 
     parser.add_argument(
         "--mode",
@@ -55,7 +55,7 @@ def parse_args():
 
     parser.add_argument(
         "--json_path",
-        default="dataset/label",
+        default="/Users/jeongho/Desktop/dataset/label",
         type=str,
     )
 
@@ -94,7 +94,7 @@ def parse_args():
 
     parser.add_argument(
         "--batch_size",
-        default=8,
+        default=1,
         type=int,
     )
 
@@ -155,7 +155,7 @@ def main(args):
 
     ## Adjust the number of output in model for each region image
 
-    model_dict_path = os.path.join(check_path, "0", "state_dict.bin")
+    model_dict_path = os.path.join(check_path, "1", "state_dict.bin")
 
     if args.reset:
         print(f"\033[90mReseting......{model_dict_path}\033[0m")

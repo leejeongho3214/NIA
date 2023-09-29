@@ -352,11 +352,11 @@ class Model(object):
         return vis_img
 
     def save_img(self, iteration, patch_list):
-        if (
-            self.epoch == 0
-            and iteration == len(self.train_loader) - 1
-            and self.m_idx == 1
-        ):
+        # if (
+        #     self.epoch == 0
+        #     and iteration == len(self.train_loader) - 1
+        #     and self.m_idx == 1
+        # ):
             if self.args.mode == "class":
                 vis_img = np.zeros([256 * 5, 256 * 3, 3])
                 self.num_patch = len(patch_list) + 7
@@ -370,7 +370,7 @@ class Model(object):
                 if self.args.normalize:
                     img = (img + 1) / 2
 
-                if int(area_num) in [1, 7, 8]:
+                if img.shape[1] > 128:
                     l_img = (img[:, :128]).numpy()
                     l_img = cv2.resize(l_img, (256, 256))
                     cv2.putText(
@@ -398,7 +398,7 @@ class Model(object):
                     vis_img = self.match_img(vis_img, r_img)
                     self.num += 1
 
-                elif int(area_num) in [3, 4]:
+                elif img.shape[0] > 128:
                     l_img = (img[:128]).numpy()
                     l_img = cv2.resize(l_img, (256, 256))
                     cv2.putText(
@@ -443,7 +443,8 @@ class Model(object):
 
             mkdir(f"vis/{self.args.mode}/{self.args.name}")
             cv2.imwrite(
-                f"vis/{self.args.mode}/{self.args.name}/Input.jpg",
+                f"vis/{self.args.mode}/{self.args.name}/{iteration}.jpg",
+                # f"vis/{self.args.mode}/{self.args.name}/Input.jpg",
                 vis_img * 255,
             )
 
@@ -524,13 +525,13 @@ class Model(object):
                 img = torch.flip(img, dims=[3])
             adjust_learning_rate(optimizer, self.epoch, self.args)
 
-            if self.area_num in [1, 7, 8]:
+            if img.shape[-1] > 128:
                 img_l = img[:, :, :, :128]
                 img_r = img[:, :, :, 128:]
                 pred = self.model.to(device)(img_l)
                 pred = self.model.to(device)(img_r) + pred
 
-            elif self.area_num in [3, 4]:
+            elif img.shape[-2] > 128:
                 img_l = img[:, :, :128, :]
                 img_r = img[:, :, 128:, :]
                 pred = self.model.to(device)(img_l)
@@ -568,6 +569,7 @@ class Model(object):
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                if iteration == len(data_loader) - 1:
-                    self.save_img(iteration, patch_list)
-                    self.temp_model_list[self.m_idx] = self.model
+                self.save_img(iteration, patch_list)
+                # if iteration == len(data_loader) - 1:
+                #     self.save_img(iteration, patch_list)
+                #     self.temp_model_list[self.m_idx] = self.model

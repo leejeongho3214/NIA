@@ -94,16 +94,23 @@ class CustomDataset(Dataset):
                         area_list = dict()
                         start_idx = 1 if args.mode == "class" else 0
                         for idx_area in range(start_idx, 9):
-                            (
-                                reduction_value,
-                                bbox_x,
-                                json_name,
-                                area_name,
-                                meta,
-                                patch_img,
-                            ) = self.load_img(
-                                img_name, angle, idx_area, equ_name, img, args
-                            )
+                            try:
+                                (
+                                    reduction_value,
+                                    bbox_x,
+                                    json_name,
+                                    area_name,
+                                    meta,
+                                    patch_img,
+                                ) = self.load_img(
+                                    img_name, angle, idx_area, equ_name, img, args
+                                )
+                            except:
+                                if self.load_img(
+                                    img_name, angle, idx_area, equ_name, img, args
+                                ):
+                                    area_list[f"{idx_area}"] = [torch.zeros([3, 128, 128]), dict()]
+                                    continue
                             if idx_area != 0:
                                 try:
                                     n_patch_img = cv2.resize(
@@ -119,7 +126,7 @@ class CustomDataset(Dataset):
                                     )
                                     continue
 
-                                patch_img = self.make_double(idx_area, n_patch_img)
+                                patch_img = self.make_double(n_patch_img)
 
                             else:
                                 patch_img = cv2.resize(patch_img, (args.res, args.res))
@@ -153,8 +160,12 @@ class CustomDataset(Dataset):
     def __getitem__(self, idx):
         return self.sub_path[idx]
 
-    def make_double(self, idx_area, n_patch_img):
-        if idx_area in [1, 7, 8]:
+    def make_double(self, n_patch_img):
+        row = n_patch_img.shape[0]
+        col = n_patch_img.shape[1]
+        ratio_len = row / col
+
+        if 0.66 > ratio_len:
             patch_img = np.zeros((128, 256, 3), dtype=np.uint8)
             if n_patch_img.shape[0] * 2 > 128:
                 reduction_value = 64 / n_patch_img.shape[0]
@@ -173,9 +184,8 @@ class CustomDataset(Dataset):
                 )
                 patch_img[: n_patch_img.shape[0] * 2] = patch
 
-        elif idx_area in [3, 4]:
+        elif ratio_len > 1.66:
             patch_img = np.zeros((256, 128, 3), dtype=np.uint8)
-
             if n_patch_img.shape[1] * 2 > 128:
                 reduction_value = 64 / n_patch_img.shape[1]
                 patch = cv2.resize(
@@ -196,7 +206,6 @@ class CustomDataset(Dataset):
                     ),
                 )
                 patch_img[:, : n_patch_img.shape[1] * 2] = patch
-
         else:
             patch_img = np.zeros((128, 128, 3), dtype=np.uint8)
             patch_img[: n_patch_img.shape[0], : n_patch_img.shape[1]] = n_patch_img
@@ -216,6 +225,9 @@ class CustomDataset(Dataset):
             encoding="utf8",
         ) as f:
             meta = json.load(f)
+
+        if any([item == "None" for item in meta["images"]["bbox"]]):
+            return 1
 
         bbox_point = [int(item) for item in meta["images"]["bbox"]]
         bbox_x = [
