@@ -352,11 +352,10 @@ class Model(object):
         return vis_img
 
     def save_img(self, iteration, patch_list):
-        # if (
-        #     self.epoch == 0
-        #     and iteration == len(self.train_loader) - 1
-        #     and self.m_idx == 1
-        # ):
+        if (
+            self.epoch == 0
+            and self.m_idx == 1
+        ):
             if self.args.mode == "class":
                 vis_img = np.zeros([256 * 5, 256 * 3, 3])
                 self.num_patch = len(patch_list) + 7
@@ -366,12 +365,13 @@ class Model(object):
 
             self.num = 0
             for area_num in patch_list:
-                img = patch_list[area_num][0][0].permute(1, 2, 0)
+                img = patch_list[area_num][0][0].permute(1, 2, 0).numpy().copy()
+
                 if self.args.normalize:
                     img = (img + 1) / 2
-
+                    
                 if img.shape[1] > 128:
-                    l_img = (img[:, :128]).numpy()
+                    l_img = (img[:, :128])
                     l_img = cv2.resize(l_img, (256, 256))
                     cv2.putText(
                         l_img,
@@ -382,9 +382,18 @@ class Model(object):
                         (0, 244, 0),
                         2,
                     )
+                    cv2.putText(
+                        l_img,
+                        f"{list(patch_list[area_num][2][0].shape)}",
+                        (int(img.shape[1] / 4), int(img.shape[0] / 2)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.7,
+                        (222, 244, 22),
+                        2,
+                    )
                     vis_img = self.match_img(vis_img, l_img)
                     self.num += 1
-                    r_img = (img[:, 128:]).numpy()
+                    r_img = (img[:, 128:])
                     r_img = cv2.resize(r_img, (256, 256))
                     cv2.putText(
                         r_img,
@@ -399,7 +408,7 @@ class Model(object):
                     self.num += 1
 
                 elif img.shape[0] > 128:
-                    l_img = (img[:128]).numpy()
+                    l_img = (img[:128])
                     l_img = cv2.resize(l_img, (256, 256))
                     cv2.putText(
                         l_img,
@@ -410,9 +419,18 @@ class Model(object):
                         (0, 244, 0),
                         2,
                     )
+                    cv2.putText(
+                        l_img,
+                        f"{list(patch_list[area_num][2][0].shape)}",
+                        (int(img.shape[1] / 4), int(img.shape[0] / 2)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.7,
+                        (222, 244, 22),
+                        2,
+                    )
                     vis_img = self.match_img(vis_img, l_img)
                     self.num += 1
-                    r_img = (img[128:]).numpy()
+                    r_img = (img[128:])
                     r_img = cv2.resize(r_img, (256, 256))
                     cv2.putText(
                         r_img,
@@ -427,7 +445,7 @@ class Model(object):
                     self.num += 1
 
                 else:
-                    img = (img[:, :128]).numpy()
+                    img = (img[:, :128])
                     img = cv2.resize(img, (256, 256))
                     cv2.putText(
                         img,
@@ -438,8 +456,18 @@ class Model(object):
                         (0, 244, 0),
                         2,
                     )
+                    cv2.putText(
+                        img,
+                        f"{list(patch_list[area_num][2][0].shape)}",
+                        (int(img.shape[1] / 4), int(img.shape[0] / 2)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.7,
+                        (222, 244, 22),
+                        2,
+                    )
                     vis_img = self.match_img(vis_img, img)
                     self.num += 1
+                
 
             mkdir(f"vis/{self.args.mode}/{self.args.name}")
             cv2.imwrite(
@@ -509,8 +537,11 @@ class Model(object):
 
         self.phase = phase
         self.area_num = str(self.m_idx + 1) if self.flag else str(self.m_idx)
-
+        
         for iteration, patch_list in enumerate(data_loader):
+            if not self.area_num in list(patch_list.keys()):
+                continue
+            
             if type(patch_list[self.area_num][1]) == torch.Tensor:
                 label = patch_list[self.area_num][1].to(device)
             else:
@@ -519,6 +550,11 @@ class Model(object):
                         device
                     )
                 label = patch_list[self.area_num][1]
+                
+            if label == {}:
+                if iteration == len(data_loader) - 1:
+                    self.temp_model_list[self.m_idx] = self.model
+                continue
 
             img = patch_list[self.area_num][0].to(device)
             if self.area_num in [4, 6]:
@@ -569,7 +605,7 @@ class Model(object):
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                self.save_img(iteration, patch_list)
-                # if iteration == len(data_loader) - 1:
-                #     self.save_img(iteration, patch_list)
-                #     self.temp_model_list[self.m_idx] = self.model
+                if (iteration % 10)  == 0:
+                    self.save_img(iteration, patch_list)
+                if iteration == len(data_loader) - 1:
+                    self.temp_model_list[self.m_idx] = self.model

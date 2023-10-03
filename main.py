@@ -42,7 +42,7 @@ def parse_args():
 
     parser.add_argument("--stop_early", type=int, default=30)
 
-    parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
+    parser.add_argument("--equ", type=int, default=[1, 2, 3], choices=[1, 2, 3], nargs="+")
 
     parser.add_argument("--angle", default="all", type=str, choices=["F", "all"])
 

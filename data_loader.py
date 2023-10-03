@@ -41,6 +41,11 @@ area_naming = {
     "8": "chin",
 }
 
+img_num = {
+    '01': 7,
+    '02': 3, 
+    '03': 3,
+}
 
 regression_name = {}
 
@@ -79,7 +84,7 @@ class CustomDataset(Dataset):
                         file_name.lower().endswith(ext) for ext in [".jpg", ".jpeg"]
                     ):
                         img_count += 1
-                if img_count == 7:
+                if img_count == img_num[equ_name]:
                     folder_path = os.path.join(self.img_path, equ_name, sub_fold)
                     for img_name in os.listdir(folder_path):
                         if not img_name.endswith((".jpg", ".jpeg")):  ## 일부러 F를 추가함
@@ -88,6 +93,7 @@ class CustomDataset(Dataset):
                         if args.angle == "F":
                             if not img_name.endswith(("F.jpg")):
                                 continue
+
                         angle = img_name.split(".")[0].split("_")[-1]
 
                         img = cv2.imread(os.path.join(folder_path, img_name))
@@ -97,11 +103,10 @@ class CustomDataset(Dataset):
                             try:
                                 (
                                     reduction_value,
-                                    bbox_x,
                                     json_name,
                                     area_name,
                                     meta,
-                                    patch_img,
+                                    ori_patch_img,
                                 ) = self.load_img(
                                     img_name, angle, idx_area, equ_name, img, args
                                 )
@@ -109,24 +114,27 @@ class CustomDataset(Dataset):
                                 if self.load_img(
                                     img_name, angle, idx_area, equ_name, img, args
                                 ):
-                                    area_list[f"{idx_area}"] = [torch.zeros([3, 128, 128]), dict()]
+                                    area_list[f"{idx_area}"] = [torch.zeros([3, 128, 128]), dict(), [0]]
                                     continue
                             if idx_area != 0:
                                 try:
                                     n_patch_img = cv2.resize(
-                                        patch_img,
+                                        ori_patch_img,
                                         (
-                                            int(patch_img.shape[1] / reduction_value),
-                                            int(patch_img.shape[0] / reduction_value),
+                                            int(ori_patch_img.shape[1] / reduction_value),
+                                            int(ori_patch_img.shape[0] / reduction_value),
                                         ),
                                     )
                                 except:
                                     print(
-                                        f"Sub No: {json_name.split('_')[0]} & Angle: {angle} & Area: {area_naming[area_name]} , w: {bbox_x[1]- bbox_x[0]}"
+                                        f"Sub No: {json_name.split('_')[0]} & Angle: {angle} & Area: {area_naming[area_name]} , {list(ori_patch_img.shape)}"
                                     )
+                                    area_list[f"{idx_area}"] = [torch.zeros([3, 128, 128]), dict(), [0]]
                                     continue
-
+                                
                                 patch_img = self.make_double(n_patch_img)
+                                if not isinstance(patch_img, np.ndarray):  
+                                    continue
 
                             else:
                                 patch_img = cv2.resize(patch_img, (args.res, args.res))
@@ -145,7 +153,7 @@ class CustomDataset(Dataset):
                                 item_list = self.norm_reg(meta, idx_area)
                                 label_data = torch.tensor(item_list)
 
-                            area_list[f"{idx_area}"] = [patch_img, label_data]
+                            area_list[f"{idx_area}"] = [patch_img, label_data, ori_patch_img]
 
                         self.sub_path.append(area_list)
 
@@ -163,49 +171,29 @@ class CustomDataset(Dataset):
     def make_double(self, n_patch_img):
         row = n_patch_img.shape[0]
         col = n_patch_img.shape[1]
-        ratio_len = row / col
-
-        if 0.66 > ratio_len:
+        
+        if row < 64: 
             patch_img = np.zeros((128, 256, 3), dtype=np.uint8)
-            if n_patch_img.shape[0] * 2 > 128:
-                reduction_value = 64 / n_patch_img.shape[0]
-                patch = cv2.resize(
-                    n_patch_img,
-                    (
-                        int(128 * 2 * reduction_value),
-                        int(n_patch_img.shape[0] * 2 * reduction_value),
-                    ),
-                )
-                patch_img[:, : int(128 * 2 * reduction_value)] = patch
-            else:
-                patch = cv2.resize(
-                    n_patch_img,
-                    (128 * 2, n_patch_img.shape[0] * 2),
-                )
-                patch_img[: n_patch_img.shape[0] * 2] = patch
+            patch = cv2.resize(
+                n_patch_img,
+                (
+                    int(n_patch_img.shape[1] * 2),
+                    int(n_patch_img.shape[0] * 2),
+                ),
+            )
+            patch_img[: n_patch_img.shape[0] * 2, :int(n_patch_img.shape[1]) * 2] = patch
 
-        elif ratio_len > 1.66:
+        elif col < 64: 
             patch_img = np.zeros((256, 128, 3), dtype=np.uint8)
-            if n_patch_img.shape[1] * 2 > 128:
-                reduction_value = 64 / n_patch_img.shape[1]
-                patch = cv2.resize(
-                    n_patch_img,
-                    (
-                        int(n_patch_img.shape[1] * 2 * reduction_value),
-                        int(128 * 2 * reduction_value),
-                    ),
-                )
-                patch_img[: int(128 * 2 * reduction_value)] = patch
+            patch = cv2.resize(
+                n_patch_img,
+                (
+                    int(n_patch_img.shape[1] * 2),
+                    int(n_patch_img.shape[0] * 2),
+                ),
+            )
+            patch_img[: n_patch_img.shape[0] * 2, :int(n_patch_img.shape[1] * 2)] = patch
 
-            else:
-                patch = cv2.resize(
-                    n_patch_img,
-                    (
-                        n_patch_img.shape[1] * 2,
-                        128 * 2,
-                    ),
-                )
-                patch_img[:, : n_patch_img.shape[1] * 2] = patch
         else:
             patch_img = np.zeros((128, 128, 3), dtype=np.uint8)
             patch_img[: n_patch_img.shape[0], : n_patch_img.shape[1]] = n_patch_img
@@ -238,6 +226,10 @@ class CustomDataset(Dataset):
             min(bbox_point[1], bbox_point[3]),
             max(bbox_point[1], bbox_point[3]),
         ]
+        
+        if (bbox_x[1] - bbox_x[0]) < 128 or (bbox_y[1] - bbox_y[0]) < 128:
+            return 1
+        
         area_name = str(int(json_name.split("_")[-1].split(".")[0]))
         if (bbox_point[0] > bbox_point[2]) or (bbox_point[1] > bbox_point[3]):
             print(
@@ -248,7 +240,7 @@ class CustomDataset(Dataset):
 
         reduction_value = max(patch_img.shape) / args.res
 
-        return reduction_value, bbox_x, json_name, area_name, meta, patch_img
+        return reduction_value, json_name, area_name, meta, patch_img
 
     def norm_reg(self, meta, idx_area):
         item_list = list()
