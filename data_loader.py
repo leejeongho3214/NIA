@@ -7,6 +7,7 @@ import numpy as np
 import cv2
 import json
 from matplotlib import pyplot as plt
+from tqdm import tqdm
 
 folder_name = {
     "F": "01",
@@ -72,8 +73,8 @@ class CustomDataset(Dataset):
             "test": transforms.Compose(element),
         }
         self.sub_path = list()
-        for equ_name in sub_path_list:
-            for sub_fold in os.listdir(os.path.join(self.img_path, equ_name)):
+        for equ_name in tqdm(sub_path_list, desc = 'equ_name'):
+            for sub_fold in tqdm(os.listdir(os.path.join(self.img_path, equ_name)), desc = 'subject_no',leave=False):
                 if sub_fold.startswith("."):
                     continue
                 img_count = 0
@@ -137,9 +138,9 @@ class CustomDataset(Dataset):
                                     continue
 
                             else:
-                                patch_img = cv2.resize(patch_img, (args.res, args.res))
+                                patch_img = cv2.resize(ori_patch_img, (args.res, args.res))
 
-                            pil_img = Image.fromarray(patch_img)
+                            pil_img = Image.fromarray(ori_patch_img)
                             patch_img = self.transform["train"](pil_img)
                             label_data = (
                                 meta["annotations"]

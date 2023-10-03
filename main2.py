@@ -1,3 +1,4 @@
+import shutil
 import numpy as np
 import torch
 from torchvision import models
@@ -41,9 +42,9 @@ def parse_args():
 
     parser.add_argument("--stop_early", type=int, default=30)
 
-    parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
+    parser.add_argument("--equ", type=int, default=[1, 2, 3], choices=[1, 2, 3], nargs="+")
 
-    parser.add_argument("--angle", default="F", type=str, choices=["F", "all"])
+    parser.add_argument("--angle", default="all", type=str, choices=["F", "all"])
 
     parser.add_argument(
         "--mode",
@@ -93,7 +94,7 @@ def parse_args():
 
     parser.add_argument(
         "--batch_size",
-        default=8,
+        default=1,
         type=int,
     )
 
@@ -111,7 +112,11 @@ def parse_args():
 
 
 def build_dataset(args, logger):
-    train_dataset, val_dataset, test_dataset = random_split(CustomDataset(args), [0.8, 0.1, 0.1], generator= torch.Generator().manual_seed(523))
+    train_dataset, val_dataset, test_dataset = random_split(
+        CustomDataset(args),
+        [0.8, 0.1, 0.1],
+        generator=torch.Generator().manual_seed(523),
+    )
     ## For consistent results, we have set a seed number
     logger.info(
         f"Train Dataset => {len(train_dataset)} // Valid Dataset => {len(val_dataset)} // Test Dataset => {len(test_dataset)}"
@@ -129,19 +134,17 @@ def main(args):
     mkdir(check_path)
     ## Make the directories for save
 
-    args.best_loss = (
-        [0 for _ in range(8)] if args.mode == "class" else [np.inf for _ in range(8)]
-    )
-
     model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
-    model_list = [copy.deepcopy(model) for _ in range(8)]
-    # Define 8 resnet models for each region
 
     model_num_class = (
-        [15, 9, 9, 9, 12, 12, 5, 7]
+        [np.nan, 15, 9, 9, 0, 12, 0, 5, 7]
         if args.mode == "class"
-        else [2, np.nan, 1, 1, 3, 3, np.nan, 2]
+        else [1, 2, np.nan, 1, 0, 3, 0, np.nan, 2]
     )
+    
+    args.best_loss = [np.inf for _ in range(len(model_num_class))]
+    model_list = [copy.deepcopy(model) for _ in range(len(model_num_class))]
+    # Define 9 resnet models for each region
     resume_list = list()
     for idx, item in enumerate(model_num_class):
         if not np.isnan(item):
@@ -152,23 +155,25 @@ def main(args):
 
     ## Adjust the number of output in model for each region image
 
-    model_dict_path = os.path.join(check_path, "0", "state_dict.bin")
+    model_dict_path = os.path.join(check_path, "1", "state_dict.bin")
 
-    if os.path.isfile(model_dict_path) and not args.reset:
+    if args.reset:
+        print(f"\033[90mReseting......{model_dict_path}\033[0m")
+        if os.path.isdir(check_path):
+            shutil.rmtree(check_path)
+            mkdir(check_path)
+    # If there is check-point, load that
+
+    if os.path.isfile(model_dict_path):
         print(f"\033[92mResuming......{model_dict_path}\033[0m")
 
         for idx in resume_list:
+            if idx in [4, 6]: continue
             model_list[idx] = resume_checkpoint(
                 args,
                 model_list[idx],
                 os.path.join(check_path, f"{idx}", "state_dict.bin"),
             )
-
-    if args.reset:
-        print(f"\033[90mReseting......{model_dict_path}\033[0m")
-        if os.path.isfile(os.path.join(check_path, "log.txt")):
-            os.remove(os.path.join(check_path, "log.txt"))
-    # If there is check-point, load that
 
     logger = setup_logger(args.name, check_path)
     logger.info(args)
@@ -203,28 +208,28 @@ def main(args):
     for epoch in range(args.load_epoch, args.epoch):
         resnet_model.update_e(epoch + 1) if args.load_epoch else None
 
-        for model_idx in range(8):
+        for model_idx in range(len(model_num_class)):
             if np.isnan(model_num_class[model_idx]):
                 continue
             # In regression task, there are no images for 미간, 입술, 턱
-
             resnet_model.choice(model_idx)
             # Change the model for each region
-            resnet_model.train()
-            resnet_model.valid()
+            resnet_model.run(phase="train")
+            resnet_model.run(phase="valid")
 
         resnet_model.update_m(model_num_class)
+
         # If the model's acc is higher than best acc, it saves this model
-        for model_idx in range(8):
+        for model_idx in range(len(model_num_class)):
             if np.isnan(model_num_class[model_idx]):
                 continue
             resnet_model.choice(model_idx)
-            resnet_model.test()
+            resnet_model.run(phase="test")
 
         resnet_model.print_total()
         # Show the result for each value, such as pigmentation and pore, by averaging all of them
         resnet_model.update_e(epoch + 1)
-        resnet_model.reset_log()
+        resnet_model.reset_log(mode = args.mode)
 
         if resnet_model.stop_early():
             break
