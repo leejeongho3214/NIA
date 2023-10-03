@@ -43,9 +43,9 @@ area_naming = {
 }
 
 img_num = {
-    '01': 7,
-    '02': 3, 
-    '03': 3,
+    "01": 7,
+    "02": 3,
+    "03": 3,
 }
 
 regression_name = {}
@@ -73,8 +73,12 @@ class CustomDataset(Dataset):
             "test": transforms.Compose(element),
         }
         self.sub_path = list()
-        for equ_name in tqdm(sub_path_list, desc = 'equ_name'):
-            for sub_fold in tqdm(os.listdir(os.path.join(self.img_path, equ_name)), desc = 'subject_no',leave=False):
+        for equ_name in tqdm(sub_path_list, desc="equ_name"):
+            for sub_fold in tqdm(
+                os.listdir(os.path.join(self.img_path, equ_name)),
+                desc="subject_no",
+                leave=False,
+            ):
                 if sub_fold.startswith("."):
                     continue
                 img_count = 0
@@ -115,32 +119,46 @@ class CustomDataset(Dataset):
                                 if self.load_img(
                                     img_name, angle, idx_area, equ_name, img, args
                                 ):
-                                    area_list[f"{idx_area}"] = [torch.zeros([3, 128, 128]), dict(), [0]]
+                                    area_list[f"{idx_area}"] = [
+                                        torch.zeros([3, 128, 128]),
+                                        dict(),
+                                        [0],
+                                    ]
                                     continue
                             if idx_area != 0:
                                 try:
                                     n_patch_img = cv2.resize(
                                         ori_patch_img,
                                         (
-                                            int(ori_patch_img.shape[1] / reduction_value),
-                                            int(ori_patch_img.shape[0] / reduction_value),
+                                            int(
+                                                ori_patch_img.shape[1] / reduction_value
+                                            ),
+                                            int(
+                                                ori_patch_img.shape[0] / reduction_value
+                                            ),
                                         ),
                                     )
                                 except:
                                     print(
                                         f"Sub No: {json_name.split('_')[0]} & Angle: {angle} & Area: {area_naming[area_name]} , {list(ori_patch_img.shape)}"
                                     )
-                                    area_list[f"{idx_area}"] = [torch.zeros([3, 128, 128]), dict(), [0]]
+                                    area_list[f"{idx_area}"] = [
+                                        torch.zeros([3, 128, 128]),
+                                        dict(),
+                                        [0],
+                                    ]
                                     continue
-                                
+
                                 patch_img = self.make_double(n_patch_img)
-                                if not isinstance(patch_img, np.ndarray):  
+                                if not isinstance(patch_img, np.ndarray):
                                     continue
 
                             else:
-                                patch_img = cv2.resize(ori_patch_img, (args.res, args.res))
+                                patch_img = cv2.resize(
+                                    ori_patch_img, (args.res, args.res)
+                                )
 
-                            pil_img = Image.fromarray(ori_patch_img)
+                            pil_img = Image.fromarray(patch_img)
                             patch_img = self.transform["train"](pil_img)
                             label_data = (
                                 meta["annotations"]
@@ -151,10 +169,13 @@ class CustomDataset(Dataset):
                                 continue
 
                             if args.mode != "class":
-                                item_list = self.norm_reg(meta, idx_area)
-                                label_data = torch.tensor(item_list)
+                                label_data = self.norm_reg(meta, idx_area)
 
-                            area_list[f"{idx_area}"] = [patch_img, label_data, ori_patch_img]
+                            area_list[f"{idx_area}"] = [
+                                patch_img,
+                                label_data,
+                                ori_patch_img,
+                            ]
 
                         self.sub_path.append(area_list)
 
@@ -172,8 +193,8 @@ class CustomDataset(Dataset):
     def make_double(self, n_patch_img):
         row = n_patch_img.shape[0]
         col = n_patch_img.shape[1]
-        
-        if row < 64: 
+
+        if row < 64:
             patch_img = np.zeros((128, 256, 3), dtype=np.uint8)
             patch = cv2.resize(
                 n_patch_img,
@@ -182,9 +203,11 @@ class CustomDataset(Dataset):
                     int(n_patch_img.shape[0] * 2),
                 ),
             )
-            patch_img[: n_patch_img.shape[0] * 2, :int(n_patch_img.shape[1]) * 2] = patch
+            patch_img[
+                : n_patch_img.shape[0] * 2, : int(n_patch_img.shape[1]) * 2
+            ] = patch
 
-        elif col < 64: 
+        elif col < 64:
             patch_img = np.zeros((256, 128, 3), dtype=np.uint8)
             patch = cv2.resize(
                 n_patch_img,
@@ -193,7 +216,9 @@ class CustomDataset(Dataset):
                     int(n_patch_img.shape[0] * 2),
                 ),
             )
-            patch_img[: n_patch_img.shape[0] * 2, :int(n_patch_img.shape[1] * 2)] = patch
+            patch_img[
+                : n_patch_img.shape[0] * 2, : int(n_patch_img.shape[1] * 2)
+            ] = patch
 
         else:
             patch_img = np.zeros((128, 128, 3), dtype=np.uint8)
@@ -227,10 +252,10 @@ class CustomDataset(Dataset):
             min(bbox_point[1], bbox_point[3]),
             max(bbox_point[1], bbox_point[3]),
         ]
-        
+
         if (bbox_x[1] - bbox_x[0]) < 128 or (bbox_y[1] - bbox_y[0]) < 128:
             return 1
-        
+
         area_name = str(int(json_name.split("_")[-1].split(".")[0]))
         if (bbox_point[0] > bbox_point[2]) or (bbox_point[1] > bbox_point[3]):
             print(

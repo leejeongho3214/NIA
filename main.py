@@ -30,7 +30,7 @@ def parse_args():
 
     parser.add_argument(
         "--img_path",
-        default="dataset/img",
+        default="/Users/jeongho/Desktop/dataset/img",
         type=str,
     )
 
@@ -55,7 +55,7 @@ def parse_args():
 
     parser.add_argument(
         "--json_path",
-        default="dataset/label",
+        default="/Users/jeongho/Desktop/dataset/label",
         type=str,
     )
 
