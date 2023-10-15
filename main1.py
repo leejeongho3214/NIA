@@ -1,20 +1,22 @@
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+
 import shutil
 import numpy as np
 import torch
 from torchvision import models
 
 from tensorboardX import SummaryWriter
-import os
+
 import copy
 from torch.utils.data import random_split
 from matplotlib import pyplot as plt
 from logger import setup_logger
 from data_loader import CustomDataset
-from model import Model, resume_checkpoint, mkdir
+from model import resume_checkpoint, mkdir, Model
 from torchvision.models import ResNet50_Weights
 import torch.nn as nn
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 import argparse
 from torch.utils import data
 
@@ -30,7 +32,7 @@ def parse_args():
 
     parser.add_argument(
         "--img_path",
-        default="dataset/img",
+        default="dataset/50%/img",
         type=str,
     )
 
@@ -42,7 +44,9 @@ def parse_args():
 
     parser.add_argument("--stop_early", type=int, default=30)
 
-    parser.add_argument("--equ", type=int, default=[1, 2, 3], choices=[1, 2, 3], nargs="+")
+    parser.add_argument(
+        "--equ", type=int, default=[1, 2, 3], choices=[1, 2, 3], nargs="+"
+    )
 
     parser.add_argument("--angle", default="all", type=str, choices=["F", "all"])
 
@@ -55,7 +59,7 @@ def parse_args():
 
     parser.add_argument(
         "--json_path",
-        default="dataset/label",
+        default="dataset/50%/label",
         type=str,
     )
 
@@ -64,9 +68,7 @@ def parse_args():
         default="checkpoint",
         type=str,
     )
-
-    parser.add_argument("--normalize", action="store_true")
-
+    
     parser.add_argument("--double", action="store_true")
 
     parser.add_argument(
@@ -100,7 +102,7 @@ def parse_args():
 
     parser.add_argument(
         "--num_workers",
-        default=0,
+        default=4,
         type=int,
     )
 
@@ -141,7 +143,7 @@ def main(args):
         if args.mode == "class"
         else [1, 2, np.nan, 1, 0, 3, 0, np.nan, 2]
     )
-    
+
     args.best_loss = [np.inf for _ in range(len(model_num_class))]
     model_list = [copy.deepcopy(model) for _ in range(len(model_num_class))]
     # Define 9 resnet models for each region
@@ -154,7 +156,6 @@ def main(args):
             resume_list.append(idx)
 
     ## Adjust the number of output in model for each region image
-
     model_dict_path = os.path.join(check_path, "1", "state_dict.bin")
 
     if args.reset:
@@ -168,7 +169,8 @@ def main(args):
         print(f"\033[92mResuming......{model_dict_path}\033[0m")
 
         for idx in resume_list:
-            if idx in [4, 6]: continue
+            if idx in [4, 6]:
+                continue
             model_list[idx] = resume_checkpoint(
                 args,
                 model_list[idx],
@@ -200,6 +202,7 @@ def main(args):
         shuffle=False,
     )
     # Data Loader
+    del train_dataset, val_dataset, test_dataset
 
     resnet_model = Model(
         args, model_list, trainset_loader, valset_loader, testset_loader, logger, writer
@@ -229,7 +232,7 @@ def main(args):
         resnet_model.print_total()
         # Show the result for each value, such as pigmentation and pore, by averaging all of them
         resnet_model.update_e(epoch + 1)
-        resnet_model.reset_log(mode = args.mode)
+        resnet_model.reset_log(mode=args.mode)
 
         if resnet_model.stop_early():
             break

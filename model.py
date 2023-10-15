@@ -1,4 +1,5 @@
 import errno
+import gc
 import os
 import cv2
 import torch
@@ -352,10 +353,7 @@ class Model(object):
         return vis_img
 
     def save_img(self, iteration, patch_list):
-        if (
-            self.epoch == 0
-            and self.m_idx == 1
-        ):
+        if self.epoch == 0 and self.m_idx == 1:
             if self.args.mode == "class":
                 vis_img = np.zeros([256 * 5, 256 * 3, 3])
                 self.num_patch = len(patch_list) + 7
@@ -366,12 +364,10 @@ class Model(object):
             self.num = 0
             for area_num in patch_list:
                 img = patch_list[area_num][0][0].permute(1, 2, 0).numpy().copy()
+                img = (img + 1) / 2
 
-                if self.args.normalize:
-                    img = (img + 1) / 2
-                    
                 if img.shape[1] > 128:
-                    l_img = (img[:, :128])
+                    l_img = img[:, :128]
                     l_img = cv2.resize(l_img, (256, 256))
                     cv2.putText(
                         l_img,
@@ -382,18 +378,10 @@ class Model(object):
                         (0, 244, 0),
                         2,
                     )
-                    cv2.putText(
-                        l_img,
-                        f"{list(patch_list[area_num][2][0].shape)}",
-                        (int(img.shape[1] / 4), int(img.shape[0] / 2)),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.7,
-                        (222, 244, 22),
-                        2,
-                    )
+
                     vis_img = self.match_img(vis_img, l_img)
                     self.num += 1
-                    r_img = (img[:, 128:])
+                    r_img = img[:, 128:]
                     r_img = cv2.resize(r_img, (256, 256))
                     cv2.putText(
                         r_img,
@@ -408,7 +396,7 @@ class Model(object):
                     self.num += 1
 
                 elif img.shape[0] > 128:
-                    l_img = (img[:128])
+                    l_img = img[:128]
                     l_img = cv2.resize(l_img, (256, 256))
                     cv2.putText(
                         l_img,
@@ -419,18 +407,10 @@ class Model(object):
                         (0, 244, 0),
                         2,
                     )
-                    cv2.putText(
-                        l_img,
-                        f"{list(patch_list[area_num][2][0].shape)}",
-                        (int(img.shape[1] / 4), int(img.shape[0] / 2)),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.7,
-                        (222, 244, 22),
-                        2,
-                    )
+
                     vis_img = self.match_img(vis_img, l_img)
                     self.num += 1
-                    r_img = (img[128:])
+                    r_img = img[128:]
                     r_img = cv2.resize(r_img, (256, 256))
                     cv2.putText(
                         r_img,
@@ -445,7 +425,7 @@ class Model(object):
                     self.num += 1
 
                 else:
-                    img = (img[:, :128])
+                    img = img[:, :128]
                     img = cv2.resize(img, (256, 256))
                     cv2.putText(
                         img,
@@ -456,18 +436,9 @@ class Model(object):
                         (0, 244, 0),
                         2,
                     )
-                    cv2.putText(
-                        img,
-                        f"{list(patch_list[area_num][2][0].shape)}",
-                        (int(img.shape[1] / 4), int(img.shape[0] / 2)),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.7,
-                        (222, 244, 22),
-                        2,
-                    )
+
                     vis_img = self.match_img(vis_img, img)
                     self.num += 1
-                
 
             mkdir(f"vis/{self.args.mode}/{self.args.name}")
             cv2.imwrite(
@@ -514,19 +485,22 @@ class Model(object):
             )
 
     def run(self, phase="train"):
+        
         self.model = (
             copy.deepcopy(self.model_list[self.m_idx])
             if phase in ["train", "test"]
             else self.temp_model_list[self.m_idx]
         )
         self.model.train() if phase == "train" else self.model.eval()
-
+        
         optimizer = torch.optim.Adam(
             params=list(self.model.parameters()),
             lr=self.args.lr,
             betas=(0.9, 0.999),
             weight_decay=0,
         )
+        adjust_learning_rate(optimizer, self.epoch, self.args)
+
         data_loader = (
             self.train_loader
             if phase == "train"
@@ -538,74 +512,84 @@ class Model(object):
         self.phase = phase
         self.area_num = str(self.m_idx + 1) if self.flag else str(self.m_idx)
         
-        for iteration, patch_list in enumerate(data_loader):
-            if not self.area_num in list(patch_list.keys()):
-                continue
-            
-            if type(patch_list[self.area_num][1]) == torch.Tensor:
-                label = patch_list[self.area_num][1].to(device)
-            else:
-                for name in patch_list[self.area_num][1]:
-                    patch_list[self.area_num][1][name] = patch_list[self.area_num][1][name].to(
-                        device
-                    )
-                label = patch_list[self.area_num][1]
+        def run_iter():
+            for iteration, patch_list in enumerate(data_loader):
+                if not self.area_num in list(patch_list.keys()):
+                    continue
+
+                if type(patch_list[self.area_num][1]) == torch.Tensor:
+                    label = patch_list[self.area_num][1].to(device)
+                else:
+                    for name in patch_list[self.area_num][1]:
+                        patch_list[self.area_num][1][name] = patch_list[self.area_num][1][
+                            name
+                        ].to(device)
+                    label = patch_list[self.area_num][1]
+
+                if label == {}:
+                    if iteration == len(data_loader) - 1:
+                        self.temp_model_list[self.m_idx] = self.model
+                    continue
+
+                img = patch_list[self.area_num][0].to(device)
+                if self.area_num in [4, 6]:
+                    img = torch.flip(img, dims=[3])
+
+                if img.shape[-1] > 128:
+                    img_l = img[:, :, :, :128]
+                    img_r = img[:, :, :, 128:]
+                    pred = self.model.to(device)(img_l)
+                    pred = self.model.to(device)(img_r) + pred
+
+                elif img.shape[-2] > 128:
+                    img_l = img[:, :, :128, :]
+                    img_r = img[:, :, 128:, :]
+                    pred = self.model.to(device)(img_l)
+                    pred = self.model.to(device)(img_r) + pred
+
+                else:
+                    pred = self.model.to(device)(img)
+
+                if self.phase != "test":
+                    if self.args.mode == "class":
+                        loss = self.class_loss(pred, label)
+
+                    else:
+                        idx_list = np.array([idx for idx in range(label.size(0))])
+                        nan_list = self.nan_detect(label)
+                        idx_list = idx_list[idx_list != nan_list]
+                        if len(idx_list) > 0:
+                            loss = self.regression(pred[idx_list], label[idx_list])
+
+                    self.print_loss(iteration)
+
+                else:
+                    if self.args.mode == "class":
+                        self.get_test_acc(pred, label)
+                    else:
+                        idx_list = np.array([idx for idx in range(label.size(0))])
+                        nan_list = self.nan_detect(label)
+                        idx_list = idx_list[idx_list != nan_list]
+                        if len(idx_list) > 0:
+                            self.get_test_loss(
+                                pred[idx_list], label[idx_list].to(device), self.area_num
+                            )
+
+                if self.phase == "train":
+                    
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+                    if (iteration % 10) == 0:
+                        self.save_img(iteration, patch_list)
+                    if iteration == len(data_loader) - 1:
+                        self.temp_model_list[self.m_idx] = self.model
+        
+        if self.phase == 'train':
+            run_iter()
+        else:
+            with torch.no_grad():
+                run_iter()
+
                 
-            if label == {}:
-                if iteration == len(data_loader) - 1:
-                    self.temp_model_list[self.m_idx] = self.model
-                continue
-
-            img = patch_list[self.area_num][0].to(device)
-            if self.area_num in [4, 6]:
-                img = torch.flip(img, dims=[3])
-            adjust_learning_rate(optimizer, self.epoch, self.args)
-
-            if img.shape[-1] > 128:
-                img_l = img[:, :, :, :128]
-                img_r = img[:, :, :, 128:]
-                pred = self.model.to(device)(img_l)
-                pred = self.model.to(device)(img_r) + pred
-
-            elif img.shape[-2] > 128:
-                img_l = img[:, :, :128, :]
-                img_r = img[:, :, 128:, :]
-                pred = self.model.to(device)(img_l)
-                pred = self.model.to(device)(img_r) + pred
-
-            else:
-                pred = self.model.to(device)(img)
-
-            if self.phase != "test":
-                if self.args.mode == "class":
-                    loss = self.class_loss(pred, label)
-
-                else:
-                    idx_list = np.array([idx for idx in range(label.size(0))])
-                    nan_list = self.nan_detect(label)
-                    idx_list = idx_list[idx_list != nan_list]
-                    if len(idx_list) > 0:
-                        loss = self.regression(pred[idx_list], label[idx_list])
-
-                self.print_loss(iteration)
-
-            else:
-                if self.args.mode == "class":
-                    self.get_test_acc(pred, label)
-                else:
-                    idx_list = np.array([idx for idx in range(label.size(0))])
-                    nan_list = self.nan_detect(label)
-                    idx_list = idx_list[idx_list != nan_list]
-                    if len(idx_list) > 0:
-                        self.get_test_loss(
-                            pred[idx_list], label[idx_list].to(device), self.area_num
-                        )
-
-            if self.phase == "train":
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                if (iteration % 10)  == 0:
-                    self.save_img(iteration, patch_list)
-                if iteration == len(data_loader) - 1:
-                    self.temp_model_list[self.m_idx] = self.model
+                    

@@ -57,16 +57,10 @@ class CustomDataset(Dataset):
         self.json_path = args.json_path
         sub_path_list = os.listdir(self.img_path)
         sub_path_list = [f"{equ:02}" for equ in args.equ]
-        element = (
-            [
-                transforms.ToTensor(),
-                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-            ]
-            if args.normalize
-            else [
-                transforms.ToTensor(),
-            ]
-        )
+        element = [
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        ]
 
         self.transform = {
             "train": transforms.Compose(element),
@@ -79,8 +73,11 @@ class CustomDataset(Dataset):
                 desc="subject_no",
                 leave=False,
             ):
-                if sub_fold.startswith("."):
+                if sub_fold.startswith(".") or not os.path.exists(
+                    os.path.join(self.json_path, equ_name, sub_fold)
+                ):
                     continue
+
                 img_count = 0
                 for file_name in os.listdir(
                     os.path.join(self.img_path, equ_name, sub_fold)
@@ -122,7 +119,6 @@ class CustomDataset(Dataset):
                                     area_list[f"{idx_area}"] = [
                                         torch.zeros([3, 128, 128]),
                                         dict(),
-                                        [0],
                                     ]
                                     continue
                             if idx_area != 0:
@@ -140,12 +136,11 @@ class CustomDataset(Dataset):
                                     )
                                 except:
                                     print(
-                                        f"Sub No: {json_name.split('_')[0]} & Angle: {angle} & Area: {area_naming[area_name]} , {list(ori_patch_img.shape)}"
+                                        f"Sub No: {json_name.split('_')[0]} & Angle: {angle} & Equ: {equ_name} & Area: {area_naming[area_name]} , {list(ori_patch_img.shape)}"
                                     )
                                     area_list[f"{idx_area}"] = [
                                         torch.zeros([3, 128, 128]),
                                         dict(),
-                                        [0],
                                     ]
                                     continue
 
@@ -173,8 +168,7 @@ class CustomDataset(Dataset):
 
                             area_list[f"{idx_area}"] = [
                                 patch_img,
-                                label_data,
-                                ori_patch_img,
+                                label_data
                             ]
 
                         self.sub_path.append(area_list)
@@ -265,6 +259,7 @@ class CustomDataset(Dataset):
         patch_img = img[bbox_y[0] : bbox_y[1], bbox_x[0] : bbox_x[1]]
 
         reduction_value = max(patch_img.shape) / args.res
+
 
         return reduction_value, json_name, area_name, meta, patch_img
 
