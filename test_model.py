@@ -206,8 +206,12 @@ class Model_test(object):
             dig = area_name.split("_")[-1]
             pred_l = torch.argmax(pred[:, num : num + class_num_list[dig]], dim=1)
             num += class_num_list[dig]
+            
+            score = 0
+            if abs((pred_l - gt[:, idx]).item()) < 2:
+                score += 1
             self.test_class_acc[dig].update_acc(
-                (pred_l == gt[:, idx]).sum().item(),
+                score,
                 pred_l.shape[0],
             )
             patch_list[area_num][2][dig] = [int(gt[:, idx].item()), int(pred_l.item())]
@@ -215,6 +219,26 @@ class Model_test(object):
         return patch_list
 
     def save_img(self, patch_list, iteration):
+        def marking_text():
+            for idx, name in enumerate(patch_list[area_num][2]):
+                cv2.putText(
+                    l_img,
+                    f"Gt {name} => {patch_list[area_num][2][name][0]}",
+                    (0, l_img.shape[0] - 50 - 50 * idx),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    (0, 244, 244),
+                    2,
+                )
+                cv2.putText(
+                    l_img,
+                    f"Pred {name} => {patch_list[area_num][2][name][1]}",
+                    (0, l_img.shape[0] - 25 - 50 * idx),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    (100, 244, 244),
+                    2,
+                )
         self.num_patch = len(patch_list) + 5
         self.col = 4 if self.args.mode == "class" else 3
         vis_img = np.zeros([256 * 4, 256 * self.col, 3])
@@ -225,7 +249,7 @@ class Model_test(object):
             if self.args.normalize:
                 img = (img + 1) / 2
 
-            if int(area_num) in [1, 7, 8]:
+            if img.shape[1] > 128:
                 l_img = (img[:, :128]).numpy()
                 l_img = cv2.resize(l_img, (256, 256))
                 cv2.putText(
@@ -237,25 +261,8 @@ class Model_test(object):
                     (0, 244, 0),
                     2,
                 )
-                for idx, name in enumerate(patch_list[area_num][2]):
-                    cv2.putText(
-                        l_img,
-                        f"Gt {name} => {patch_list[area_num][2][name][0]}",
-                        (0, l_img.shape[0] - 50 - 50 * idx),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.6,
-                        (0, 244, 244),
-                        2,
-                    )
-                    cv2.putText(
-                        l_img,
-                        f"Pred {name} => {patch_list[area_num][2][name][1]}",
-                        (0, l_img.shape[0] - 25 - 50 * idx),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.6,
-                        (100, 244, 244),
-                        2,
-                    )
+                if len(patch_list[area_num]) > 2: marking_text()
+                
                 vis_img = self.match_img(vis_img, l_img)
                 self.num += 1
                 r_img = (img[:, 128:]).numpy()
@@ -272,7 +279,8 @@ class Model_test(object):
                 vis_img = self.match_img(vis_img, r_img)
                 self.num += 1
 
-            elif int(area_num) in [3, 4]:
+
+            elif img.shape[0] > 128:
                 l_img = (img[:128]).numpy()
                 l_img = cv2.resize(l_img, (256, 256))
                 cv2.putText(
@@ -284,25 +292,7 @@ class Model_test(object):
                     (0, 244, 0),
                     2,
                 )
-                for idx, name in enumerate(patch_list[area_num][2]):
-                    cv2.putText(
-                        l_img,
-                        f"Gt {name} => {patch_list[area_num][2][name][0]}",
-                        (0, l_img.shape[0] - 50 - 50 * idx),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.6,
-                        (0, 244, 244),
-                        2,
-                    )
-                    cv2.putText(
-                        l_img,
-                        f"Pred {name} => {patch_list[area_num][2][name][1]}",
-                        (0, l_img.shape[0] - 25 - 50 * idx),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.6,
-                        (100, 244, 244),
-                        2,
-                    )
+                if len(patch_list[area_num]) > 2: marking_text()
                 vis_img = self.match_img(vis_img, l_img)
                 self.num += 1
                 r_img = (img[128:]).numpy()
@@ -331,25 +321,26 @@ class Model_test(object):
                     (0, 244, 0),
                     2,
                 )
-                for idx, name in enumerate(patch_list[area_num][2]):
-                    cv2.putText(
-                        img,
-                        f"Gt {name} => {patch_list[area_num][2][name][0]}",
-                        (0, img.shape[0] - 50 - 50 * idx),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.6,
-                        (0, 244, 244),
-                        2,
-                    )
-                    cv2.putText(
-                        img,
-                        f"Pred {name} => {patch_list[area_num][2][name][1]}",
-                        (0, img.shape[0] - 25 - 50 * idx),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.6,
-                        (100, 244, 244),
-                        2,
-                    )
+                if len(patch_list[area_num]) > 2:
+                    for idx, name in enumerate(patch_list[area_num][2]):
+                        cv2.putText(
+                            img,
+                            f"Gt {name} => {patch_list[area_num][2][name][0]}",
+                            (0, img.shape[0] - 50 - 50 * idx),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.6,
+                            (0, 244, 244),
+                            2,
+                        )
+                        cv2.putText(
+                            img,
+                            f"Pred {name} => {patch_list[area_num][2][name][1]}",
+                            (0, img.shape[0] - 25 - 50 * idx),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.6,
+                            (100, 244, 244),
+                            2,
+                        )
                 vis_img = self.match_img(vis_img, img)
                 self.num += 1
 
@@ -403,15 +394,20 @@ class Model_test(object):
                         ].to(device)
                     label = patch_list[area_num][1]
 
+                if label == {}:
+                    continue
                 img = patch_list[area_num][0].to(device)
 
-                if area_num in [1, 7, 8]:
+                if area_num in [4, 6]:
+                    img = torch.flip(img, dims=[3])
+
+                if img.shape[-1] > 128:
                     img_l = img[:, :, :, :128]
                     img_r = img[:, :, :, 128:]
                     pred = self.model.to(device)(img_l)
                     pred = self.model.to(device)(img_r) + pred
 
-                elif area_num in [3, 4]:
+                elif img.shape[-2] > 128:
                     img_l = img[:, :, :128, :]
                     img_r = img[:, :, 128:, :]
                     pred = self.model.to(device)(img_l)
@@ -422,9 +418,11 @@ class Model_test(object):
 
                 if self.args.mode == "class":
                     patch_list = self.get_test_acc(pred, label, patch_list, area_num)
+
                 else:
                     patch_list = self.get_test_loss(
                         pred, label.to(device), area_num, patch_list
                     )
-
+                    
             self.save_img(patch_list, iteration)
+

@@ -59,7 +59,7 @@ class CustomDataset(Dataset):
         sub_path_list = [f"{equ:02}" for equ in args.equ]
         element = [
             transforms.ToTensor(),
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+            # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ]
 
         self.transform = {
@@ -164,7 +164,7 @@ class CustomDataset(Dataset):
                                 continue
 
                             if args.mode != "class":
-                                label_data = self.norm_reg(meta, idx_area)
+                                label_data = torch.tensor(self.norm_reg(meta, idx_area))
 
                             area_list[f"{idx_area}"] = [
                                 patch_img,
@@ -172,6 +172,7 @@ class CustomDataset(Dataset):
                             ]
 
                         self.sub_path.append(area_list)
+
 
                 else:
                     print(
@@ -277,20 +278,22 @@ class CustomDataset(Dataset):
 
         for item in type_class[f"{idx_area}"]:
             item_class = item.split("_")[-1]
-
-            if item_class == "R2":
-                item_list.append(meta["equipment"][item])
-
-            elif item_class in ["moisture", "Ra"]:
-                item_list.append(meta["equipment"][item] / 100)
-
-            elif item_class == "count":
-                item_list.append(meta["equipment"][item] / 300)
-
-            elif item_class == "pore":
-                item_list.append(meta["equipment"][item] / 3000)
-
+            if meta["equipment"][item] == 'Er':
+                item_list.append(np.nan)
             else:
-                assert 0, "item_class is not here"
+                if item_class == "R2":
+                    item_list.append(meta["equipment"][item])
+
+                elif item_class in ["moisture", "Ra"]:
+                    item_list.append(meta["equipment"][item] / 100)
+
+                elif item_class == "count":
+                    item_list.append(meta["equipment"][item] / 300)
+
+                elif item_class == "pore":
+                    item_list.append(meta["equipment"][item] / 3000)
+
+                else:
+                    assert 0, "item_class is not here"
 
         return item_list

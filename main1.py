@@ -32,7 +32,7 @@ def parse_args():
 
     parser.add_argument(
         "--img_path",
-        default="dataset/50%/img",
+        default="dataset/100%/img",
         type=str,
     )
 
@@ -43,7 +43,6 @@ def parse_args():
     )
 
     parser.add_argument("--stop_early", type=int, default=30)
-
     parser.add_argument(
         "--equ", type=int, default=[1, 2, 3], choices=[1, 2, 3], nargs="+"
     )
@@ -59,7 +58,7 @@ def parse_args():
 
     parser.add_argument(
         "--json_path",
-        default="dataset/50%/label",
+        default="dataset/100%/label",
         type=str,
     )
 

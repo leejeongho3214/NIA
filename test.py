@@ -15,7 +15,7 @@ from test_model import Model_test
 from torchvision.models import ResNet50_Weights
 import torch.nn as nn
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 import argparse
 from torch.utils import data
 
@@ -31,7 +31,7 @@ def parse_args():
 
     parser.add_argument(
         "--img_path",
-        default="dataset/img",
+        default="dataset/100%/img",
         type=str,
     )
 
@@ -56,7 +56,7 @@ def parse_args():
 
     parser.add_argument(
         "--json_path",
-        default="dataset/label",
+        default="dataset/100%/label",
         type=str,
     )
 
@@ -101,7 +101,7 @@ def parse_args():
 
     parser.add_argument(
         "--num_workers",
-        default=0,
+        default=4,
         type=int,
     )
 
@@ -186,8 +186,6 @@ def main(args):
 
     resnet_model.print_total()
     # Show the result for each value, such as pigmentation and pore, by averaging all of them
-
-
 
 if __name__ == "__main__":
     args = parse_args()

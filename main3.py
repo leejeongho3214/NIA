@@ -1,5 +1,6 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 import shutil
 import numpy as np
@@ -32,7 +33,7 @@ def parse_args():
 
     parser.add_argument(
         "--img_path",
-        default="dataset/50%/img",
+        default="dataset/100%/img",
         type=str,
     )
 
@@ -59,7 +60,7 @@ def parse_args():
 
     parser.add_argument(
         "--json_path",
-        default="dataset/50%/label",
+        default="dataset/100%/label",
         type=str,
     )
 
@@ -68,7 +69,7 @@ def parse_args():
         default="checkpoint",
         type=str,
     )
-    
+
     parser.add_argument("--double", action="store_true")
 
     parser.add_argument(

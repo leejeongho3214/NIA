@@ -1,4 +1,5 @@
 import os
+
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import shutil
@@ -68,7 +69,7 @@ def parse_args():
         default="checkpoint",
         type=str,
     )
-    
+
     parser.add_argument("--double", action="store_true")
 
     parser.add_argument(

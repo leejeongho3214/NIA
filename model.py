@@ -555,11 +555,13 @@ class Model(object):
                         loss = self.class_loss(pred, label)
 
                     else:
-                        idx_list = np.array([idx for idx in range(label.size(0))])
-                        nan_list = self.nan_detect(label)
-                        idx_list = idx_list[idx_list != nan_list]
+                        idx_list = set([idx for idx in range(label.size(0))])
+                        nan_list = set(self.nan_detect(label))
+                        idx_list = list(idx_list - nan_list)
                         if len(idx_list) > 0:
                             loss = self.regression(pred[idx_list], label[idx_list])
+                        else:
+                            continue
 
                     self.print_loss(iteration)
 
@@ -567,16 +569,15 @@ class Model(object):
                     if self.args.mode == "class":
                         self.get_test_acc(pred, label)
                     else:
-                        idx_list = np.array([idx for idx in range(label.size(0))])
-                        nan_list = self.nan_detect(label)
-                        idx_list = idx_list[idx_list != nan_list]
+                        idx_list = set([idx for idx in range(label.size(0))])
+                        nan_list = set(self.nan_detect(label))
+                        idx_list = list(idx_list - nan_list)
                         if len(idx_list) > 0:
                             self.get_test_loss(
                                 pred[idx_list], label[idx_list].to(device), self.area_num
                             )
 
                 if self.phase == "train":
-                    
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
