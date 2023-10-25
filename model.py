@@ -537,13 +537,13 @@ class Model(object):
 
                 if img.shape[-1] > 128:
                     img_l = img[:, :, :, :128]
-                    img_r = img[:, :, :, 128:]
+                    img_r = torch.flip(img[:, :, :, 128:], dims=[3])
                     pred = self.model.to(device)(img_l)
                     pred = self.model.to(device)(img_r) + pred
 
                 elif img.shape[-2] > 128:
                     img_l = img[:, :, :128, :]
-                    img_r = img[:, :, 128:, :]
+                    img_r = torch.flip(img[:, :, 128:, :], dims=[2])
                     pred = self.model.to(device)(img_l)
                     pred = self.model.to(device)(img_r) + pred
 
