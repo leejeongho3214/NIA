@@ -511,8 +511,10 @@ class Model(object):
 
         self.phase = phase
         self.area_num = str(self.m_idx + 1) if self.flag else str(self.m_idx)
+        self.img_count = 0
         
         def run_iter():
+            self.img_count = 0
             for iteration, patch_list in enumerate(data_loader):
                 if not self.area_num in list(patch_list.keys()):
                     continue
@@ -585,12 +587,16 @@ class Model(object):
                         self.save_img(iteration, patch_list)
                     if iteration == len(data_loader) - 1:
                         self.temp_model_list[self.m_idx] = self.model
+                        
+                self.img_count += 1
         
         if self.phase == 'train':
             run_iter()
         else:
             with torch.no_grad():
                 run_iter()
+                
+        self.logger.debug(f"{self.img_count}")
 
                 
                     

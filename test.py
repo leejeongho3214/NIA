@@ -1,4 +1,3 @@
-import shutil
 import numpy as np
 import torch
 from torchvision import models
@@ -156,7 +155,7 @@ def main(args):
 
 
     if os.path.isfile(model_dict_path):
-        print(f"\033[92mResuming......{model_dict_path}\033[0m")
+        print(f"\033[92mResuming......{check_path}\033[0m")
 
         for idx in resume_list:
             if idx in [4, 6]: continue

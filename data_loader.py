@@ -89,12 +89,8 @@ class CustomDataset(Dataset):
                 if img_count == img_num[equ_name]:
                     folder_path = os.path.join(self.img_path, equ_name, sub_fold)
                     for img_name in os.listdir(folder_path):
-                        if not img_name.endswith((".jpg", ".jpeg")):  ## 일부러 F를 추가함
+                        if not img_name.endswith((".jpg", ".jpeg")):
                             continue
-
-                        if args.angle == "F":
-                            if not img_name.endswith(("F.jpg")):
-                                continue
 
                         angle = img_name.split(".")[0].split("_")[-1]
 
@@ -288,7 +284,7 @@ class CustomDataset(Dataset):
                     item_list.append(meta["equipment"][item] / 100)
 
                 elif item_class == "count":
-                    item_list.append(meta["equipment"][item] / 300)
+                    item_list.append(meta["equipment"][item] / 350)
 
                 elif item_class == "pore":
                     item_list.append(meta["equipment"][item] / 3000)

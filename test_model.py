@@ -160,22 +160,37 @@ class Model_test(object):
         return round(self.test_regresion_mae[name].avg, 4)
 
     def print_total(self):
-        if self.args.mode == "class":
-            print(
-                f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] pigmentation: {self.acc_avg('pigmentation')}% // wrinkle: {self.acc_avg('wrinkle')}% // sagging: {self.acc_avg('sagging')}% // pore: {self.acc_avg('pore')}% // dryness: {self.acc_avg('dryness')}%"
-            )
+        log_path = "Evaluation.txt"
+        with open(log_path, "a") as f:
+            if self.args.mode == "class":
+                print(
+                    f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] pigmentation: {self.acc_avg('pigmentation')}% // wrinkle: {self.acc_avg('wrinkle')}% // sagging: {self.acc_avg('sagging')}% // pore: {self.acc_avg('pore')}% // dryness: {self.acc_avg('dryness')}%"
+                )
 
-            print(
-                f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Total Average Acc => {((self.acc_avg('pigmentation') + self.acc_avg('wrinkle') + self.acc_avg('sagging') + self.acc_avg('pore') + self.acc_avg('dryness') ) / 5):.2f}%"
-            )
+                print(
+                    f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Total Average Acc => {((self.acc_avg('pigmentation') + self.acc_avg('wrinkle') + self.acc_avg('sagging') + self.acc_avg('pore') + self.acc_avg('dryness') ) / 5):.2f}%"
+                )
+                f.write(
+                    f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] pigmentation: {self.acc_avg('pigmentation')}% // wrinkle: {self.acc_avg('wrinkle')}% // sagging: {self.acc_avg('sagging')}% // pore: {self.acc_avg('pore')}% // dryness: {self.acc_avg('dryness')}%\n"
+                )
+                f.write(
+                    f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Total Average Acc => {((self.acc_avg('pigmentation') + self.acc_avg('wrinkle') + self.acc_avg('sagging') + self.acc_avg('pore') + self.acc_avg('dryness') ) / 5):.2f}%\n"
+                )
 
-        else:
-            print(
-                f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] moisture: {self.loss_avg('moisture')} // wrinkle: {self.loss_avg('wrinkle')} // elasticity: {self.loss_avg('elasticity')} // pore: {self.loss_avg('pore')}"
-            )
-            print(
-                f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Total Average MAE => {((self.loss_avg('moisture') + self.loss_avg('wrinkle') +self.loss_avg('elasticity') + self.loss_avg('pore')) / 4):.3f}"
-            )
+            else:
+                print(
+                    f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] moisture: {self.loss_avg('moisture')} // wrinkle: {self.loss_avg('wrinkle')} // elasticity: {self.loss_avg('elasticity')} // pore: {self.loss_avg('pore')}"
+                )
+                print(
+                    f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Total Average MAE => {((self.loss_avg('moisture') + self.loss_avg('wrinkle') +self.loss_avg('elasticity') + self.loss_avg('pore')) / 4):.3f}"
+                )
+                f.write(
+                    f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] moisture: {self.loss_avg('moisture')} // wrinkle: {self.loss_avg('wrinkle')} // elasticity: {self.loss_avg('elasticity')} // pore: {self.loss_avg('pore')}\n"
+                )
+                f.write(
+                    f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Total Average MAE => {((self.loss_avg('moisture') + self.loss_avg('wrinkle') +self.loss_avg('elasticity') + self.loss_avg('pore')) / 4):.3f}\n"
+                )
+            f.close()
 
     def match_img(self, vis_img, img):
         col = self.num % self.col
@@ -206,7 +221,7 @@ class Model_test(object):
             dig = area_name.split("_")[-1]
             pred_l = torch.argmax(pred[:, num : num + class_num_list[dig]], dim=1)
             num += class_num_list[dig]
-            
+
             score = 0
             if abs((pred_l - gt[:, idx]).item()) < 2:
                 score += 1
@@ -239,6 +254,7 @@ class Model_test(object):
                     (100, 244, 244),
                     2,
                 )
+
         self.num_patch = len(patch_list) + 5
         self.col = 4 if self.args.mode == "class" else 3
         vis_img = np.zeros([256 * 4, 256 * self.col, 3])
@@ -261,8 +277,9 @@ class Model_test(object):
                     (0, 244, 0),
                     2,
                 )
-                if len(patch_list[area_num]) > 2: marking_text()
-                
+                if len(patch_list[area_num]) > 2:
+                    marking_text()
+
                 vis_img = self.match_img(vis_img, l_img)
                 self.num += 1
                 r_img = (img[:, 128:]).numpy()
@@ -279,7 +296,6 @@ class Model_test(object):
                 vis_img = self.match_img(vis_img, r_img)
                 self.num += 1
 
-
             elif img.shape[0] > 128:
                 l_img = (img[:128]).numpy()
                 l_img = cv2.resize(l_img, (256, 256))
@@ -292,7 +308,8 @@ class Model_test(object):
                     (0, 244, 0),
                     2,
                 )
-                if len(patch_list[area_num]) > 2: marking_text()
+                if len(patch_list[area_num]) > 2:
+                    marking_text()
                 vis_img = self.match_img(vis_img, l_img)
                 self.num += 1
                 r_img = (img[128:]).numpy()
@@ -365,7 +382,7 @@ class Model_test(object):
             if dig == "moisture":
                 gt, pred = gt * 100, pred * 100
             elif dig == "count":
-                gt, pred = gt * 300, pred * 300
+                gt, pred = gt * 350, pred * 350
             elif dig == "pore":
                 gt, pred = gt * 3000, pred * 3000
             patch_list[area_num][2][dig] = [round(gt.item(), 3), round(pred.item(), 3)]
@@ -373,6 +390,9 @@ class Model_test(object):
         return patch_list
 
     def test(self, model_num_class, data_loader):
+        eval_list = dict()
+        for 
+
         for iteration, patch_list in enumerate(data_loader):
             for model_idx in range(len(model_num_class)):
                 if np.isnan(model_num_class[model_idx]):
@@ -423,6 +443,5 @@ class Model_test(object):
                     patch_list = self.get_test_loss(
                         pred, label.to(device), area_num, patch_list
                     )
-                    
-            self.save_img(patch_list, iteration)
 
+            self.save_img(patch_list, iteration)
