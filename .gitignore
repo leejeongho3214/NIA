@@ -5,6 +5,7 @@ img/
 label/
 vis/
 checkpoint/
+dataset/
 .vscode/
 __MACOSX/
 tensorboard/
@@ -12,3 +13,5 @@ __pycache__/
 *.xlsx
 *.ipynb
 *.pyc
+
+docker/
