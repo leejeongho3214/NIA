@@ -1,7 +1,9 @@
+import datetime
 import numpy as np
 import torch
 from torchvision import models
 
+import sys
 import os
 import copy
 from torch.utils.data import random_split
@@ -11,14 +13,14 @@ from test_model import Model_test
 from torchvision.models import ResNet50_Weights
 import torch.nn as nn
 import argparse
+from logger import setup_logger
 from torch.utils import data
-
 
 def parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "name",
+        "--name",
         default="100%/1,2,3",
         type=str,
     )
@@ -30,16 +32,10 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--loss_dir",
-        default="tensorboard",
-        type=str,
+        "--equ", type=int, default=[1, 2, 3], choices=[1, 2, 3], nargs="+"
     )
 
-    parser.add_argument("--stop_early", type=int, default=30)
-
-    parser.add_argument("--equ", type=int, default=[1, 2, 3], choices=[1, 2, 3], nargs="+")
-
-    parser.add_argument("--angle", default="F", type=str, choices=["F", "all"])
+    parser.add_argument("--angle", default="all", type=str, choices=["F", "all"])
 
     parser.add_argument(
         "--mode",
@@ -59,10 +55,6 @@ def parse_args():
         default="checkpoint",
         type=str,
     )
-
-    parser.add_argument("--normalize", action="store_true")
-
-    parser.add_argument("--double", action="store_true")
 
     parser.add_argument(
         "--epoch",
@@ -99,14 +91,12 @@ def parse_args():
         type=int,
     )
 
-    parser.add_argument("--reset", action="store_true")
-
     args = parser.parse_args()
 
     return args
 
 
-def build_dataset(args, logger):
+def build_dataset(args):
     train_dataset, val_dataset, test_dataset = random_split(
         CustomDataset(args),
         [0.8, 0.1, 0.1],
@@ -118,22 +108,28 @@ def build_dataset(args, logger):
 
 
 def main(args):
-    log_path = os.path.join(args.loss_dir, args.mode, args.name)
     check_path = os.path.join(args.output_dir, args.mode, args.name)
-
-    mkdir(log_path)
     mkdir(check_path)
     ## Make the directories for save
+    d = os.popen("date").read()
+    l = os.popen("ls -al").read()
 
+    logger = setup_logger(args.name, ".")
 
+    logger.info(d)
+    logger.info(l)
+
+    logger.info("Command Line: " + " ".join(sys.argv))
     model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
     model_list = [copy.deepcopy(model) for _ in range(9)]
     # Define 8 resnet models for each region
 
+    ## Class Definition
     model_num_class = (
-        [np.nan, 15, 9, 9, 0, 12, 0, 5, 7]
+        [np.nan, 15, 7, 7, 0, 12, 0, 5, 7] ## 9에서 7로 수정 필요
         if args.mode == "class"
         else [1, 2, np.nan, 1, 0, 3, 0, np.nan, 2]
+        ##   안면전체(색소침착) / 이마()
     )
 
     resume_list = list()
@@ -145,15 +141,14 @@ def main(args):
             resume_list.append(idx)
 
     ## Adjust the number of output in model for each region image
-
     model_dict_path = os.path.join(check_path, "1", "state_dict.bin")
 
-
     if os.path.isfile(model_dict_path):
-        print(f"\033[92mResuming......{check_path}\033[0m")
+        logger.info(f"\033[92mResuming......{check_path}\033[0m")
 
         for idx in resume_list:
-            if idx in [4, 6]: continue
+            if idx in [4, 6]:
+                continue
             model_list[idx] = resume_checkpoint(
                 args,
                 model_list[idx],
@@ -162,8 +157,7 @@ def main(args):
     else:
         assert 0, "Check the check-point path, there's not any file in that"
 
-    _, _, test_dataset = build_dataset(args, None)
-
+    _, _, test_dataset = build_dataset(args)
 
     testset_loader = data.DataLoader(
         dataset=test_dataset,
@@ -173,14 +167,20 @@ def main(args):
     )
     # Data Loader
 
-    resnet_model = Model_test(args, model_list, testset_loader)
+    resnet_model = Model_test(args, model_list, testset_loader, logger)
     # If the model's acc is higher than best acc, it saves this model
-
+    logger.info("Inferece ...")
     resnet_model.test(model_num_class, testset_loader)
+    logger.info("Finish!")
 
-    resnet_model.print_total()
+    resnet_model.print_total(iter)
     # Show the result for each value, such as pigmentation and pore, by averaging all of them
+
+    return logger
+
 
 if __name__ == "__main__":
     args = parse_args()
-    main(args)
+    logger = main(args)
+    logger.info(os.popen("date").read())
+    logger.info(os.popen("ls -al").read())

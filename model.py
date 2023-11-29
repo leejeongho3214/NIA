@@ -16,8 +16,6 @@ if torch.cuda.is_available():
 else:
     device = torch.device("cpu")
     
-
-
 class AverageMeter(object):
     def __init__(self):
         self.reset()
@@ -109,9 +107,9 @@ class Model(object):
         model_list,
         train_loader,
         valid_loader,
-        testset_loader,
         logger,
         writer,
+        test_loader,
     ):
         super(Model, self).__init__()
         self.args = args
@@ -119,7 +117,7 @@ class Model(object):
         self.temp_model_list = [None for _ in range(9)]
         self.train_loader = train_loader
         self.valid_loader = valid_loader
-        self.test_loader = testset_loader
+        self.test_loader = test_loader
         self.best_loss = args.best_loss
 
         self.writer = writer
@@ -320,12 +318,14 @@ class Model(object):
         num = 0
         loss = 0
         for name in label:
-            dig = name.split("_")[-1]
+            area, dig = name.split("_")[-2:]
+            
+            class_num = 9 if area == "forehead" and dig == "wrinkle" else class_num_list[dig]
             gt = F.one_hot(
-                label[name].type(torch.int64), num_classes=class_num_list[dig]
+                label[name].type(torch.int64), num_classes=class_num
             ).to(device)
-            pred_p = softmax(pred[:, num : num + class_num_list[dig]])
-            num += class_num_list[dig]
+            pred_p = softmax(pred[:, num : num + class_num])
+            num += class_num
             loss += self.criterion(pred_p.type(torch.float), gt.type(torch.float))
 
         self.train_loss[self.m_idx].update(
@@ -365,7 +365,6 @@ class Model(object):
             self.num = 0
             for area_num in patch_list:
                 img = patch_list[area_num][0][0].permute(1, 2, 0).numpy().copy()
-                img = (img + 1) / 2
 
                 if img.shape[1] > 128:
                     l_img = img[:, :128]
@@ -487,12 +486,12 @@ class Model(object):
 
     def run(self, phase="train"):
         
-        self.model = (
-            copy.deepcopy(self.model_list[self.m_idx])
-            if phase in ["train", "test"]
-            else self.temp_model_list[self.m_idx]
-        )
-        self.model.train() if phase == "train" else self.model.eval()
+        # self.model = (
+        #     copy.deepcopy(self.model_list[self.m_idx])
+        #     if phase in ["train", "test"]
+        #     else self.temp_model_list[self.m_idx]
+        # )
+        # self.model.train() if phase == "train" else self.model.eval()
         
         optimizer = torch.optim.Adam(
             params=list(self.model.parameters()),
@@ -506,9 +505,10 @@ class Model(object):
             self.train_loader
             if phase == "train"
             else self.valid_loader
-            if phase == "valid"
-            else self.test_loader
         )
+        
+        if phase == 'test':
+            data_loader = self.test_loader
 
         self.phase = phase
         self.area_num = str(self.m_idx + 1) if self.flag else str(self.m_idx)
@@ -522,6 +522,7 @@ class Model(object):
 
                 if type(patch_list[self.area_num][1]) == torch.Tensor:
                     label = patch_list[self.area_num][1].to(device)
+                    
                 else:
                     for name in patch_list[self.area_num][1]:
                         patch_list[self.area_num][1][name] = patch_list[self.area_num][1][
@@ -538,56 +539,54 @@ class Model(object):
                 if self.area_num in [4, 6]:
                     img = torch.flip(img, dims=[3])
 
-                if img.shape[-1] > 128:
-                    img_l = img[:, :, :, :128]
-                    img_r = torch.flip(img[:, :, :, 128:], dims=[3])
-                    pred = self.model.to(device)(img_l)
-                    pred = self.model.to(device)(img_r) + pred
+                # if img.shape[-1] > 128:
+                #     img_l = img[:, :, :, :128]
+                #     img_r = torch.flip(img[:, :, :, 128:], dims=[3])
+                #     pred = self.model.to(device)(img_l)
+                #     pred = self.model.to(device)(img_r) + pred
 
-                elif img.shape[-2] > 128:
-                    img_l = img[:, :, :128, :]
-                    img_r = torch.flip(img[:, :, 128:, :], dims=[2])
-                    pred = self.model.to(device)(img_l)
-                    pred = self.model.to(device)(img_r) + pred
+                # elif img.shape[-2] > 128:
+                #     img_l = img[:, :, :128, :]
+                #     img_r = torch.flip(img[:, :, 128:, :], dims=[2])
+                #     pred = self.model.to(device)(img_l)
+                #     pred = self.model.to(device)(img_r) + pred
 
-                else:
-                    pred = self.model.to(device)(img)
+                # else:
+                #     pred = self.model.to(device)(img)
 
-                if self.phase != "test":
-                    if self.args.mode == "class":
-                        loss = self.class_loss(pred, label)
+                # if self.phase != "test":
+                #     if self.args.mode == "class":
+                #         loss = self.class_loss(pred, label)
 
-                    else:
-                        idx_list = set([idx for idx in range(label.size(0))])
-                        nan_list = set(self.nan_detect(label))
-                        idx_list = list(idx_list - nan_list)
-                        if len(idx_list) > 0:
-                            loss = self.regression(pred[idx_list], label[idx_list])
-                        else:
-                            continue
+                #     else:
+                #         idx_list = set([idx for idx in range(label.size(0))])
+                #         nan_list = set(self.nan_detect(label))
+                #         idx_list = list(idx_list - nan_list)
+                #         if len(idx_list) > 0:
+                #             loss = self.regression(pred[idx_list], label[idx_list])
+                #         else:
+                #             continue
 
-                    self.print_loss(iteration)
+                    # self.print_loss(iteration)
 
-                else:
-                    if self.args.mode == "class":
-                        self.get_test_acc(pred, label)
-                    else:
-                        idx_list = set([idx for idx in range(label.size(0))])
-                        nan_list = set(self.nan_detect(label))
-                        idx_list = list(idx_list - nan_list)
-                        if len(idx_list) > 0:
-                            self.get_test_loss(
-                                pred[idx_list], label[idx_list].to(device), self.area_num
-                            )
+                # else:
+                #     if self.args.mode == "class":
+                #         self.get_test_acc(pred, label)
+                #     else:
+                #         idx_list = set([idx for idx in range(label.size(0))])
+                #         nan_list = set(self.nan_detect(label))
+                #         idx_list = list(idx_list - nan_list)
+                #         if len(idx_list) > 0:
+                #             self.get_test_loss(
+                #                 pred[idx_list], label[idx_list].to(device), self.area_num
+                #             )
 
-                if self.phase == "train":
-                    optimizer.zero_grad()
-                    loss.backward()
-                    optimizer.step()
-                    if (iteration % 10) == 0:
-                        self.save_img(iteration, patch_list)
-                    if iteration == len(data_loader) - 1:
-                        self.temp_model_list[self.m_idx] = self.model
+                # if self.phase == "train":
+                #     optimizer.zero_grad()
+                #     loss.backward()
+                #     optimizer.step()
+                #     if iteration == len(data_loader) - 1:
+                #         self.temp_model_list[self.m_idx] = self.model
                         
                 self.img_count += 1
         
@@ -596,5 +595,7 @@ class Model(object):
         else:
             with torch.no_grad():
                 run_iter()
+                
+        print(f"{self.phase}_{self.area_num}_{self.img_count}장")
                 
                     

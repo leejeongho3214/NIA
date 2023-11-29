@@ -2,12 +2,11 @@ from PIL import Image
 import torch
 from torchvision import transforms
 import os
-from torch.utils.data import Dataset, ConcatDataset
 import numpy as np
 import cv2
 import json
-from matplotlib import pyplot as plt
 from tqdm import tqdm
+from torch.utils.data import Dataset, ConcatDataset
 
 folder_name = {
     "F": "01",
@@ -23,7 +22,7 @@ folder_name = {
 
 class_num_list = {
     "pigmentation": 6,
-    "wrinkle": 9,
+    "wrinkle": 7,
     "pore": 6,
     "dryness": 5,
     "sagging": 7,
@@ -32,7 +31,7 @@ class_num_list = {
 
 area_naming = {
     "0": "all",
-    "1": "forearm",
+    "1": "forehead",
     "2": "glabellus",
     "3": "l_peroucular",
     "4": "r_peroucular",
@@ -58,8 +57,7 @@ class CustomDataset(Dataset):
         sub_path_list = os.listdir(self.img_path)
         sub_path_list = [f"{equ:02}" for equ in args.equ]
         element = [
-            transforms.ToTensor(),
-            # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+            transforms.ToTensor()
         ]
 
         self.transform = {
@@ -68,6 +66,8 @@ class CustomDataset(Dataset):
         }
         self.sub_path = list()
         for equ_name in tqdm(sub_path_list, desc="equ_name"):
+            if equ_name.startswith("."):
+                continue
             for sub_fold in tqdm(
                 os.listdir(os.path.join(self.img_path, equ_name)),
                 desc="subject_no",
@@ -78,102 +78,81 @@ class CustomDataset(Dataset):
                 ):
                     continue
 
-                img_count = 0
-                for file_name in os.listdir(
-                    os.path.join(self.img_path, equ_name, sub_fold)
-                ):
-                    if any(
-                        file_name.lower().endswith(ext) for ext in [".jpg", ".jpeg"]
-                    ):
-                        img_count += 1
-                if img_count == img_num[equ_name]:
-                    folder_path = os.path.join(self.img_path, equ_name, sub_fold)
-                    for img_name in os.listdir(folder_path):
-                        if not img_name.endswith((".jpg", ".jpeg")):
-                            continue
-
-                        angle = img_name.split(".")[0].split("_")[-1]
-
-                        img = cv2.imread(os.path.join(folder_path, img_name))
-                        area_list = dict()
-                        start_idx = 1 if args.mode == "class" else 0
-                        for idx_area in range(start_idx, 9):
-                            try:
-                                (
-                                    reduction_value,
-                                    json_name,
-                                    area_name,
-                                    meta,
-                                    ori_patch_img,
-                                ) = self.load_img(
-                                    img_name, angle, idx_area, equ_name, img, args
-                                )
-                            except:
-                                if self.load_img(
-                                    img_name, angle, idx_area, equ_name, img, args
-                                ):
-                                    area_list[f"{idx_area}"] = [
-                                        torch.zeros([3, 128, 128]),
-                                        dict(),
-                                    ]
-                                    continue
-                            if idx_area != 0:
-                                try:
-                                    n_patch_img = cv2.resize(
-                                        ori_patch_img,
-                                        (
-                                            int(
-                                                ori_patch_img.shape[1] / reduction_value
-                                            ),
-                                            int(
-                                                ori_patch_img.shape[0] / reduction_value
-                                            ),
-                                        ),
-                                    )
-                                except:
-                                    print(
-                                        f"Sub No: {json_name.split('_')[0]} & Angle: {angle} & Equ: {equ_name} & Area: {area_naming[area_name]} , {list(ori_patch_img.shape)}"
-                                    )
-                                    area_list[f"{idx_area}"] = [
-                                        torch.zeros([3, 128, 128]),
-                                        dict(),
-                                    ]
-                                    continue
-
-                                patch_img = self.make_double(n_patch_img)
-                                if not isinstance(patch_img, np.ndarray):
-                                    continue
-
-                            else:
-                                patch_img = cv2.resize(
-                                    ori_patch_img, (args.res, args.res)
-                                )
-
-                            pil_img = Image.fromarray(patch_img)
-                            patch_img = self.transform["train"](pil_img)
-                            label_data = (
-                                meta["annotations"]
-                                if args.mode == "class"
-                                else meta["equipment"]
+                folder_path = os.path.join(self.img_path, equ_name, sub_fold)
+                for img_name in os.listdir(folder_path):
+                    if not img_name.endswith(('.png', '.jpg', '.jpeg')):
+                        continue
+                    angle = img_name.split(".")[0].split("_")[-1]
+                    img = cv2.imread(os.path.join(folder_path, img_name))
+                    area_list = dict()
+                    start_idx = 1 if args.mode == "class" else 0
+                    for idx_area in range(start_idx, 9):
+                        try:
+                            (
+                                reduction_value,
+                                _,
+                                area_name,
+                                meta,
+                                ori_patch_img,
+                            ) = self.load_img(
+                                img_name, angle, idx_area, equ_name, img, args
                             )
-                            if type(label_data) != dict:
+                            
+                        except:
+                            if self.load_img(
+                                img_name, angle, idx_area, equ_name, img, args
+                            ):
+                                area_list[f"{idx_area}"] = [
+                                    torch.zeros([3, 128, 128]),
+                                    dict(),
+                                ]
+                                continue
+                            
+                        if idx_area != 0:
+                            n_patch_img = cv2.resize(
+                                ori_patch_img,
+                                (
+                                    int(
+                                        ori_patch_img.shape[1] / reduction_value
+                                    ),
+                                    int(
+                                        ori_patch_img.shape[0] / reduction_value
+                                    ),
+                                ),
+                            )
+
+                            patch_img = self.make_double(n_patch_img)
+                            if not isinstance(patch_img, np.ndarray):
                                 continue
 
-                            if args.mode != "class":
-                                label_data = torch.tensor(self.norm_reg(meta, idx_area))
+                        else:
+                            patch_img = cv2.resize(
+                                ori_patch_img, (args.res, args.res)
+                            )
 
-                            area_list[f"{idx_area}"] = [
-                                patch_img,
-                                label_data
-                            ]
+                        pil_img = Image.fromarray(patch_img)
+                        patch_img = self.transform["train"](pil_img)
+                        label_data = (
+                            meta["annotations"]
+                            if args.mode == "class"
+                            else meta["equipment"]
+                        )
+                        if type(label_data) != dict:
+                            continue
 
-                        self.sub_path.append(area_list)
+                        if args.mode != "class":
+                            label_data = torch.tensor(self.norm_reg(meta, idx_area))
+                            
+                        desc_area = "Sub." + sub_fold + "_Equ." + equ_name + "_Angle." + angle + "_Area." + area_name
+                        area_list[f"{idx_area}"] = [
+                            patch_img,
+                            label_data,
+                            desc_area,
+                        ]
 
+                    self.sub_path.append(area_list)
 
-                else:
-                    print(
-                        f"\033[94m{os.path.join(self.img_path, equ_name, sub_fold)}는 제외됨\033[0m"
-                    )
+                    
 
     def __len__(self):
         return len(self.sub_path)
@@ -248,11 +227,6 @@ class CustomDataset(Dataset):
             return 1
 
         area_name = str(int(json_name.split("_")[-1].split(".")[0]))
-        if (bbox_point[0] > bbox_point[2]) or (bbox_point[1] > bbox_point[3]):
-            print(
-                f"Sub No: {json_name.split('_')[0]} & Angle: {angle} & Area: {area_naming[area_name]}// 위치 반전"
-            )
-
         patch_img = img[bbox_y[0] : bbox_y[1], bbox_x[0] : bbox_x[1]]
 
         reduction_value = max(patch_img.shape) / args.res

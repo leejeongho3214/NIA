@@ -1,7 +1,5 @@
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-
 import shutil
 import numpy as np
 import torch
@@ -122,7 +120,7 @@ def build_dataset(args, logger):
     )
     ## For consistent results, we have set a seed number
     logger.info(
-        f"Train Dataset => {len(train_dataset)} // Valid Dataset => {len(val_dataset)} // Test Dataset => {len(test_dataset)}"
+        f"Train Dataset => {len(train_dataset)} // Valid Dataset => {len(val_dataset)}"
     )
 
     return train_dataset, val_dataset, test_dataset
@@ -140,7 +138,7 @@ def main(args):
     model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
 
     model_num_class = (
-        [np.nan, 15, 9, 9, 0, 12, 0, 5, 7]
+        [np.nan, 15, 7, 7, 0, 12, 0, 5, 7]
         if args.mode == "class"
         else [1, 2, np.nan, 1, 0, 3, 0, np.nan, 2]
     )
@@ -181,7 +179,7 @@ def main(args):
     logger = setup_logger(args.name, check_path)
     logger.info(args)
 
-    train_dataset, val_dataset, test_dataset = build_dataset(args, logger)
+    train_dataset, val_dataset, test_dataset= build_dataset(args, logger)
 
     trainset_loader = data.DataLoader(
         dataset=train_dataset,
@@ -195,18 +193,19 @@ def main(args):
         num_workers=args.num_workers,
         shuffle=False,
     )
-
+    
     testset_loader = data.DataLoader(
         dataset=test_dataset,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         shuffle=False,
     )
+
     # Data Loader
     del train_dataset, val_dataset, test_dataset
 
     resnet_model = Model(
-        args, model_list, trainset_loader, valset_loader, testset_loader, logger, writer
+        args, model_list, trainset_loader, valset_loader, logger, writer, testset_loader
     )
 
     for epoch in range(args.load_epoch, args.epoch):
@@ -220,7 +219,9 @@ def main(args):
             # Change the model for each region
             resnet_model.run(phase="train")
             resnet_model.run(phase="valid")
-
+            resnet_model.run(phase="test")
+            
+        return
         resnet_model.update_m(model_num_class)
 
         # If the model's acc is higher than best acc, it saves this model

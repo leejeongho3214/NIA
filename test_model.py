@@ -103,11 +103,11 @@ def resume_checkpoint(args, model, path):
 
 
 class Model_test(object):
-    def __init__(self, args, model_list, testset_loader):
+    def __init__(self, args, model_list, testset_loader, logger):
         super(Model_test, self).__init__()
         self.args = args
         self.model_list = model_list
-
+        self.logger = logger
         self.test_loader = testset_loader
 
         self.test_class_acc = {
@@ -142,7 +142,6 @@ class Model_test(object):
         self.m_idx = 0
         self.model = None
         self.update_c = 0
-        self.logger = None
 
     def choice(self, m_idx):
         if m_idx in [4, 6]:
@@ -160,38 +159,25 @@ class Model_test(object):
     def loss_avg(self, name):
         return round(self.test_regresion_mae[name].avg, 4)
 
-    def print_total(self):
-        log_path = "Evaluation.txt"
-        with open(log_path, "a") as f:
-            if self.args.mode == "class":
-                print(
-                    f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] pigmentation: {self.acc_avg('pigmentation')}% // wrinkle: {self.acc_avg('wrinkle')}% // sagging: {self.acc_avg('sagging')}% // pore: {self.acc_avg('pore')}% // dryness: {self.acc_avg('dryness')}%"
-                )
+    def print_total(self, iter):
+        if self.args.mode == "class":
+            self.logger.info(
+                f"pigmentation: {self.acc_avg('pigmentation')}%(T: {self.test_class_acc['pigmentation'].sum} / F: {self.test_class_acc['pigmentation'].count - self.test_class_acc['pigmentation'].sum}) // wrinkle: {self.acc_avg('wrinkle')}%(T: {self.test_class_acc['wrinkle'].sum} / F: {self.test_class_acc['wrinkle'].count - self.test_class_acc['wrinkle'].sum}) // sagging: {self.acc_avg('sagging')}%(T: {self.test_class_acc['sagging'].sum} / F: {self.test_class_acc['sagging'].count - self.test_class_acc['sagging'].sum}) // pore: {self.acc_avg('pore')}%(T: {self.test_class_acc['pore'].sum} / F: {self.test_class_acc['pore'].count - self.test_class_acc['pore'].sum}) // dryness: {self.acc_avg('dryness')}%(T: {self.test_class_acc['dryness'].sum} / F: {self.test_class_acc['dryness'].count - self.test_class_acc['dryness'].sum})"
+            )
 
-                print(
-                    f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Total Average Acc => {((self.acc_avg('pigmentation') + self.acc_avg('wrinkle') + self.acc_avg('sagging') + self.acc_avg('pore') + self.acc_avg('dryness') ) / 5):.2f}%"
-                )
-                f.write(
-                    f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] pigmentation: {self.acc_avg('pigmentation')}% // wrinkle: {self.acc_avg('wrinkle')}% // sagging: {self.acc_avg('sagging')}% // pore: {self.acc_avg('pore')}% // dryness: {self.acc_avg('dryness')}%\n"
-                )
-                f.write(
-                    f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Total Average Acc => {((self.acc_avg('pigmentation') + self.acc_avg('wrinkle') + self.acc_avg('sagging') + self.acc_avg('pore') + self.acc_avg('dryness') ) / 5):.2f}%\n"
-                )
+            self.logger.info(
+                f"Total Average Acc => {((self.acc_avg('pigmentation') + self.acc_avg('wrinkle') + self.acc_avg('sagging') + self.acc_avg('pore') + self.acc_avg('dryness') ) / 5):.2f}%"
+            )
 
-            else:
-                print(
-                    f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] count: {self.loss_avg('count')} // moisture: {self.loss_avg('moisture')} // wrinkle: {self.loss_avg('wrinkle')} // elasticity: {self.loss_avg('elasticity')} // pore: {self.loss_avg('pore')}"
-                )
-                print(
-                    f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Total Average MAE => {((self.loss_avg('count') + self.loss_avg('moisture') + self.loss_avg('wrinkle') +self.loss_avg('elasticity') + self.loss_avg('pore')) / 5):.3f}"
-                )
-                f.write(
-                    f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] count: {self.loss_avg('count')} // moisture: {self.loss_avg('moisture')} // wrinkle: {self.loss_avg('wrinkle')} // elasticity: {self.loss_avg('elasticity')} // pore: {self.loss_avg('pore')}\n"
-                )
-                f.write(
-                    f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Total Average MAE => {((self.loss_avg('count') + self.loss_avg('moisture') + self.loss_avg('wrinkle') +self.loss_avg('elasticity') + self.loss_avg('pore')) / 5):.3f}\n"
-                )
-            f.close()
+        else:
+            self.logger.info(
+                f"count: {self.loss_avg('count')} // moisture: {self.loss_avg('moisture')} // wrinkle: {self.loss_avg('wrinkle')} // elasticity: {self.loss_avg('elasticity')} // pore: {self.loss_avg('pore')}"
+            )
+            self.logger.info(
+                f"[{iter} / {len(self.test_loader)}]Total Average MAE => {((self.loss_avg('count') + self.loss_avg('moisture') + self.loss_avg('wrinkle') +self.loss_avg('elasticity') + self.loss_avg('pore')) / 5):.3f}"
+            )
+
+        self.logger.info("============" * 15)
 
     def match_img(self, vis_img, img):
         col = self.num % self.col
@@ -207,6 +193,32 @@ class Model_test(object):
                 if not torch.isfinite(value):
                     nan_list.append(batch_idx)
         return nan_list
+
+    def get_test_loss(self, pred_p, label, area_num, patch_list):
+        count = 0
+        patch_list[area_num].append(dict())
+        for name in self.equip_loss[area_num]:
+            dig = name.split("_")[-1]
+            gt = label[:, count : count + self.equip_loss[area_num][name]]
+            pred = pred_p[:, count : count + self.equip_loss[area_num][name]]
+            count += self.equip_loss[area_num][name]
+            self.test_regresion_mae[name].update(
+                self.criterion(pred, gt).item(), batch_size=pred.shape[0]
+            )
+            self.logger.info(
+                patch_list[area_num][2][0]
+                + f"({dig})"
+                + f"==> Pred: {pred.item():.3f}  /  Gt: {gt.item():.3f}  ==> MAE: {self.criterion(pred, gt).item():.3f}"
+            )
+            if dig == "moisture":
+                gt, pred = gt * 100, pred * 100
+            elif dig == "count":
+                gt, pred = gt * 350, pred * 350
+            elif dig == "pore":
+                gt, pred = gt * 3000, pred * 3000
+            patch_list[area_num][3][dig] = [round(gt.item(), 3), round(pred.item(), 3)]
+
+        return patch_list
 
     def get_test_acc(self, pred, label, patch_list, area_num):
         gt = (
@@ -224,174 +236,25 @@ class Model_test(object):
             num += class_num_list[dig]
 
             score = 0
+            flag = False
             if abs((pred_l - gt[:, idx]).item()) < 2:
                 score += 1
+                flag = True
             self.test_class_acc[dig].update_acc(
                 score,
                 pred_l.shape[0],
             )
-            patch_list[area_num][2][dig] = [int(gt[:, idx].item()), int(pred_l.item())]
-
-        return patch_list
-
-    def save_img(self, patch_list, iteration):
-        def marking_text():
-            for idx, name in enumerate(patch_list[area_num][2]):
-                cv2.putText(
-                    l_img,
-                    f"Gt {name} => {patch_list[area_num][2][name][0]}",
-                    (0, l_img.shape[0] - 50 - 50 * idx),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    (0, 244, 244),
-                    2,
-                )
-                cv2.putText(
-                    l_img,
-                    f"Pred {name} => {patch_list[area_num][2][name][1]}",
-                    (0, l_img.shape[0] - 25 - 50 * idx),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    (100, 244, 244),
-                    2,
-                )
-
-        self.num_patch = len(patch_list) + 5
-        self.col = 4 if self.args.mode == "class" else 3
-        vis_img = np.zeros([256 * 4, 256 * self.col, 3])
-
-        self.num = 0
-        for area_num in patch_list:
-            img = patch_list[area_num][0][0].permute(1, 2, 0)
-            if self.args.normalize:
-                img = (img + 1) / 2
-
-            if img.shape[1] > 128:
-                l_img = (img[:, :128]).numpy()
-                l_img = cv2.resize(l_img, (256, 256))
-                cv2.putText(
-                    l_img,
-                    f"{area_naming[str(int(area_num))]}",
-                    (10, 25),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (0, 244, 0),
-                    2,
-                )
-                if len(patch_list[area_num]) > 2:
-                    marking_text()
-
-                vis_img = self.match_img(vis_img, l_img)
-                self.num += 1
-                r_img = (img[:, 128:]).numpy()
-                r_img = cv2.resize(r_img, (256, 256))
-                cv2.putText(
-                    r_img,
-                    f"{area_naming[str(int(area_num))]}",
-                    (10, 25),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (0, 244, 0),
-                    2,
-                )
-                vis_img = self.match_img(vis_img, r_img)
-                self.num += 1
-
-            elif img.shape[0] > 128:
-                l_img = (img[:128]).numpy()
-                l_img = cv2.resize(l_img, (256, 256))
-                cv2.putText(
-                    l_img,
-                    f"{area_naming[str(int(area_num))]}",
-                    (10, 25),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (0, 244, 0),
-                    2,
-                )
-                if len(patch_list[area_num]) > 2:
-                    marking_text()
-                vis_img = self.match_img(vis_img, l_img)
-                self.num += 1
-                r_img = (img[128:]).numpy()
-                r_img = cv2.resize(r_img, (256, 256))
-                cv2.putText(
-                    r_img,
-                    f"{area_naming[str(int(area_num))]}",
-                    (10, 25),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (0, 244, 0),
-                    2,
-                )
-                vis_img = self.match_img(vis_img, r_img)
-                self.num += 1
-
-            else:
-                img = (img[:, :128]).numpy()
-                img = cv2.resize(img, (256, 256))
-                cv2.putText(
-                    img,
-                    f"{area_naming[str(int(area_num))]}",
-                    (10, 25),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (0, 244, 0),
-                    2,
-                )
-                if len(patch_list[area_num]) > 2:
-                    for idx, name in enumerate(patch_list[area_num][2]):
-                        cv2.putText(
-                            img,
-                            f"Gt {name} => {patch_list[area_num][2][name][0]}",
-                            (0, img.shape[0] - 50 - 50 * idx),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.6,
-                            (0, 244, 244),
-                            2,
-                        )
-                        cv2.putText(
-                            img,
-                            f"Pred {name} => {patch_list[area_num][2][name][1]}",
-                            (0, img.shape[0] - 25 - 50 * idx),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.6,
-                            (100, 244, 244),
-                            2,
-                        )
-                vis_img = self.match_img(vis_img, img)
-                self.num += 1
-
-        mkdir(f"vis/test/{self.args.mode}/{self.args.name}")
-        cv2.imwrite(
-            f"vis/test/{self.args.mode}/{self.args.name}/test_{iteration}.jpg",
-            vis_img * 255,
-        )
-
-    def get_test_loss(self, pred_p, label, area_num, patch_list):
-        count = 0
-
-        patch_list[area_num].append(dict())
-        for name in self.equip_loss[area_num]:
-            dig = name.split("_")[-1]
-            gt = label[:, count : count + self.equip_loss[area_num][name]]
-            pred = pred_p[:, count : count + self.equip_loss[area_num][name]]
-            count += self.equip_loss[area_num][name]
-            self.test_regresion_mae[name].update(
-                self.criterion(pred, gt).item(), batch_size=pred.shape[0]
+            patch_list[area_num][3][dig] = [int(gt[:, idx].item()), int(pred_l.item())]
+            self.logger.info(
+                patch_list[area_num][2][0]
+                + f"({dig})"
+                + f"==> Pred: {pred_l.item()}  /  Gt: {gt[:, idx].item()}  ==> {flag} "
             )
-            if dig == "moisture":
-                gt, pred = gt * 100, pred * 100
-            elif dig == "count":
-                gt, pred = gt * 350, pred * 350
-            elif dig == "pore":
-                gt, pred = gt * 3000, pred * 3000
-            patch_list[area_num][2][dig] = [round(gt.item(), 3), round(pred.item(), 3)]
 
         return patch_list
 
     def test(self, model_num_class, data_loader):
-        for iteration, patch_list in tqdm(enumerate(data_loader), desc= "Inferencing..."):
+        for iter, patch_list in enumerate(data_loader):
             for model_idx in range(len(model_num_class)):
                 if np.isnan(model_num_class[model_idx]):
                     continue
@@ -435,11 +298,8 @@ class Model_test(object):
                     pred = self.model.to(device)(img)
 
                 if self.args.mode == "class":
-                    patch_list = self.get_test_acc(pred, label, patch_list, area_num)
+                    _ = self.get_test_acc(pred, label, patch_list, area_num)
 
                 else:
-                    patch_list = self.get_test_loss(
-                        pred, label.to(device), area_num, patch_list
-                    )
-
-            self.save_img(patch_list, iteration)
+                    _ = self.get_test_loss(pred, label.to(device), area_num, patch_list)
+            self.print_total(iter)

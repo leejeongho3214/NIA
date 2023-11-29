@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 from logging import StreamHandler, Handler, getLevelName
+from model import mkdir
 
 
 # this class is a copy of logging.FileHandler except we end self.close()
@@ -79,7 +80,7 @@ class FileHandler(StreamHandler):
         return '<%s %s (%s)>' % (self.__class__.__name__, self.baseFilename, level)
 
 
-def setup_logger(name, save_dir, filename="log.txt"):
+def setup_logger(name, path, filename="Evaluation.txt"):
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
 
@@ -91,11 +92,12 @@ def setup_logger(name, save_dir, filename="log.txt"):
     logger.propagate = False
     logger.addHandler(ch)
     
-    if save_dir:
-        fh = FileHandler(os.path.join(save_dir, filename), encoding='utf-8', mode = 'at')
-        fh.setLevel(logging.DEBUG)
-        fh.setFormatter(formatter2)
-        logger.addHandler(fh)
-
-
+    if os.path.isfile(path):
+        mkdir(path)
+        
+    fh = FileHandler(os.path.join(path, filename), encoding='utf-8', mode = 'at')
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(formatter2)
+    logger.addHandler(fh)
+    
     return logger
