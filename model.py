@@ -486,12 +486,12 @@ class Model(object):
 
     def run(self, phase="train"):
         
-        # self.model = (
-        #     copy.deepcopy(self.model_list[self.m_idx])
-        #     if phase in ["train", "test"]
-        #     else self.temp_model_list[self.m_idx]
-        # )
-        # self.model.train() if phase == "train" else self.model.eval()
+        self.model = (
+            copy.deepcopy(self.model_list[self.m_idx])
+            if phase in ["train", "test"]
+            else self.temp_model_list[self.m_idx]
+        )
+        self.model.train() if phase == "train" else self.model.eval()
         
         optimizer = torch.optim.Adam(
             params=list(self.model.parameters()),
@@ -502,13 +502,11 @@ class Model(object):
         adjust_learning_rate(optimizer, self.epoch, self.args)
 
         data_loader = (
-            self.train_loader
-            if phase == "train"
-            else self.valid_loader
+            self.train_loader if phase == "train"
+            else self.valid_loader if phase == "valid"
+            else self.test_loader
         )
         
-        if phase == 'test':
-            data_loader = self.test_loader
 
         self.phase = phase
         self.area_num = str(self.m_idx + 1) if self.flag else str(self.m_idx)
@@ -539,54 +537,54 @@ class Model(object):
                 if self.area_num in [4, 6]:
                     img = torch.flip(img, dims=[3])
 
-                # if img.shape[-1] > 128:
-                #     img_l = img[:, :, :, :128]
-                #     img_r = torch.flip(img[:, :, :, 128:], dims=[3])
-                #     pred = self.model.to(device)(img_l)
-                #     pred = self.model.to(device)(img_r) + pred
+                if img.shape[-1] > 128:
+                    img_l = img[:, :, :, :128]
+                    img_r = torch.flip(img[:, :, :, 128:], dims=[3])
+                    pred = self.model.to(device)(img_l)
+                    pred = self.model.to(device)(img_r) + pred
 
-                # elif img.shape[-2] > 128:
-                #     img_l = img[:, :, :128, :]
-                #     img_r = torch.flip(img[:, :, 128:, :], dims=[2])
-                #     pred = self.model.to(device)(img_l)
-                #     pred = self.model.to(device)(img_r) + pred
+                elif img.shape[-2] > 128:
+                    img_l = img[:, :, :128, :]
+                    img_r = torch.flip(img[:, :, 128:, :], dims=[2])
+                    pred = self.model.to(device)(img_l)
+                    pred = self.model.to(device)(img_r) + pred
 
-                # else:
-                #     pred = self.model.to(device)(img)
+                else:
+                    pred = self.model.to(device)(img)
 
-                # if self.phase != "test":
-                #     if self.args.mode == "class":
-                #         loss = self.class_loss(pred, label)
+                if self.phase != "test":
+                    if self.args.mode == "class":
+                        loss = self.class_loss(pred, label)
 
-                #     else:
-                #         idx_list = set([idx for idx in range(label.size(0))])
-                #         nan_list = set(self.nan_detect(label))
-                #         idx_list = list(idx_list - nan_list)
-                #         if len(idx_list) > 0:
-                #             loss = self.regression(pred[idx_list], label[idx_list])
-                #         else:
-                #             continue
+                    else:
+                        idx_list = set([idx for idx in range(label.size(0))])
+                        nan_list = set(self.nan_detect(label))
+                        idx_list = list(idx_list - nan_list)
+                        if len(idx_list) > 0:
+                            loss = self.regression(pred[idx_list], label[idx_list])
+                        else:
+                            continue
 
-                    # self.print_loss(iteration)
+                    self.print_loss(iteration)
 
-                # else:
-                #     if self.args.mode == "class":
-                #         self.get_test_acc(pred, label)
-                #     else:
-                #         idx_list = set([idx for idx in range(label.size(0))])
-                #         nan_list = set(self.nan_detect(label))
-                #         idx_list = list(idx_list - nan_list)
-                #         if len(idx_list) > 0:
-                #             self.get_test_loss(
-                #                 pred[idx_list], label[idx_list].to(device), self.area_num
-                #             )
+                else:
+                    if self.args.mode == "class":
+                        self.get_test_acc(pred, label)
+                    else:
+                        idx_list = set([idx for idx in range(label.size(0))])
+                        nan_list = set(self.nan_detect(label))
+                        idx_list = list(idx_list - nan_list)
+                        if len(idx_list) > 0:
+                            self.get_test_loss(
+                                pred[idx_list], label[idx_list].to(device), self.area_num
+                            )
 
-                # if self.phase == "train":
-                #     optimizer.zero_grad()
-                #     loss.backward()
-                #     optimizer.step()
-                #     if iteration == len(data_loader) - 1:
-                #         self.temp_model_list[self.m_idx] = self.model
+                if self.phase == "train":
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+                    if iteration == len(data_loader) - 1:
+                        self.temp_model_list[self.m_idx] = self.model
                         
                 self.img_count += 1
         

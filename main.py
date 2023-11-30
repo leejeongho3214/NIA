@@ -219,9 +219,7 @@ def main(args):
             # Change the model for each region
             resnet_model.run(phase="train")
             resnet_model.run(phase="valid")
-            resnet_model.run(phase="test")
             
-        return
         resnet_model.update_m(model_num_class)
 
         # If the model's acc is higher than best acc, it saves this model

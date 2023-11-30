@@ -16,6 +16,7 @@ import argparse
 from logger import setup_logger
 from torch.utils import data
 
+
 def parse_args():
     parser = argparse.ArgumentParser()
 
@@ -36,6 +37,8 @@ def parse_args():
     )
 
     parser.add_argument("--angle", default="all", type=str, choices=["F", "all"])
+
+    parser.add_argument("--test", action="store_true")
 
     parser.add_argument(
         "--mode",
@@ -109,12 +112,11 @@ def build_dataset(args):
 
 def main(args):
     check_path = os.path.join(args.output_dir, args.mode, args.name)
-    mkdir(check_path)
     ## Make the directories for save
     d = os.popen("date").read()
     l = os.popen("ls -al").read()
 
-    logger = setup_logger(args.name, ".")
+    logger = setup_logger(args.name, args.mode)
 
     logger.info(d)
     logger.info(l)
@@ -126,10 +128,9 @@ def main(args):
 
     ## Class Definition
     model_num_class = (
-        [np.nan, 15, 7, 7, 0, 12, 0, 5, 7] ## 9에서 7로 수정 필요
+        [np.nan, 15, 7, 7, 0, 12, 0, 5, 7]
         if args.mode == "class"
         else [1, 2, np.nan, 1, 0, 3, 0, np.nan, 2]
-        ##   안면전체(색소침착) / 이마()
     )
 
     resume_list = list()
@@ -157,7 +158,7 @@ def main(args):
     else:
         assert 0, "Check the check-point path, there's not any file in that"
 
-    _, _, test_dataset = build_dataset(args)
+    test_dataset = CustomDataset(args)
 
     testset_loader = data.DataLoader(
         dataset=test_dataset,

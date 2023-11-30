@@ -166,7 +166,7 @@ class Model_test(object):
             )
 
             self.logger.info(
-                f"Total Average Acc => {((self.acc_avg('pigmentation') + self.acc_avg('wrinkle') + self.acc_avg('sagging') + self.acc_avg('pore') + self.acc_avg('dryness') ) / 5):.2f}%"
+                f"[{iter} / {len(self.test_loader)}]Total Average Acc => {((self.acc_avg('pigmentation') + self.acc_avg('wrinkle') + self.acc_avg('sagging') + self.acc_avg('pore') + self.acc_avg('dryness') ) / 5):.2f}%"
             )
 
         else:
@@ -174,7 +174,7 @@ class Model_test(object):
                 f"count: {self.loss_avg('count')} // moisture: {self.loss_avg('moisture')} // wrinkle: {self.loss_avg('wrinkle')} // elasticity: {self.loss_avg('elasticity')} // pore: {self.loss_avg('pore')}"
             )
             self.logger.info(
-                f"[{iter} / {len(self.test_loader)}]Total Average MAE => {((self.loss_avg('count') + self.loss_avg('moisture') + self.loss_avg('wrinkle') +self.loss_avg('elasticity') + self.loss_avg('pore')) / 5):.3f}"
+                f"[{iter} / {len(self.test_loader)}] Total Average MAE => {((self.loss_avg('count') + self.loss_avg('moisture') + self.loss_avg('wrinkle') +self.loss_avg('elasticity') + self.loss_avg('pore')) / 5):.3f}"
             )
 
         self.logger.info("============" * 15)
