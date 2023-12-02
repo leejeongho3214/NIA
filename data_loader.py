@@ -27,6 +27,7 @@ class_num_list = {
     "pore": 6,
     "dryness": 5,
     "sagging": 7,
+    "forehead_wrinkle": 9
 }
 
 
@@ -95,11 +96,12 @@ class CustomDataset(Dataset):
         generator=torch.Generator().manual_seed(523),
         )
     
-        data_list = test_list if args.test else train_list
+        data_list = train_list if args.train else test_list
         
         for value in tqdm(data_list):
             equ_name = value['equ_name']
             folder_path = value['folder_path']
+            sub_fold = folder_path.split('/')[-1]
             img_name = value['img_name']
             
             angle = img_name.split(".")[0].split("_")[-1]
@@ -163,7 +165,7 @@ class CustomDataset(Dataset):
                 if args.mode != "class":
                     label_data = torch.tensor(self.norm_reg(meta, idx_area))
                     
-                desc_area = "Sub." + sub_fold + "_Equ." + equ_name + "_Angle." + angle + "_Area." + area_name
+                desc_area = "Sub_" + sub_fold + "_Equ_" + equ_name + "_Angle_" + angle + "_Area_" + area_name
                 area_list[f"{idx_area}"] = [
                     patch_img,
                     label_data,
@@ -171,7 +173,7 @@ class CustomDataset(Dataset):
                 ]
 
             self.sub_path.append(area_list)
-                    
+
 
     def __len__(self):
         return len(self.sub_path)

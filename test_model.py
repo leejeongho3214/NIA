@@ -103,11 +103,12 @@ def resume_checkpoint(args, model, path):
 
 
 class Model_test(object):
-    def __init__(self, args, model_list, testset_loader, logger):
+    def __init__(self, args, model_list, testset_loader, logger, logger2):
         super(Model_test, self).__init__()
         self.args = args
         self.model_list = model_list
         self.logger = logger
+        self.logger2 = logger2
         self.test_loader = testset_loader
 
         self.test_class_acc = {
@@ -195,13 +196,12 @@ class Model_test(object):
         return nan_list
 
     def get_test_loss(self, pred_p, label, area_num, patch_list):
-        count = 0
         patch_list[area_num].append(dict())
-        for name in self.equip_loss[area_num]:
+        for idx, name in enumerate(self.equip_loss[area_num]):
             dig = name.split("_")[-1]
-            gt = label[:, count : count + self.equip_loss[area_num][name]]
-            pred = pred_p[:, count : count + self.equip_loss[area_num][name]]
-            count += self.equip_loss[area_num][name]
+            gt = label[:, idx: idx + 1]
+            if gt == np.nan: continue
+            pred = pred_p[:, idx: idx + 1]
             self.test_regresion_mae[name].update(
                 self.criterion(pred, gt).item(), batch_size=pred.shape[0]
             )
@@ -209,6 +209,11 @@ class Model_test(object):
                 patch_list[area_num][2][0]
                 + f"({dig})"
                 + f"==> Pred: {pred.item():.3f}  /  Gt: {gt.item():.3f}  ==> MAE: {self.criterion(pred, gt).item():.3f}"
+            )
+            self.logger2.info(
+                patch_list[area_num][2][0]
+                + f"_{dig}_"
+                + f"_Pred: {pred.item():.3f}_Gt: {gt.item():.3f}"
             )
             if dig == "moisture":
                 gt, pred = gt * 100, pred * 100
@@ -232,7 +237,10 @@ class Model_test(object):
         patch_list[area_num].append(dict())
         for idx, area_name in enumerate(label):
             dig = area_name.split("_")[-1]
-            pred_l = torch.argmax(pred[:, num : num + class_num_list[dig]], dim=1)
+            if area_name == "forehead_wrinkle":
+                pred_l = torch.argmax(pred[:, num : num + class_num_list["forehead_wrinkle"]], dim=1)
+            else:
+                pred_l = torch.argmax(pred[:, num : num + class_num_list[dig]], dim=1)
             num += class_num_list[dig]
 
             score = 0
@@ -249,6 +257,11 @@ class Model_test(object):
                 patch_list[area_num][2][0]
                 + f"({dig})"
                 + f"==> Pred: {pred_l.item()}  /  Gt: {gt[:, idx].item()}  ==> {flag} "
+            )
+            self.logger2.info(
+                patch_list[area_num][2][0]
+                + f"_{dig}_"
+                + f"_Pred: {pred_l.item()}_Gt: {gt[:, idx].item()}"
             )
 
         return patch_list

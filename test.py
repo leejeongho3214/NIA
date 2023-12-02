@@ -31,14 +31,8 @@ def parse_args():
         default="dataset/img",
         type=str,
     )
-
-    parser.add_argument(
-        "--equ", type=int, default=[1, 2, 3], choices=[1, 2, 3], nargs="+"
-    )
-
-    parser.add_argument("--angle", default="all", type=str, choices=["F", "all"])
-
-    parser.add_argument("--test", action="store_true")
+    
+    parser.add_argument("--train", action="store_true")
 
     parser.add_argument(
         "--mode",
@@ -54,34 +48,11 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--output_dir",
-        default="checkpoint",
-        type=str,
-    )
-
-    parser.add_argument(
-        "--epoch",
-        default=300,
-        type=int,
-    )
-
-    parser.add_argument(
         "--res",
         default=128,
         type=int,
     )
-    parser.add_argument(
-        "--load_epoch",
-        default=0,
-        type=int,
-    )
-
-    parser.add_argument(
-        "--lr",
-        default=1e-3,
-        type=float,
-    )
-
+    
     parser.add_argument(
         "--batch_size",
         default=1,
@@ -99,24 +70,16 @@ def parse_args():
     return args
 
 
-def build_dataset(args):
-    train_dataset, val_dataset, test_dataset = random_split(
-        CustomDataset(args),
-        [0.8, 0.1, 0.1],
-        generator=torch.Generator().manual_seed(523),
-    )
-    ## For consistent results, we have set a seed number
-
-    return train_dataset, val_dataset, test_dataset
-
-
 def main(args):
     check_path = os.path.join(args.output_dir, args.mode, args.name)
     ## Make the directories for save
     d = os.popen("date").read()
     l = os.popen("ls -al").read()
 
+    data_ = "train" if args.train else "test"
     logger = setup_logger(args.name, args.mode)
+    log_name = args.name + "_" + args.mode + "_" + data_ if args.train else args.name + "_" + args.mode + "_" + data_
+    logger2 = setup_logger(log_name, args.mode + "_" + data_ + "_pred")
 
     logger.info(d)
     logger.info(l)
@@ -168,14 +131,11 @@ def main(args):
     )
     # Data Loader
 
-    resnet_model = Model_test(args, model_list, testset_loader, logger)
+    resnet_model = Model_test(args, model_list, testset_loader, logger, logger2)
     # If the model's acc is higher than best acc, it saves this model
     logger.info("Inferece ...")
     resnet_model.test(model_num_class, testset_loader)
     logger.info("Finish!")
-
-    resnet_model.print_total(iter)
-    # Show the result for each value, such as pigmentation and pore, by averaging all of them
 
     return logger
 

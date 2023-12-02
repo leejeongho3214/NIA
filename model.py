@@ -507,7 +507,6 @@ class Model(object):
             else self.test_loader
         )
         
-
         self.phase = phase
         self.area_num = str(self.m_idx + 1) if self.flag else str(self.m_idx)
         self.img_count = 0
