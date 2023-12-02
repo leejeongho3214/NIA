@@ -103,12 +103,11 @@ def resume_checkpoint(args, model, path):
 
 
 class Model_test(object):
-    def __init__(self, args, model_list, testset_loader, logger, logger2):
+    def __init__(self, args, model_list, testset_loader, logger):
         super(Model_test, self).__init__()
         self.args = args
         self.model_list = model_list
         self.logger = logger
-        self.logger2 = logger2
         self.test_loader = testset_loader
 
         self.test_class_acc = {
@@ -210,11 +209,7 @@ class Model_test(object):
                 + f"({dig})"
                 + f"==> Pred: {pred.item():.3f}  /  Gt: {gt.item():.3f}  ==> MAE: {self.criterion(pred, gt).item():.3f}"
             )
-            self.logger2.info(
-                patch_list[area_num][2][0]
-                + f"_{dig}_"
-                + f"_Pred: {pred.item():.3f}_Gt: {gt.item():.3f}"
-            )
+
             if dig == "moisture":
                 gt, pred = gt * 100, pred * 100
             elif dig == "count":
@@ -258,11 +253,7 @@ class Model_test(object):
                 + f"({dig})"
                 + f"==> Pred: {pred_l.item()}  /  Gt: {gt[:, idx].item()}  ==> {flag} "
             )
-            self.logger2.info(
-                patch_list[area_num][2][0]
-                + f"_{dig}_"
-                + f"_Pred: {pred_l.item()}_Gt: {gt[:, idx].item()}"
-            )
+
 
         return patch_list
 
@@ -289,7 +280,7 @@ class Model_test(object):
                     label = patch_list[area_num][1]
 
                 if label == {}:
-                    continue
+                    continue        ## 눈가 영역이 없는 경우
                 img = patch_list[area_num][0].to(device)
 
                 if area_num in [4, 6]:

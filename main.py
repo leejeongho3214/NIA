@@ -179,30 +179,31 @@ def main(args):
     logger = setup_logger(args.name, check_path)
     logger.info(args)
 
-    train_dataset, val_dataset, test_dataset= build_dataset(args, logger)
+    dataset = CustomDataset(args)
 
+    dataset.load_dataset(args, "train")
     trainset_loader = data.DataLoader(
-        dataset=train_dataset,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        shuffle=True,
-    )
-    valset_loader = data.DataLoader(
-        dataset=val_dataset,
+        dataset=dataset,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         shuffle=False,
-    )
+    ) 
     
-    testset_loader = data.DataLoader(
-        dataset=test_dataset,
+    dataset.load_dataset(args, "val")
+    valset_loader = data.DataLoader(
+        dataset=dataset,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         shuffle=False,
-    )
-
-    # Data Loader
-    del train_dataset, val_dataset, test_dataset
+    ) 
+    
+    dataset.load_dataset(args, "test")
+    testset_loader = data.DataLoader(
+        dataset=dataset,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        shuffle=False,
+    ) 
 
     resnet_model = Model(
         args, model_list, trainset_loader, valset_loader, logger, writer, testset_loader

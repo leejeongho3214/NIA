@@ -32,6 +32,12 @@ def parse_args():
         type=str,
     )
     
+    parser.add_argument(
+        "--output_dir",
+        default="checkpoint",
+        type=str,
+    )
+    
     parser.add_argument("--train", action="store_true")
 
     parser.add_argument(
@@ -76,10 +82,7 @@ def main(args):
     d = os.popen("date").read()
     l = os.popen("ls -al").read()
 
-    data_ = "train" if args.train else "test"
     logger = setup_logger(args.name, args.mode)
-    log_name = args.name + "_" + args.mode + "_" + data_ if args.train else args.name + "_" + args.mode + "_" + data_
-    logger2 = setup_logger(log_name, args.mode + "_" + data_ + "_pred")
 
     logger.info(d)
     logger.info(l)
@@ -121,20 +124,21 @@ def main(args):
     else:
         assert 0, "Check the check-point path, there's not any file in that"
 
-    test_dataset = CustomDataset(args)
-
-    testset_loader = data.DataLoader(
-        dataset=test_dataset,
+    dataset = CustomDataset(args)
+    
+    dataset.load_dataset(args, "test")
+    dataset_loader = data.DataLoader(
+        dataset=dataset,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         shuffle=False,
-    )
+    ) 
     # Data Loader
 
-    resnet_model = Model_test(args, model_list, testset_loader, logger, logger2)
+    resnet_model = Model_test(args, model_list, dataset_loader, logger)
     # If the model's acc is higher than best acc, it saves this model
     logger.info("Inferece ...")
-    resnet_model.test(model_num_class, testset_loader)
+    resnet_model.test(model_num_class, dataset_loader)
     logger.info("Finish!")
 
     return logger

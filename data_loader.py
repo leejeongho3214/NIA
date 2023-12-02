@@ -27,7 +27,7 @@ class_num_list = {
     "pore": 6,
     "dryness": 5,
     "sagging": 7,
-    "forehead_wrinkle": 9
+    "forehead_wrinkle": 9,
 }
 
 
@@ -49,30 +49,37 @@ img_num = {
     "03": 3,
 }
 
-regression_name = {}
-
 
 class CustomDataset(Dataset):
     def __init__(self, args):
+        self.load_list(args)
+        self.train_list, self.val_list, self.test_list = random_split(
+            self.dataset, [0.8, 0.1, 0.1],
+            generator=torch.Generator().manual_seed(523),
+        )
+
+    def __len__(self):
+        return len(self.sub_path)
+
+    def __getitem__(self, idx):
+        return self.sub_path[idx]
+
+    def load_list(self, args):
+
         self.img_path = args.img_path
         self.dataset = list()
         self.json_path = args.json_path
-        sub_path_list = os.listdir(self.img_path)
-        sub_path_list = [f"{equ:02}" for equ in args.equ]
-        element = [
-            transforms.ToTensor()
+        sub_path_list = [
+            item for item in os.listdir(self.img_path) if not item.startswith(".")
         ]
 
-        self.transform = {
-            "train": transforms.Compose(element),
-            "test": transforms.Compose(element),
-        }
-        self.sub_path = list()
-        
-        
+        self.transform = transforms.ToTensor()
+
+
         for equ_name in sub_path_list:
             if equ_name.startswith("."):
                 continue
+
             for sub_fold in os.listdir(os.path.join(self.img_path, equ_name)):
                 if sub_fold.startswith(".") or not os.path.exists(
                     os.path.join(self.json_path, equ_name, sub_fold)
@@ -81,29 +88,26 @@ class CustomDataset(Dataset):
 
                 folder_path = os.path.join(self.img_path, equ_name, sub_fold)
                 for img_name in os.listdir(folder_path):
-                    if not img_name.endswith(('.png', '.jpg', '.jpeg')):
+                    if not img_name.endswith((".png", ".jpg", ".jpeg")):
                         continue
+
+                    self.dataset.append(
+                        {
+                            "equ_name": equ_name,
+                            "folder_path": folder_path,
+                            "img_name": img_name,
+                        }
+                    )
                     
-                    self.dataset.append({
-                            "equ_name": equ_name, 
-                            "folder_path": folder_path, 
-                            "img_name": img_name
-                        })
-                    
-        train_list, _, test_list = random_split(
-        self.dataset, # test parameter 추가
-        [0.8, 0.1, 0.1],
-        generator=torch.Generator().manual_seed(523),
-        )
-    
-        data_list = train_list if args.train else test_list
-        
+    def load_dataset(self, args, mode):
+        self.sub_path = list()
+        data_list = self.train_list if mode == "train" else self.val_list if mode == "val" else self.test_list
         for value in tqdm(data_list):
-            equ_name = value['equ_name']
-            folder_path = value['folder_path']
-            sub_fold = folder_path.split('/')[-1]
-            img_name = value['img_name']
-            
+            equ_name = value["equ_name"]
+            folder_path = value["folder_path"]
+            sub_fold = folder_path.split("/")[-1]
+            img_name = value["img_name"]
+
             angle = img_name.split(".")[0].split("_")[-1]
             img = cv2.imread(os.path.join(folder_path, img_name))
             area_list = dict()
@@ -116,30 +120,22 @@ class CustomDataset(Dataset):
                         area_name,
                         meta,
                         ori_patch_img,
-                    ) = self.load_img(
-                        img_name, angle, idx_area, equ_name, img, args
-                    )
-                    
+                    ) = self.load_img(img_name, angle, idx_area, equ_name, img, args)
+
                 except:
-                    if self.load_img(
-                        img_name, angle, idx_area, equ_name, img, args
-                    ):
+                    if self.load_img(img_name, angle, idx_area, equ_name, img, args):
                         area_list[f"{idx_area}"] = [
                             torch.zeros([3, 128, 128]),
                             dict(),
                         ]
                         continue
-                    
+
                 if idx_area != 0:
                     n_patch_img = cv2.resize(
                         ori_patch_img,
                         (
-                            int(
-                                ori_patch_img.shape[1] / reduction_value
-                            ),
-                            int(
-                                ori_patch_img.shape[0] / reduction_value
-                            ),
+                            int(ori_patch_img.shape[1] / reduction_value),
+                            int(ori_patch_img.shape[0] / reduction_value),
                         ),
                     )
 
@@ -148,24 +144,29 @@ class CustomDataset(Dataset):
                         continue
 
                 else:
-                    patch_img = cv2.resize(
-                        ori_patch_img, (args.res, args.res)
-                    )
+                    patch_img = cv2.resize(ori_patch_img, (args.res, args.res))
 
                 pil_img = Image.fromarray(patch_img)
-                patch_img = self.transform["train"](pil_img)
+                patch_img = self.transform(pil_img)
                 label_data = (
-                    meta["annotations"]
-                    if args.mode == "class"
-                    else meta["equipment"]
+                    meta["annotations"] if args.mode == "class" else meta["equipment"]
                 )
                 if type(label_data) != dict:
                     continue
 
                 if args.mode != "class":
                     label_data = torch.tensor(self.norm_reg(meta, idx_area))
-                    
-                desc_area = "Sub_" + sub_fold + "_Equ_" + equ_name + "_Angle_" + angle + "_Area_" + area_name
+
+                desc_area = (
+                    "Sub_"
+                    + sub_fold
+                    + "_Equ_"
+                    + equ_name
+                    + "_Angle_"
+                    + angle
+                    + "_Area_"
+                    + area_name
+                )
                 area_list[f"{idx_area}"] = [
                     patch_img,
                     label_data,
@@ -173,14 +174,7 @@ class CustomDataset(Dataset):
                 ]
 
             self.sub_path.append(area_list)
-
-
-    def __len__(self):
-        return len(self.sub_path)
-
-    def __getitem__(self, idx):
-        return self.sub_path[idx]
-
+    
     def make_double(self, n_patch_img):
         row = n_patch_img.shape[0]
         col = n_patch_img.shape[1]
@@ -252,7 +246,6 @@ class CustomDataset(Dataset):
 
         reduction_value = max(patch_img.shape) / args.res
 
-
         return reduction_value, json_name, area_name, meta, patch_img
 
     def norm_reg(self, meta, idx_area):
@@ -269,7 +262,7 @@ class CustomDataset(Dataset):
 
         for item in type_class[f"{idx_area}"]:
             item_class = item.split("_")[-1]
-            if meta["equipment"][item] == 'Er':
+            if meta["equipment"][item] == "Er":
                 item_list.append(np.nan)
             else:
                 if item_class == "R2":
