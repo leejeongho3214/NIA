@@ -5,6 +5,7 @@ import os
 import numpy as np
 import cv2
 import json
+from collections import defaultdict
 from tqdm import tqdm
 from torch.utils.data import random_split
 from torch.utils.data import Dataset, ConcatDataset
@@ -57,12 +58,17 @@ class CustomDataset(Dataset):
             self.dataset, [0.8, 0.1, 0.1],
             generator=torch.Generator().manual_seed(523),
         )
-
+        self.remove_list = defaultdict(int)
+        
     def __len__(self):
         return len(self.sub_path)
 
     def __getitem__(self, idx):
         return self.sub_path[idx]
+    
+    def print_remove(self):
+        [print(f"{key}에서 " + self.remove_list[key] + " 장의 이미지가 제외되었습니다. ") for key in self.remove_list]
+
 
     def load_list(self, args):
 
@@ -174,7 +180,7 @@ class CustomDataset(Dataset):
                 ]
 
             self.sub_path.append(area_list)
-    
+
     def make_double(self, n_patch_img):
         row = n_patch_img.shape[0]
         col = n_patch_img.shape[1]
@@ -239,7 +245,7 @@ class CustomDataset(Dataset):
         ]
 
         if (bbox_x[1] - bbox_x[0]) < 90 or (bbox_y[1] - bbox_y[0]) < 90:
-            return 1
+            self.remove_list[str(idx_area)] += 1
 
         area_name = str(int(json_name.split("_")[-1].split(".")[0]))
         patch_img = img[bbox_y[0] : bbox_y[1], bbox_x[0] : bbox_x[1]]

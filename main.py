@@ -44,12 +44,6 @@ def parse_args():
     parser.add_argument("--stop_early", type=int, default=30)
 
     parser.add_argument(
-        "--equ", type=int, default=[1, 2, 3], choices=[1, 2, 3], nargs="+"
-    )
-
-    parser.add_argument("--angle", default="all", type=str, choices=["F", "all"])
-
-    parser.add_argument(
         "--mode",
         default="class",
         choices=["regression", "class"],
@@ -67,8 +61,6 @@ def parse_args():
         default="checkpoint",
         type=str,
     )
-
-    parser.add_argument("--double", action="store_true")
 
     parser.add_argument(
         "--epoch",
@@ -186,7 +178,7 @@ def main(args):
         dataset=dataset,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        shuffle=False,
+        shuffle=True,
     ) 
     
     dataset.load_dataset(args, "val")
@@ -222,13 +214,6 @@ def main(args):
             resnet_model.run(phase="valid")
             
         resnet_model.update_m(model_num_class)
-
-        # If the model's acc is higher than best acc, it saves this model
-        for model_idx in range(len(model_num_class)):
-            if np.isnan(model_num_class[model_idx]):
-                continue
-            resnet_model.choice(model_idx)
-            resnet_model.run(phase="test")
 
         resnet_model.print_total()
         # Show the result for each value, such as pigmentation and pore, by averaging all of them

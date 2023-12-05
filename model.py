@@ -451,7 +451,7 @@ class Model(object):
         nan_list = list()
         for batch_idx, batch_data in enumerate(label):
             for value in batch_data:
-                if not torch.isfinite(value):
+                if not torch.isnan(value):
                     nan_list.append(batch_idx)
         return nan_list
 

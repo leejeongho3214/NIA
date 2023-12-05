@@ -33,6 +33,12 @@ def parse_args():
     )
     
     parser.add_argument(
+        "--data",
+        default="test",
+        type=str,
+    )
+    
+    parser.add_argument(
         "--output_dir",
         default="checkpoint",
         type=str,
@@ -126,7 +132,7 @@ def main(args):
 
     dataset = CustomDataset(args)
     
-    dataset.load_dataset(args, "test")
+    dataset.load_dataset(args, args.data)
     dataset_loader = data.DataLoader(
         dataset=dataset,
         batch_size=args.batch_size,
@@ -140,6 +146,7 @@ def main(args):
     logger.info("Inferece ...")
     resnet_model.test(model_num_class, dataset_loader)
     logger.info("Finish!")
+    dataset.print_remove()
 
     return logger
 

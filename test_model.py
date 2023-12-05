@@ -1,3 +1,4 @@
+from collections import defaultdict
 import datetime
 import errno
 import os
@@ -109,6 +110,7 @@ class Model_test(object):
         self.model_list = model_list
         self.logger = logger
         self.test_loader = testset_loader
+        self.count = defaultdict(int)
 
         self.test_class_acc = {
             "sagging": AverageMeter(),
@@ -199,7 +201,8 @@ class Model_test(object):
         for idx, name in enumerate(self.equip_loss[area_num]):
             dig = name.split("_")[-1]
             gt = label[:, idx: idx + 1]
-            if gt == np.nan: continue
+            if torch.isnan(gt): 
+                continue
             pred = pred_p[:, idx: idx + 1]
             self.test_regresion_mae[name].update(
                 self.criterion(pred, gt).item(), batch_size=pred.shape[0]
@@ -209,6 +212,8 @@ class Model_test(object):
                 + f"({dig})"
                 + f"==> Pred: {pred.item():.3f}  /  Gt: {gt.item():.3f}  ==> MAE: {self.criterion(pred, gt).item():.3f}"
             )
+            
+            self.count[f"{area_num}_{dig}"] += 1
 
             if dig == "moisture":
                 gt, pred = gt * 100, pred * 100
@@ -253,6 +258,8 @@ class Model_test(object):
                 + f"({dig})"
                 + f"==> Pred: {pred_l.item()}  /  Gt: {gt[:, idx].item()}  ==> {flag} "
             )
+            
+            self.count[f"{area_num}_{dig}"] += 1
 
 
         return patch_list
@@ -307,3 +314,4 @@ class Model_test(object):
                 else:
                     _ = self.get_test_loss(pred, label.to(device), area_num, patch_list)
             self.print_total(iter)
+        [print(f"{key} => {self.count[key]} 장") for key in self.count]
