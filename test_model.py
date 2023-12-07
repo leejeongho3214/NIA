@@ -203,6 +203,7 @@ class Model_test(object):
             gt = label[:, idx: idx + 1]
             if torch.isnan(gt): 
                 continue
+            
             pred = pred_p[:, idx: idx + 1]
             self.test_regresion_mae[name].update(
                 self.criterion(pred, gt).item(), batch_size=pred.shape[0]
@@ -287,7 +288,8 @@ class Model_test(object):
                     label = patch_list[area_num][1]
 
                 if label == {}:
-                    continue        ## 눈가 영역이 없는 경우
+                    continue        ## 눈가/볼 영역이 없는 경우
+                
                 img = patch_list[area_num][0].to(device)
 
                 if area_num in [4, 6]:
@@ -314,4 +316,5 @@ class Model_test(object):
                 else:
                     _ = self.get_test_loss(pred, label.to(device), area_num, patch_list)
             self.print_total(iter)
-        [print(f"{key} => {self.count[key]} 장") for key in self.count]
+            
+        if self.args.log: [self.logger.info(f"{key} => {self.count[key]} 장") for key in self.count]

@@ -1,0 +1,9 @@
+test
+__MACOSX
+ _pycache__
+.vscode
+tensorboard
+.gitignore
+.env
+*.txt
+!requirements.txt

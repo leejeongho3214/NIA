@@ -109,7 +109,6 @@ class Model(object):
         valid_loader,
         logger,
         writer,
-        test_loader,
     ):
         super(Model, self).__init__()
         self.args = args
@@ -117,7 +116,6 @@ class Model(object):
         self.temp_model_list = [None for _ in range(9)]
         self.train_loader = train_loader
         self.valid_loader = valid_loader
-        self.test_loader = test_loader
         self.best_loss = args.best_loss
 
         self.writer = writer
@@ -125,23 +123,6 @@ class Model(object):
 
         self.train_loss = [AverageMeter() for _ in range(9)]
         self.val_loss = [AverageMeter() for _ in range(9)]
-        self.test_value = (
-            {
-                "sagging": AverageMeter(),
-                "wrinkle": AverageMeter(),
-                "pore": AverageMeter(),
-                "pigmentation": AverageMeter(),
-                "dryness": AverageMeter(),
-            }
-            if self.args.mode == "class"
-            else {
-                "moisture": AverageMeter(),
-                "wrinkle": AverageMeter(),
-                "elasticity": AverageMeter(),
-                "pore": AverageMeter(),
-                "count": AverageMeter(),
-            }
-        )
 
         self.keep_acc = {
             "sagging": 0,
@@ -194,6 +175,7 @@ class Model(object):
         for idx, value in enumerate(model_num_class):
             if np.isnan(value) or idx in [4, 6]:
                 continue
+            
             if self.best_loss[idx] > self.val_loss[idx].avg:
                 try:
                     self.best_loss[idx] = round(self.val_loss[idx].avg.item(), 4)
@@ -244,25 +226,6 @@ class Model(object):
 
         return result
 
-    def print_total(self):
-        if self.args.mode == "class":
-            print(
-                f"[{self.phase}] [Early Stop: {self.update_c}/{self.args.stop_early}] pigmentation: {self.acc_avg('pigmentation')}%({self.up_and_down('pigmentation')}) // wrinkle: {self.acc_avg('wrinkle')}%({self.up_and_down('wrinkle')}) // sagging: {self.acc_avg('sagging')}%({self.up_and_down('sagging')}) // pore: {self.acc_avg('pore')}%({self.up_and_down('pore')}) // dryness: {self.acc_avg('dryness')}%({self.up_and_down('dryness')})"
-            )
-            self.logger.debug(
-                f"Epoch: {self.epoch} [Early Stop: {self.update_c}/{self.args.stop_early}] pigmentation: {self.acc_avg('pigmentation')}%({self.up_and_down('pigmentation', color ='', c_color='')}) // wrinkle: {self.acc_avg('wrinkle')}%({self.up_and_down('wrinkle', color ='', c_color='')}) // sagging: {self.acc_avg('sagging')}%({self.up_and_down('sagging', color ='', c_color='')}) // pore: {self.acc_avg('pore')}%({self.up_and_down('pore', color ='', c_color='')}) // dryness: {self.acc_avg('dryness')}%({self.up_and_down('dryness', color ='', c_color='')})"
-            )
-            for name in self.test_value:
-                self.keep_acc[name] = self.test_value[name].avg * 100
-        else:
-            print(
-                f"[{self.phase}] [Early Stop: {self.update_c}/{self.args.stop_early}] moisture: {self.loss_avg('moisture')}({self.up_and_down('moisture')}) // wrinkle: {self.loss_avg('wrinkle')}({self.up_and_down('wrinkle')}) // elasticity: {self.loss_avg('elasticity')}({self.up_and_down('elasticity')}) // pore: {self.loss_avg('pore')}({self.up_and_down('pore')}) // pigmentation: {self.loss_avg('count')}({self.up_and_down('count')})"
-            )
-            self.logger.debug(
-                f"Epoch: {self.epoch} [Early Stop: {self.update_c}/{self.args.stop_early}] moisture: {self.loss_avg('moisture')}({self.up_and_down('moisture', color = '', c_color='')}) // wrinkle: {self.loss_avg('wrinkle')}({self.up_and_down('wrinkle', color = '', c_color='')}) // elasticity: {self.loss_avg('elasticity')}({self.up_and_down('elasticity', color = '', c_color='')}) // pore: {self.loss_avg('pore')} ({self.up_and_down('pore', color = '', c_color='')}) // pigmentation: {self.loss_avg('count')}({self.up_and_down('count')})"
-            )
-            for name in self.test_value:
-                self.keep_mae[name] = self.test_value[name].avg
 
     def print_loss(self, iteration):
         dataloader_len = (
@@ -450,9 +413,8 @@ class Model(object):
     def nan_detect(self, label):
         nan_list = list()
         for batch_idx, batch_data in enumerate(label):
-            for value in batch_data:
-                if not torch.isnan(value):
-                    nan_list.append(batch_idx)
+            if torch.isnan(batch_data):
+                nan_list.append(batch_idx)
         return nan_list
 
     def get_test_acc(self, pred, label):
@@ -488,7 +450,7 @@ class Model(object):
         
         self.model = (
             copy.deepcopy(self.model_list[self.m_idx])
-            if phase in ["train", "test"]
+            if phase == 'train'
             else self.temp_model_list[self.m_idx]
         )
         self.model.train() if phase == "train" else self.model.eval()
@@ -503,8 +465,7 @@ class Model(object):
 
         data_loader = (
             self.train_loader if phase == "train"
-            else self.valid_loader if phase == "valid"
-            else self.test_loader
+            else self.valid_loader
         )
         
         self.phase = phase
@@ -528,10 +489,8 @@ class Model(object):
                     label = patch_list[self.area_num][1]
 
                 if label == {}:
-                    if iteration == len(data_loader) - 1:
-                        self.temp_model_list[self.m_idx] = self.model
                     continue
-
+                
                 img = patch_list[self.area_num][0].to(device)
                 if self.area_num in [4, 6]:
                     img = torch.flip(img, dims=[3])
@@ -551,32 +510,19 @@ class Model(object):
                 else:
                     pred = self.model.to(device)(img)
 
-                if self.phase != "test":
-                    if self.args.mode == "class":
-                        loss = self.class_loss(pred, label)
-
-                    else:
-                        idx_list = set([idx for idx in range(label.size(0))])
-                        nan_list = set(self.nan_detect(label))
-                        idx_list = list(idx_list - nan_list)
-                        if len(idx_list) > 0:
-                            loss = self.regression(pred[idx_list], label[idx_list])
-                        else:
-                            continue
-
-                    self.print_loss(iteration)
+                if self.args.mode == "class":
+                    loss = self.class_loss(pred, label)
 
                 else:
-                    if self.args.mode == "class":
-                        self.get_test_acc(pred, label)
+                    idx_list = set([idx for idx in range(label.size(0))])
+                    nan_list = set(self.nan_detect(label))
+                    idx_list = list(idx_list - nan_list)
+                    if len(idx_list) > 0:
+                        loss = self.regression(pred[idx_list], label[idx_list])
                     else:
-                        idx_list = set([idx for idx in range(label.size(0))])
-                        nan_list = set(self.nan_detect(label))
-                        idx_list = list(idx_list - nan_list)
-                        if len(idx_list) > 0:
-                            self.get_test_loss(
-                                pred[idx_list], label[idx_list].to(device), self.area_num
-                            )
+                        continue
+
+                self.print_loss(iteration)
 
                 if self.phase == "train":
                     optimizer.zero_grad()
@@ -586,6 +532,7 @@ class Model(object):
                         self.temp_model_list[self.m_idx] = self.model
                         
                 self.img_count += 1
+                self.temp_model_list[self.m_idx] = self.model
         
         if self.phase == 'train':
             run_iter()

@@ -1,4 +1,5 @@
 from PIL import Image
+import natsort
 import torch
 from torchvision import transforms
 import os
@@ -55,8 +56,7 @@ class CustomDataset(Dataset):
     def __init__(self, args):
         self.load_list(args)
         self.train_list, self.val_list, self.test_list = random_split(
-            self.dataset, [0.8, 0.1, 0.1],
-            generator=torch.Generator().manual_seed(523),
+            self.dataset, [0.8, 0.1, 0.1]
         )
         self.remove_list = defaultdict(int)
         
@@ -66,19 +66,14 @@ class CustomDataset(Dataset):
     def __getitem__(self, idx):
         return self.sub_path[idx]
     
-    def print_remove(self):
-        [print(f"{key}에서 " + self.remove_list[key] + " 장의 이미지가 제외되었습니다. ") for key in self.remove_list]
-
-
     def load_list(self, args):
 
         self.img_path = args.img_path
         self.dataset = list()
         self.json_path = args.json_path
         sub_path_list = [
-            item for item in os.listdir(self.img_path) if not item.startswith(".")
+            item for item in natsort.natsorted(os.listdir(self.img_path)) if not item.startswith(".")
         ]
-
         self.transform = transforms.ToTensor()
 
 
@@ -86,14 +81,14 @@ class CustomDataset(Dataset):
             if equ_name.startswith("."):
                 continue
 
-            for sub_fold in os.listdir(os.path.join(self.img_path, equ_name)):
+            for sub_fold in natsort.natsorted(os.listdir(os.path.join(self.img_path, equ_name))):
                 if sub_fold.startswith(".") or not os.path.exists(
                     os.path.join(self.json_path, equ_name, sub_fold)
                 ):
                     continue
 
                 folder_path = os.path.join(self.img_path, equ_name, sub_fold)
-                for img_name in os.listdir(folder_path):
+                for img_name in  natsort.natsorted(os.listdir(folder_path)):
                     if not img_name.endswith((".png", ".jpg", ".jpeg")):
                         continue
 
@@ -104,6 +99,7 @@ class CustomDataset(Dataset):
                             "img_name": img_name,
                         }
                     )
+
                     
     def load_dataset(self, args, mode):
         self.sub_path = list()
@@ -180,6 +176,7 @@ class CustomDataset(Dataset):
                 ]
 
             self.sub_path.append(area_list)
+
 
     def make_double(self, n_patch_img):
         row = n_patch_img.shape[0]

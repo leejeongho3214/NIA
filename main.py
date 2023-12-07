@@ -24,8 +24,8 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "name",
-        default="base",
+        "--name",
+        default="100%/1,2,3",
         type=str,
     )
 
@@ -104,19 +104,6 @@ def parse_args():
     return args
 
 
-def build_dataset(args, logger):
-    train_dataset, val_dataset, test_dataset = random_split(
-        CustomDataset(args),
-        [0.8, 0.1, 0.1],
-        generator=torch.Generator().manual_seed(523),
-    )
-    ## For consistent results, we have set a seed number
-    logger.info(
-        f"Train Dataset => {len(train_dataset)} // Valid Dataset => {len(val_dataset)}"
-    )
-
-    return train_dataset, val_dataset, test_dataset
-
 
 def main(args):
     log_path = os.path.join(args.loss_dir, args.mode, args.name)
@@ -168,7 +155,7 @@ def main(args):
                 os.path.join(check_path, f"{idx}", "state_dict.bin"),
             )
 
-    logger = setup_logger(args.name, check_path)
+    logger = setup_logger(args.name, args.mode)
     logger.info(args)
 
     dataset = CustomDataset(args)
@@ -188,17 +175,9 @@ def main(args):
         num_workers=args.num_workers,
         shuffle=False,
     ) 
-    
-    dataset.load_dataset(args, "test")
-    testset_loader = data.DataLoader(
-        dataset=dataset,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        shuffle=False,
-    ) 
 
     resnet_model = Model(
-        args, model_list, trainset_loader, valset_loader, logger, writer, testset_loader
+        args, model_list, trainset_loader, valset_loader, logger, writer
     )
 
     for epoch in range(args.load_epoch, args.epoch):
@@ -215,13 +194,13 @@ def main(args):
             
         resnet_model.update_m(model_num_class)
 
-        resnet_model.print_total()
         # Show the result for each value, such as pigmentation and pore, by averaging all of them
         resnet_model.update_e(epoch + 1)
         resnet_model.reset_log(mode=args.mode)
 
         if resnet_model.stop_early():
             break
+        
     writer.close()
 
 

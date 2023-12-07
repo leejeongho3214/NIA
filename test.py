@@ -1,4 +1,5 @@
 import datetime
+import random
 import numpy as np
 import torch
 from torchvision import models
@@ -16,7 +17,12 @@ import argparse
 from logger import setup_logger
 from torch.utils import data
 
+torch.manual_seed(523)
+torch.cuda.manual_seed_all(523)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 
+    
 def parse_args():
     parser = argparse.ArgumentParser()
 
@@ -45,6 +51,8 @@ def parse_args():
     )
     
     parser.add_argument("--train", action="store_true")
+    
+    parser.add_argument("--log", action="store_true")
 
     parser.add_argument(
         "--mode",
@@ -88,7 +96,7 @@ def main(args):
     d = os.popen("date").read()
     l = os.popen("ls -al").read()
 
-    logger = setup_logger(args.name, args.mode)
+    logger = setup_logger(args.name, args.mode + f"_{args.data}1")
 
     logger.info(d)
     logger.info(l)
@@ -98,7 +106,7 @@ def main(args):
     model_list = [copy.deepcopy(model) for _ in range(9)]
     # Define 8 resnet models for each region
 
-    ## Class Definition
+    ## Class Definitionq
     model_num_class = (
         [np.nan, 15, 7, 7, 0, 12, 0, 5, 7]
         if args.mode == "class"
@@ -146,7 +154,6 @@ def main(args):
     logger.info("Inferece ...")
     resnet_model.test(model_num_class, dataset_loader)
     logger.info("Finish!")
-    dataset.print_remove()
 
     return logger
 
