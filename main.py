@@ -1,6 +1,7 @@
 import os
 
 import shutil
+import sys
 import numpy as np
 import torch
 from torchvision import models
@@ -10,6 +11,7 @@ from tensorboardX import SummaryWriter
 import copy
 from torch.utils.data import random_split
 from matplotlib import pyplot as plt
+from tqdm import tqdm
 from logger import setup_logger
 from data_loader import CustomDataset
 from model import resume_checkpoint, mkdir, Model
@@ -25,7 +27,7 @@ def parse_args():
 
     parser.add_argument(
         "--name",
-        default="100%/1,2,3",
+        default="none",
         type=str,
     )
 
@@ -40,6 +42,10 @@ def parse_args():
         default="tensorboard",
         type=str,
     )
+    
+    parser.add_argument(
+            "--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+"
+        )
 
     parser.add_argument("--stop_early", type=int, default=30)
 
@@ -73,10 +79,23 @@ def parse_args():
         default=128,
         type=int,
     )
+    
+    parser.add_argument(
+        "--data_num",
+        default=-1,
+        type=int,
+    )
+        
     parser.add_argument(
         "--load_epoch",
         default=0,
         type=int,
+    )
+    
+    parser.add_argument(
+        "--label_smooth",
+        default=0.5,
+        type=float,
     )
 
     parser.add_argument(
@@ -113,6 +132,7 @@ def main(args):
     mkdir(log_path)
     mkdir(check_path)
     ## Make the directories for save
+    
 
     model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
 
@@ -155,19 +175,21 @@ def main(args):
                 os.path.join(check_path, f"{idx}", "state_dict.bin"),
             )
 
-    logger = setup_logger(args.name, args.mode)
+    logger = setup_logger(args.name, check_path)
     logger.info(args)
+    logger.info("Command Line: " + " ".join(sys.argv))
 
+    
     dataset = CustomDataset(args)
 
     dataset.load_dataset(args, "train")
     trainset_loader = data.DataLoader(
-        dataset=dataset,
+        dataset=copy.deepcopy(dataset),
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         shuffle=True,
     ) 
-    
+
     dataset.load_dataset(args, "val")
     valset_loader = data.DataLoader(
         dataset=dataset,
@@ -177,7 +199,7 @@ def main(args):
     ) 
 
     resnet_model = Model(
-        args, model_list, trainset_loader, valset_loader, logger, writer
+        args, model_list, trainset_loader, valset_loader, logger, writer, check_path
     )
 
     for epoch in range(args.load_epoch, args.epoch):
@@ -193,7 +215,7 @@ def main(args):
             resnet_model.run(phase="valid")
             
         resnet_model.update_m(model_num_class)
-
+        resnet_model.save_value()
         # Show the result for each value, such as pigmentation and pore, by averaging all of them
         resnet_model.update_e(epoch + 1)
         resnet_model.reset_log(mode=args.mode)

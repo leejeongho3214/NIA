@@ -9,7 +9,7 @@ import json
 from collections import defaultdict
 from tqdm import tqdm
 from torch.utils.data import random_split
-from torch.utils.data import Dataset, ConcatDataset
+from torch.utils.data import Dataset
 
 folder_name = {
     "F": "01",
@@ -54,41 +54,49 @@ img_num = {
 
 class CustomDataset(Dataset):
     def __init__(self, args):
+        self.args = args
         self.load_list(args)
         self.train_list, self.val_list, self.test_list = random_split(
             self.dataset, [0.8, 0.1, 0.1]
         )
         self.remove_list = defaultdict(int)
-        
+
     def __len__(self):
         return len(self.sub_path)
 
     def __getitem__(self, idx):
         return self.sub_path[idx]
-    
-    def load_list(self, args):
 
+    def load_list(self, args):
         self.img_path = args.img_path
         self.dataset = list()
         self.json_path = args.json_path
         sub_path_list = [
-            item for item in natsort.natsorted(os.listdir(self.img_path)) if not item.startswith(".")
+            item
+            for item in natsort.natsorted(os.listdir(self.img_path))
+            if not item.startswith(".")
         ]
-        self.transform = transforms.ToTensor()
-
+        self.transform = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Normalize([0.24628267, 0.3271797, 0.44643742], [0.1666497, 0.2335198, 0.3375362]),
+            ]
+        )
 
         for equ_name in sub_path_list:
-            if equ_name.startswith("."):
+            if equ_name.startswith(".") or int(equ_name) not in self.args.equ:
                 continue
 
-            for sub_fold in natsort.natsorted(os.listdir(os.path.join(self.img_path, equ_name))):
+            for sub_fold in natsort.natsorted(
+                os.listdir(os.path.join(self.img_path, equ_name))
+            ):
                 if sub_fold.startswith(".") or not os.path.exists(
                     os.path.join(self.json_path, equ_name, sub_fold)
                 ):
                     continue
 
                 folder_path = os.path.join(self.img_path, equ_name, sub_fold)
-                for img_name in  natsort.natsorted(os.listdir(folder_path)):
+                for img_name in natsort.natsorted(os.listdir(folder_path)):
                     if not img_name.endswith((".png", ".jpg", ".jpeg")):
                         continue
 
@@ -100,10 +108,17 @@ class CustomDataset(Dataset):
                         }
                     )
 
-                    
+        self.dataset = self.dataset[: self.args.data_num]
+
     def load_dataset(self, args, mode):
         self.sub_path = list()
-        data_list = self.train_list if mode == "train" else self.val_list if mode == "val" else self.test_list
+        data_list = (
+            self.train_list
+            if mode == "train"
+            else self.val_list
+            if mode == "val"
+            else self.test_list
+        )
         for value in tqdm(data_list):
             equ_name = value["equ_name"]
             folder_path = value["folder_path"]
@@ -127,7 +142,7 @@ class CustomDataset(Dataset):
                 except:
                     if self.load_img(img_name, angle, idx_area, equ_name, img, args):
                         area_list[f"{idx_area}"] = [
-                            torch.zeros([3, 128, 128]),
+                            torch.zeros([3, args.res, args.res]),
                             dict(),
                         ]
                         continue
@@ -176,7 +191,6 @@ class CustomDataset(Dataset):
                 ]
 
             self.sub_path.append(area_list)
-
 
     def make_double(self, n_patch_img):
         row = n_patch_img.shape[0]

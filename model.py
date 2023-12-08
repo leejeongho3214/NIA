@@ -109,6 +109,7 @@ class Model(object):
         valid_loader,
         logger,
         writer,
+        check_path,
     ):
         super(Model, self).__init__()
         self.args = args
@@ -120,6 +121,7 @@ class Model(object):
 
         self.writer = writer
         self.logger = logger
+        self.check_path = check_path
 
         self.train_loss = [AverageMeter() for _ in range(9)]
         self.val_loss = [AverageMeter() for _ in range(9)]
@@ -152,13 +154,16 @@ class Model(object):
 
         self.epoch = 0
         self.criterion = (
-            nn.CrossEntropyLoss() if self.args.mode == "class" else nn.L1Loss()
+            nn.CrossEntropyLoss(label_smoothing=self.args.label_smooth) if self.args.mode == "class" else nn.L1Loss()
         )
 
         self.phase = None
         self.m_idx = 0
         self.model = None
         self.update_c = 0
+        
+        self.pred = list()
+        self.gt = list()
 
     def choice(self, m_idx):
         if m_idx in [4, 6]:
@@ -189,12 +194,23 @@ class Model(object):
 
         if count == 0:
             self.update_c += 1
+            self.logger.info(f"[{self.update_c}/{self.args.stop_early}] Nothing do not update")
 
         else:
             self.update_c = 0
+            self.logger.info(f"[{self.update_c}/{self.args.stop_early}] {count} models update")
 
     def update_e(self, epoch):
         self.epoch = epoch
+    
+    def save_value(self):   
+        with open(os.path.join(self.check_path, f"epoch_{self.epoch}_pred.txt"), "w") as p:
+            with open(os.path.join(self.check_path, f"epoch_{self.epoch}_gt.txt"), "w") as g:
+                for idx in range(len(self.pred)):
+                    p.write(f"{self.pred[idx][0]}, {self.pred[idx][1]} \n")
+                    g.write(f"{self.gt[idx][0]}, {self.gt[idx][1]} \n")
+        g.close()
+        p.close()
 
     def acc_avg(self, name):
         return round(self.test_value[name].avg * 100, 2)
@@ -233,10 +249,7 @@ class Model(object):
         )
 
         if iteration == dataloader_len - 1:
-            print(
-                f"\rEpoch: {self.epoch} [{self.phase}][{area_naming[f'{self.area_num}']}][{iteration}/{dataloader_len}] ---- >  loss: {(self.train_loss[self.m_idx].avg if self.phase == 'train' else self.val_loss[self.m_idx].avg):.04f}"
-            )
-
+            self.logger.info(f"Epoch: {self.epoch} [{self.phase}][{area_naming[f'{self.area_num}']}][{iteration}/{dataloader_len}] ---- >  loss: {self.train_loss[self.m_idx].avg if self.phase == 'train' else self.val_loss[self.m_idx].avg:.04f}")
             self.writer.add_scalar(
                 f"{self.phase}/{area_naming[f'{self.m_idx}']}",
                 self.train_loss[self.m_idx].avg
@@ -276,20 +289,43 @@ class Model(object):
                 "count": AverageMeter(),
             }
         )
+        self.pred = list()
+        self.gt = list()
 
+    def labeling(self, label, num, bs):
+        template = torch.zeros(num)
+        gt = label.item()
+        if gt == 0:
+            template[0] = 0.6
+            template[1] = 0.3
+            template[2] = 0.1
+        
+        elif gt == num - 1:
+            template[-1] = 0.6
+            template[-2] = 0.3
+            template[-3] = 0.1
+            
+        else:
+            template[gt] = 0.5
+            template[gt - 1] = 0.25
+            template[gt + 1] = 0.25 
+            
+        return template.reshape(1, -1)
+    
     def class_loss(self, pred, label):
         num = 0
         loss = 0
+        bs = pred.shape[0]
         for name in label:
             area, dig = name.split("_")[-2:]
-            
             class_num = 9 if area == "forehead" and dig == "wrinkle" else class_num_list[dig]
-            gt = F.one_hot(
-                label[name].type(torch.int64), num_classes=class_num
-            ).to(device)
+            gt = self.labeling(label[name], class_num, bs).to(device)
             pred_p = softmax(pred[:, num : num + class_num])
             num += class_num
             loss += self.criterion(pred_p.type(torch.float), gt.type(torch.float))
+            
+            self.pred.append([dig, pred_p.argmax().item()])
+            self.gt.append([dig, gt.argmax().item()])
 
         self.train_loss[self.m_idx].update(
             loss, batch_size=gt.shape[0]
@@ -309,112 +345,13 @@ class Model(object):
 
         return loss
 
-    def match_img(self, vis_img, img):
-        col = self.num % 3
-        row = self.num // 3
-        vis_img[row * 256 : (row + 1) * 256, col * 256 : (col + 1) * 256] = img
-
-        return vis_img
-
-    def save_img(self, iteration, patch_list):
-        if self.epoch == 0 and self.m_idx == 1:
-            if self.args.mode == "class":
-                vis_img = np.zeros([256 * 5, 256 * 3, 3])
-                self.num_patch = len(patch_list) + 7
-            else:
-                vis_img = np.zeros([256 * 4, 256 * 3, 3])
-                self.num_patch = len(patch_list) + 4
-
-            self.num = 0
-            for area_num in patch_list:
-                img = patch_list[area_num][0][0].permute(1, 2, 0).numpy().copy()
-
-                if img.shape[1] > 128:
-                    l_img = img[:, :128]
-                    l_img = cv2.resize(l_img, (256, 256))
-                    cv2.putText(
-                        l_img,
-                        f"{area_naming[str(int(area_num))]}",
-                        (10, 25),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.7,
-                        (0, 244, 0),
-                        2,
-                    )
-
-                    vis_img = self.match_img(vis_img, l_img)
-                    self.num += 1
-                    r_img = img[:, 128:]
-                    r_img = cv2.resize(r_img, (256, 256))
-                    cv2.putText(
-                        r_img,
-                        f"{area_naming[str(int(area_num))]}",
-                        (10, 25),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.7,
-                        (0, 244, 0),
-                        2,
-                    )
-                    vis_img = self.match_img(vis_img, r_img)
-                    self.num += 1
-
-                elif img.shape[0] > 128:
-                    l_img = img[:128]
-                    l_img = cv2.resize(l_img, (256, 256))
-                    cv2.putText(
-                        l_img,
-                        f"{area_naming[str(int(area_num))]}",
-                        (10, 25),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.7,
-                        (0, 244, 0),
-                        2,
-                    )
-
-                    vis_img = self.match_img(vis_img, l_img)
-                    self.num += 1
-                    r_img = img[128:]
-                    r_img = cv2.resize(r_img, (256, 256))
-                    cv2.putText(
-                        r_img,
-                        f"{area_naming[str(int(area_num))]}",
-                        (10, 25),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.7,
-                        (0, 244, 0),
-                        2,
-                    )
-                    vis_img = self.match_img(vis_img, r_img)
-                    self.num += 1
-
-                else:
-                    img = img[:, :128]
-                    img = cv2.resize(img, (256, 256))
-                    cv2.putText(
-                        img,
-                        f"{area_naming[str(int(area_num))]}",
-                        (10, 25),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.7,
-                        (0, 244, 0),
-                        2,
-                    )
-
-                    vis_img = self.match_img(vis_img, img)
-                    self.num += 1
-
-            mkdir(f"vis/{self.args.mode}/{self.args.name}")
-            cv2.imwrite(
-                f"vis/{self.args.mode}/{self.args.name}/{iteration}.jpg",
-                # f"vis/{self.args.mode}/{self.args.name}/Input.jpg",
-                vis_img * 255,
-            )
 
     def nan_detect(self, label):
         nan_list = list()
-        for batch_idx, batch_data in enumerate(label):
-            if torch.isnan(batch_data):
-                nan_list.append(batch_idx)
+        for batch_data in label:
+            for idx, data in enumerate(batch_data):
+                if torch.isnan(data):
+                    nan_list.append(idx)
         return nan_list
 
     def get_test_acc(self, pred, label):
@@ -447,13 +384,13 @@ class Model(object):
             )
 
     def run(self, phase="train"):
-        
+        self.phase = phase
         self.model = (
             copy.deepcopy(self.model_list[self.m_idx])
-            if phase == 'train'
+            if self.phase == 'train'
             else self.temp_model_list[self.m_idx]
         )
-        self.model.train() if phase == "train" else self.model.eval()
+        self.model.train() if self.phase == "train" else self.model.eval()
         
         optimizer = torch.optim.Adam(
             params=list(self.model.parameters()),
@@ -464,11 +401,10 @@ class Model(object):
         adjust_learning_rate(optimizer, self.epoch, self.args)
 
         data_loader = (
-            self.train_loader if phase == "train"
+            self.train_loader if self.phase == "train"
             else self.valid_loader
         )
         
-        self.phase = phase
         self.area_num = str(self.m_idx + 1) if self.flag else str(self.m_idx)
         self.img_count = 0
         
@@ -524,7 +460,7 @@ class Model(object):
 
                 self.print_loss(iteration)
 
-                if self.phase == "train":
+                if phase == "train":
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
@@ -534,12 +470,9 @@ class Model(object):
                 self.img_count += 1
                 self.temp_model_list[self.m_idx] = self.model
         
-        if self.phase == 'train':
+        if phase == 'train':
             run_iter()
         else:
             with torch.no_grad():
                 run_iter()
                 
-        print(f"{self.phase}_{self.area_num}_{self.img_count}장")
-                
-                    

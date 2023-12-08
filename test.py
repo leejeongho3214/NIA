@@ -45,6 +45,15 @@ def parse_args():
     )
     
     parser.add_argument(
+        "--data_num",
+        default=-1,
+        type=int,
+    )      
+    parser.add_argument(
+            "--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+"
+        )
+    
+    parser.add_argument(
         "--output_dir",
         default="checkpoint",
         type=str,
@@ -96,7 +105,7 @@ def main(args):
     d = os.popen("date").read()
     l = os.popen("ls -al").read()
 
-    logger = setup_logger(args.name, args.mode + f"_{args.data}1")
+    logger = setup_logger(args.name, "eval/" + args.mode, filename=args.name + ".txt")
 
     logger.info(d)
     logger.info(l)

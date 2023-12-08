@@ -80,7 +80,7 @@ class FileHandler(StreamHandler):
         return '<%s %s (%s)>' % (self.__class__.__name__, self.baseFilename, level)
 
 
-def setup_logger(name, path):
+def setup_logger(name, path, filename="Evaluation.txt"):
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
 
@@ -91,11 +91,11 @@ def setup_logger(name, path):
     ch.setFormatter(formatter1)
     logger.propagate = False
     logger.addHandler(ch)
-    
-    if not os.path.exists("test"):
-        mkdir("test")
+            
+    if not os.path.isfile(path):
+        mkdir(path)
         
-    fh = FileHandler(os.path.join("test", path + ".txt"), encoding='utf-8', mode = 'at')
+    fh = FileHandler(os.path.join(path, filename), encoding='utf-8', mode = 'at')
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(formatter2)
     logger.addHandler(fh)
