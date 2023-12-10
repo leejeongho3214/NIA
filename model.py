@@ -161,6 +161,7 @@ class Model(object):
         self.m_idx = 0
         self.model = None
         self.update_c = 0
+        self.stop_loss = np.inf
         
         self.pred = list()
         self.gt = list()
@@ -176,7 +177,7 @@ class Model(object):
         self.m_idx = m_idx
 
     def update_m(self, model_num_class):
-        count = 0
+        best_loss = 0
         for idx, value in enumerate(model_num_class):
             if np.isnan(value) or idx in [4, 6]:
                 continue
@@ -186,22 +187,25 @@ class Model(object):
                     self.best_loss[idx] = round(self.val_loss[idx].avg.item(), 4)
                 except:
                     self.best_loss[idx] = round(self.val_loss[idx].avg, 4)
+                    
                 self.model_list[idx] = copy.deepcopy(self.temp_model_list[idx])
                 save_checkpoint(
                     self.model_list[idx], self.args, self.epoch, idx, self.best_loss
                 )
-                count += 1
+                
+            best_loss += self.best_loss[idx]
 
-        if count == 0:
-            self.update_c += 1
-            self.logger.info(f"[{self.update_c}/{self.args.stop_early}] Nothing do not update")
-
-        else:
+        if best_loss < self.stop_loss:
             self.update_c = 0
-            self.logger.info(f"[{self.update_c}/{self.args.stop_early}] {count} models update")
+            self.logger.info(f"[{self.update_c}/{self.args.stop_early}] update ==> Total loss {best_loss:.03f}")
+            
+        else:
+            self.update_c += 1
+            self.logger.info(f"[{self.update_c}/{self.args.stop_early}] Nothing do not update  ==> Total loss {best_loss:.03f}")
 
     def update_e(self, epoch):
         self.epoch = epoch
+        self.stop_loss = sum(self.args.best_loss)
     
     def save_value(self):   
         with open(os.path.join(self.check_path, f"epoch_{self.epoch}_pred.txt"), "w") as p:

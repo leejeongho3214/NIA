@@ -115,7 +115,7 @@ def main(args):
     model_list = [copy.deepcopy(model) for _ in range(9)]
     # Define 8 resnet models for each region
 
-    ## Class Definitionq
+    ## Class Definition
     model_num_class = (
         [np.nan, 15, 7, 7, 0, 12, 0, 5, 7]
         if args.mode == "class"

@@ -246,7 +246,7 @@ class Model_test(object):
 
             score = 0
             flag = False
-            if abs((pred_l - gt[:, idx]).item()) < 2:
+            if abs((pred_l - gt[:, idx]).item()) == 0:
                 score += 1
                 flag = True
             self.test_class_acc[dig].update_acc(
@@ -254,11 +254,11 @@ class Model_test(object):
                 pred_l.shape[0],
             )
             patch_list[area_num][3][dig] = [int(gt[:, idx].item()), int(pred_l.item())]
-            self.logger.info(
-                patch_list[area_num][2][0]
-                + f"({dig})"
-                + f"==> Pred: {pred_l.item()}  /  Gt: {gt[:, idx].item()}  ==> {flag} "
-            )
+            # self.logger.info(
+            #     patch_list[area_num][2][0]
+            #     + f"({dig})"
+            #     + f"==> Pred: {pred_l.item()}  /  Gt: {gt[:, idx].item()}  ==> {flag} "
+            # )
             
             self.count[f"{area_num}_{dig}"] += 1
 
