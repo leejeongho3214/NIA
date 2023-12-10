@@ -1,0 +1,124 @@
+2023-12-10 11:00:06,005 Sun 10 Dec 2023 11:00:05 AM KST
+
+2023-12-10 11:00:06,005 total 116
+drwxrwxrwx  9 jeongho jeongho  4096 Dec  9 17:41 .
+drwxr-xr-x 22 jeongho jeongho  4096 Dec 10 11:00 ..
+drwxrwxrwx  4 jeongho jeongho  4096 Nov 15 23:02 checkpoint
+-rw-rw-r--  1 jeongho jeongho     0 Dec  9 17:41 data.ipynb
+-rwxrwxr-x  1 jeongho jeongho  9349 Dec  8 23:12 data_loader.py
+drwxr-xr-x  4 jeongho jeongho  4096 Dec  5 11:45 dataset
+-rwxrwxrwx  1 jeongho jeongho   330 Nov 15 15:30 Dockerfile
+-rw-rw-r--  1 jeongho jeongho    85 Dec  7 16:48 .dockerignore
+-rw-rw-r--  1 jeongho jeongho    19 Dec  1 23:47 .env
+drwxrwxr-x  3 jeongho jeongho  4096 Dec  8 23:54 eval
+drwxrwxrwx  8 jeongho jeongho  4096 Dec 10 10:52 .git
+-rwxrwxrwx  1 jeongho jeongho   137 Nov 10 18:49 .gitignore
+-rwxrwxrwx  1 jeongho jeongho  3526 Dec  8 23:53 logger.py
+-rwxrwxr-x  1 jeongho jeongho  5590 Dec  8 23:11 main.py
+-rwxrwxr-x  1 jeongho jeongho 15668 Dec  9 12:48 model.py
+drwxrwxr-x  2 jeongho jeongho  4096 Dec  9 12:49 __pycache__
+-rw-rw-r--  1 jeongho jeongho   548 Dec  7 20:05 requirements.txt
+drwxrwxr-x  4 jeongho jeongho  4096 Dec  8 10:04 tensorboard
+-rwxrwxr-x  1 jeongho jeongho 11333 Dec  9 12:09 test_model.py
+-rwxrwxr-x  1 jeongho jeongho  4233 Dec  9 12:29 test.py
+drwxrwxrwx  2 jeongho jeongho  4096 Aug 31 14:04 .vscode
+
+2023-12-10 11:00:06,006 Command Line: test.py --name label_smooth_0 --mode regression --data_num 2
+2023-12-10 11:00:07,387 [92mResuming......checkpoint/regression/label_smooth_0[0m
+2023-12-10 11:00:08,885 Inferece ...
+2023-12-10 11:00:09,121 Finish!
+2023-12-10 11:00:09,237 Sun 10 Dec 2023 11:00:09 AM KST
+
+2023-12-10 11:00:09,330 total 116
+drwxrwxrwx  9 jeongho jeongho  4096 Dec  9 17:41 .
+drwxr-xr-x 22 jeongho jeongho  4096 Dec 10 11:00 ..
+drwxrwxrwx  4 jeongho jeongho  4096 Nov 15 23:02 checkpoint
+-rw-rw-r--  1 jeongho jeongho     0 Dec  9 17:41 data.ipynb
+-rwxrwxr-x  1 jeongho jeongho  9349 Dec  8 23:12 data_loader.py
+drwxr-xr-x  4 jeongho jeongho  4096 Dec  5 11:45 dataset
+-rwxrwxrwx  1 jeongho jeongho   330 Nov 15 15:30 Dockerfile
+-rw-rw-r--  1 jeongho jeongho    85 Dec  7 16:48 .dockerignore
+-rw-rw-r--  1 jeongho jeongho    19 Dec  1 23:47 .env
+drwxrwxr-x  4 jeongho jeongho  4096 Dec 10 11:00 eval
+drwxrwxrwx  8 jeongho jeongho  4096 Dec 10 10:52 .git
+-rwxrwxrwx  1 jeongho jeongho   137 Nov 10 18:49 .gitignore
+-rwxrwxrwx  1 jeongho jeongho  3526 Dec  8 23:53 logger.py
+-rwxrwxr-x  1 jeongho jeongho  5590 Dec  8 23:11 main.py
+-rwxrwxr-x  1 jeongho jeongho 15668 Dec  9 12:48 model.py
+drwxrwxr-x  2 jeongho jeongho  4096 Dec  9 12:49 __pycache__
+-rw-rw-r--  1 jeongho jeongho   548 Dec  7 20:05 requirements.txt
+drwxrwxr-x  4 jeongho jeongho  4096 Dec  8 10:04 tensorboard
+-rwxrwxr-x  1 jeongho jeongho 11333 Dec  9 12:09 test_model.py
+-rwxrwxr-x  1 jeongho jeongho  4233 Dec  9 12:29 test.py
+drwxrwxrwx  2 jeongho jeongho  4096 Aug 31 14:04 .vscode
+
+2023-12-10 11:00:21,120 Sun 10 Dec 2023 11:00:21 AM KST
+
+2023-12-10 11:00:21,120 total 116
+drwxrwxrwx  9 jeongho jeongho  4096 Dec  9 17:41 .
+drwxr-xr-x 22 jeongho jeongho  4096 Dec 10 11:00 ..
+drwxrwxrwx  4 jeongho jeongho  4096 Nov 15 23:02 checkpoint
+-rw-rw-r--  1 jeongho jeongho     0 Dec  9 17:41 data.ipynb
+-rwxrwxr-x  1 jeongho jeongho  9349 Dec  8 23:12 data_loader.py
+drwxr-xr-x  4 jeongho jeongho  4096 Dec  5 11:45 dataset
+-rwxrwxrwx  1 jeongho jeongho   330 Nov 15 15:30 Dockerfile
+-rw-rw-r--  1 jeongho jeongho    85 Dec  7 16:48 .dockerignore
+-rw-rw-r--  1 jeongho jeongho    19 Dec  1 23:47 .env
+drwxrwxr-x  4 jeongho jeongho  4096 Dec 10 11:00 eval
+drwxrwxrwx  8 jeongho jeongho  4096 Dec 10 10:52 .git
+-rwxrwxrwx  1 jeongho jeongho   137 Nov 10 18:49 .gitignore
+-rwxrwxrwx  1 jeongho jeongho  3526 Dec  8 23:53 logger.py
+-rwxrwxr-x  1 jeongho jeongho  5590 Dec  8 23:11 main.py
+-rwxrwxr-x  1 jeongho jeongho 15668 Dec  9 12:48 model.py
+drwxrwxr-x  2 jeongho jeongho  4096 Dec  9 12:49 __pycache__
+-rw-rw-r--  1 jeongho jeongho   548 Dec  7 20:05 requirements.txt
+drwxrwxr-x  4 jeongho jeongho  4096 Dec  8 10:04 tensorboard
+-rwxrwxr-x  1 jeongho jeongho 11333 Dec  9 12:09 test_model.py
+-rwxrwxr-x  1 jeongho jeongho  4233 Dec  9 12:29 test.py
+drwxrwxrwx  2 jeongho jeongho  4096 Aug 31 14:04 .vscode
+
+2023-12-10 11:00:21,120 Command Line: test.py --name label_smooth_0 --mode regression --data_num 10
+2023-12-10 11:00:22,499 [92mResuming......checkpoint/regression/label_smooth_0[0m
+2023-12-10 11:00:24,225 Inferece ...
+2023-12-10 11:00:25,050 Sub_0001_Equ_01_Angle_R15_Area_0(count)==> Pred: -0.022  /  Gt: 0.420  ==> MAE: 0.442
+2023-12-10 11:00:25,188 Sub_0001_Equ_01_Angle_R15_Area_1(moisture)==> Pred: -0.326  /  Gt: 0.530  ==> MAE: 0.856
+2023-12-10 11:00:25,188 Sub_0001_Equ_01_Angle_R15_Area_1(elasticity)==> Pred: 0.001  /  Gt: 0.653  ==> MAE: 0.652
+2023-12-10 11:00:25,348 Sub_0001_Equ_01_Angle_R15_Area_3(wrinkle)==> Pred: -0.131  /  Gt: 0.146  ==> MAE: 0.277
+2023-12-10 11:00:25,417 Sub_0001_Equ_01_Angle_R15_Area_4(wrinkle)==> Pred: -0.721  /  Gt: 0.126  ==> MAE: 0.847
+2023-12-10 11:00:25,564 Sub_0001_Equ_01_Angle_R15_Area_5(moisture)==> Pred: -0.183  /  Gt: 0.717  ==> MAE: 0.900
+2023-12-10 11:00:25,565 Sub_0001_Equ_01_Angle_R15_Area_5(elasticity)==> Pred: 0.073  /  Gt: 0.636  ==> MAE: 0.563
+2023-12-10 11:00:25,565 Sub_0001_Equ_01_Angle_R15_Area_5(pore)==> Pred: 0.378  /  Gt: 0.210  ==> MAE: 0.168
+2023-12-10 11:00:25,622 Sub_0001_Equ_01_Angle_R15_Area_6(moisture)==> Pred: -0.345  /  Gt: 0.763  ==> MAE: 1.108
+2023-12-10 11:00:25,622 Sub_0001_Equ_01_Angle_R15_Area_6(elasticity)==> Pred: 0.127  /  Gt: 0.652  ==> MAE: 0.525
+2023-12-10 11:00:25,623 Sub_0001_Equ_01_Angle_R15_Area_6(pore)==> Pred: 0.198  /  Gt: 0.203  ==> MAE: 0.005
+2023-12-10 11:00:25,774 Sub_0001_Equ_01_Angle_R15_Area_8(moisture)==> Pred: 0.331  /  Gt: 0.787  ==> MAE: 0.455
+2023-12-10 11:00:25,775 Sub_0001_Equ_01_Angle_R15_Area_8(elasticity)==> Pred: 0.452  /  Gt: 0.593  ==> MAE: 0.141
+2023-12-10 11:00:25,775 count: 0.4419 // moisture: 0.8298 // wrinkle: 0.5616 // elasticity: 0.4703 // pore: 0.0863
+2023-12-10 11:00:25,775 [0 / 1] Total Average MAE => 0.478
+2023-12-10 11:00:25,775 ====================================================================================================================================================================================
+2023-12-10 11:00:25,852 Finish!
+2023-12-10 11:00:25,982 Sun 10 Dec 2023 11:00:25 AM KST
+
+2023-12-10 11:00:26,085 total 116
+drwxrwxrwx  9 jeongho jeongho  4096 Dec  9 17:41 .
+drwxr-xr-x 22 jeongho jeongho  4096 Dec 10 11:00 ..
+drwxrwxrwx  4 jeongho jeongho  4096 Nov 15 23:02 checkpoint
+-rw-rw-r--  1 jeongho jeongho     0 Dec  9 17:41 data.ipynb
+-rwxrwxr-x  1 jeongho jeongho  9349 Dec  8 23:12 data_loader.py
+drwxr-xr-x  4 jeongho jeongho  4096 Dec  5 11:45 dataset
+-rwxrwxrwx  1 jeongho jeongho   330 Nov 15 15:30 Dockerfile
+-rw-rw-r--  1 jeongho jeongho    85 Dec  7 16:48 .dockerignore
+-rw-rw-r--  1 jeongho jeongho    19 Dec  1 23:47 .env
+drwxrwxr-x  4 jeongho jeongho  4096 Dec 10 11:00 eval
+drwxrwxrwx  8 jeongho jeongho  4096 Dec 10 10:52 .git
+-rwxrwxrwx  1 jeongho jeongho   137 Nov 10 18:49 .gitignore
+-rwxrwxrwx  1 jeongho jeongho  3526 Dec  8 23:53 logger.py
+-rwxrwxr-x  1 jeongho jeongho  5590 Dec  8 23:11 main.py
+-rwxrwxr-x  1 jeongho jeongho 15668 Dec  9 12:48 model.py
+drwxrwxr-x  2 jeongho jeongho  4096 Dec  9 12:49 __pycache__
+-rw-rw-r--  1 jeongho jeongho   548 Dec  7 20:05 requirements.txt
+drwxrwxr-x  4 jeongho jeongho  4096 Dec  8 10:04 tensorboard
+-rwxrwxr-x  1 jeongho jeongho 11333 Dec  9 12:09 test_model.py
+-rwxrwxr-x  1 jeongho jeongho  4233 Dec  9 12:29 test.py
+drwxrwxrwx  2 jeongho jeongho  4096 Aug 31 14:04 .vscode
+
