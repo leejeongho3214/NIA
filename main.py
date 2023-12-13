@@ -128,7 +128,7 @@ def main(args):
     mkdir(check_path)
     ## Make the directories for save
 
-    model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
+    model = models.resnet50(weights=None)
 
     model_num_class = (
         {
@@ -151,13 +151,6 @@ def main(args):
     args.best_loss, model_list = dict(), dict()
     args.best_loss.update({item: np.inf for item in model_num_class})
     model_list.update({item: copy.deepcopy(model) for item in model_num_class})
-    # Define 9 resnet models for each region
-    resume_list = list()
-    for item in model_num_class:
-        model_list[item].fc = nn.Linear(
-            model_list[item].fc.in_features, model_num_class[item]
-        )
-        resume_list.append(item)
 
     ## Adjust the number of output in model for each region image
     model_dict_path = os.path.join(check_path, "wrinkle", "state_dict.bin")
@@ -172,7 +165,7 @@ def main(args):
     if os.path.isfile(model_dict_path):
         print(f"\033[92mResuming......{model_dict_path}\033[0m")
 
-        for item in resume_list:
+        for item in model_num_class:
             model_list[item] = resume_checkpoint(
                 args,
                 model_list[item],

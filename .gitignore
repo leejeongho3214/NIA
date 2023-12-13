@@ -14,7 +14,7 @@ __pycache__/
 *.ipynb
 *.pyc
 checkpoint_new
-eval
+eval/
 
 
 docker/
