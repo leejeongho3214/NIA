@@ -3,18 +3,14 @@ import os
 import shutil
 import sys
 import numpy as np
-import torch
 from torchvision import models
 
 from tensorboardX import SummaryWriter
-
 import copy
-from torch.utils.data import random_split
-from matplotlib import pyplot as plt
-from tqdm import tqdm
+from utils import mkdir
 from logger import setup_logger
 from data_loader import CustomDataset
-from model import resume_checkpoint, mkdir, Model
+from model import resume_checkpoint, Model
 from torchvision.models import ResNet50_Weights
 import torch.nn as nn
 
@@ -42,10 +38,8 @@ def parse_args():
         default="tensorboard",
         type=str,
     )
-    
-    parser.add_argument(
-            "--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+"
-        )
+
+    parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
 
     parser.add_argument("--stop_early", type=int, default=30)
 
@@ -64,7 +58,7 @@ def parse_args():
 
     parser.add_argument(
         "--output_dir",
-        default="checkpoint",
+        default="checkpoint_new",
         type=str,
     )
 
@@ -79,22 +73,22 @@ def parse_args():
         default=128,
         type=int,
     )
-    
+
     parser.add_argument(
         "--data_num",
         default=-1,
         type=int,
     )
-        
+
     parser.add_argument(
         "--load_epoch",
         default=0,
         type=int,
     )
-    
+
     parser.add_argument(
         "--label_smooth",
-        default=0.5,
+        default=0,
         type=float,
     )
 
@@ -118,10 +112,11 @@ def parse_args():
 
     parser.add_argument("--reset", action="store_true")
 
+    parser.add_argument("--normalize", action="store_true")
+
     args = parser.parse_args()
 
     return args
-
 
 
 def main(args):
@@ -132,29 +127,40 @@ def main(args):
     mkdir(log_path)
     mkdir(check_path)
     ## Make the directories for save
-    
 
     model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
 
     model_num_class = (
-        [np.nan, 15, 7, 7, 0, 12, 0, 5, 7]
+        {
+            "dryness": 5,
+            "pigmentation": 6,
+            "pore": 6,
+            "sagging": 7,
+            "wrinkle": 7,
+        }  # dryness, pigmentation, pore, sagging, wrinkle
         if args.mode == "class"
-        else [1, 2, np.nan, 1, 0, 3, 0, np.nan, 2]
+        else {
+            "count": 1,
+            "pore": 1,
+            "wrinkle": 1,
+            "elasticity": 1,
+            "moisture": 1,
+        }  # pigmentation, pore, wrinkle, elasticity, moisture
     )
 
-    args.best_loss = [np.inf for _ in range(len(model_num_class))]
-    model_list = [copy.deepcopy(model) for _ in range(len(model_num_class))]
+    args.best_loss, model_list = dict(), dict()
+    args.best_loss.update({item: np.inf for item in model_num_class})
+    model_list.update({item: copy.deepcopy(model) for item in model_num_class})
     # Define 9 resnet models for each region
     resume_list = list()
-    for idx, item in enumerate(model_num_class):
-        if not np.isnan(item):
-            model_list[idx].fc = nn.Linear(
-                model_list[idx].fc.in_features, model_num_class[idx]
-            )
-            resume_list.append(idx)
+    for item in model_num_class:
+        model_list[item].fc = nn.Linear(
+            model_list[item].fc.in_features, model_num_class[item]
+        )
+        resume_list.append(item)
 
     ## Adjust the number of output in model for each region image
-    model_dict_path = os.path.join(check_path, "1", "state_dict.bin")
+    model_dict_path = os.path.join(check_path, "wrinkle", "state_dict.bin")
 
     if args.reset:
         print(f"\033[90mReseting......{model_dict_path}\033[0m")
@@ -166,20 +172,17 @@ def main(args):
     if os.path.isfile(model_dict_path):
         print(f"\033[92mResuming......{model_dict_path}\033[0m")
 
-        for idx in resume_list:
-            if idx in [4, 6]:
-                continue
-            model_list[idx] = resume_checkpoint(
+        for item in resume_list:
+            model_list[item] = resume_checkpoint(
                 args,
-                model_list[idx],
-                os.path.join(check_path, f"{idx}", "state_dict.bin"),
+                model_list[item],
+                os.path.join(check_path, f"{item}", "state_dict.bin"),
             )
 
-    logger = setup_logger(args.name, check_path)
+    logger = setup_logger(args.name + args.mode, check_path)
     logger.info(args)
     logger.info("Command Line: " + " ".join(sys.argv))
 
-    
     dataset = CustomDataset(args)
 
     dataset.load_dataset(args, "train")
@@ -188,7 +191,7 @@ def main(args):
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         shuffle=True,
-    ) 
+    )
 
     dataset.load_dataset(args, "val")
     valset_loader = data.DataLoader(
@@ -196,7 +199,7 @@ def main(args):
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         shuffle=False,
-    ) 
+    )
 
     resnet_model = Model(
         args, model_list, trainset_loader, valset_loader, logger, writer, check_path
@@ -205,15 +208,13 @@ def main(args):
     for epoch in range(args.load_epoch, args.epoch):
         resnet_model.update_e(epoch + 1) if args.load_epoch else None
 
-        for model_idx in range(len(model_num_class)):
-            if np.isnan(model_num_class[model_idx]):
-                continue
+        for model_idx in model_num_class:
             # In regression task, there are no images for 미간, 입술, 턱
             resnet_model.choice(model_idx)
             # Change the model for each region
-            resnet_model.run(phase="train")
-            resnet_model.run(phase="valid")
-            
+            resnet_model.run(model_idx, phase="train")
+            resnet_model.run(model_idx, phase="valid")
+
         resnet_model.update_m(model_num_class)
         resnet_model.save_value()
         # Show the result for each value, such as pigmentation and pore, by averaging all of them
@@ -222,7 +223,7 @@ def main(args):
 
         if resnet_model.stop_early():
             break
-        
+
     writer.close()
 
 

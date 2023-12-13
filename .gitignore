@@ -13,6 +13,9 @@ __pycache__/
 *.xlsx
 *.ipynb
 *.pyc
+checkpoint_new
+eval
+
 
 docker/
 .env

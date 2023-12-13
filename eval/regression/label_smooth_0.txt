@@ -122,3 +122,12 @@ drwxrwxr-x  4 jeongho jeongho  4096 Dec  8 10:04 tensorboard
 -rwxrwxr-x  1 jeongho jeongho  4233 Dec  9 12:29 test.py
 drwxrwxrwx  2 jeongho jeongho  4096 Aug 31 14:04 .vscode
 
+2023-12-12 14:17:19,094 Command Line: test.py --name label_smooth_0 --mode regression
+2023-12-12 14:27:16,391 Inferece ...
+2023-12-12 14:31:40,958 count: 0.9449 // moisture: 0.3583 // wrinkle: 0.4649 // elasticity: 0.2703 // pore: 0.3123
+2023-12-12 14:31:40,958 Total Average MAE => 0.470
+2023-12-12 14:31:40,958 ====================================================================================================================================================================================
+2023-12-12 14:31:40,960 Finish!
+2023-12-12 15:23:44,430 Command Line: test.py --name label_smooth_0 --mode regression
+2023-12-12 15:23:50,867 [92mResuming......checkpoint_new/regression/label_smooth_0[0m
+2023-12-12 15:31:11,563 Inferece ...

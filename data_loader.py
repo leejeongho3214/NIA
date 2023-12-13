@@ -29,7 +29,6 @@ class_num_list = {
     "pore": 6,
     "dryness": 5,
     "sagging": 7,
-    "forehead_wrinkle": 9,
 }
 
 
@@ -76,12 +75,15 @@ class CustomDataset(Dataset):
             for item in natsort.natsorted(os.listdir(self.img_path))
             if not item.startswith(".")
         ]
-        self.transform = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.Normalize([0.24628267, 0.3271797, 0.44643742], [0.1666497, 0.2335198, 0.3375362]),
-            ]
-        )
+        transform_list = [transforms.ToTensor()]
+        if self.args.normalize:
+            transform_list.append(
+                transforms.Normalize(
+                    [0.24628267, 0.3271797, 0.44643742],
+                    [0.1666497, 0.2335198, 0.3375362],
+                )
+            )
+        self.transform = transforms.Compose(transform_list)
 
         for equ_name in sub_path_list:
             if equ_name.startswith(".") or int(equ_name) not in self.args.equ:
@@ -140,12 +142,7 @@ class CustomDataset(Dataset):
                     ) = self.load_img(img_name, angle, idx_area, equ_name, img, args)
 
                 except:
-                    if self.load_img(img_name, angle, idx_area, equ_name, img, args):
-                        area_list[f"{idx_area}"] = [
-                            torch.zeros([3, args.res, args.res]),
-                            dict(),
-                        ]
-                        continue
+                    continue
 
                 if idx_area != 0:
                     n_patch_img = cv2.resize(
@@ -168,11 +165,12 @@ class CustomDataset(Dataset):
                 label_data = (
                     meta["annotations"] if args.mode == "class" else meta["equipment"]
                 )
+
                 if type(label_data) != dict:
                     continue
 
                 if args.mode != "class":
-                    label_data = torch.tensor(self.norm_reg(meta, idx_area))
+                    label_data = self.norm_reg(meta, idx_area)
 
                 desc_area = (
                     "Sub_"
@@ -184,11 +182,12 @@ class CustomDataset(Dataset):
                     + "_Area_"
                     + area_name
                 )
-                area_list[f"{idx_area}"] = [
-                    patch_img,
-                    label_data,
-                    desc_area,
-                ]
+
+                for key in label_data:
+                    dig = key.split("_")[-1]
+                    if dig not in area_list:
+                        area_list[dig] = list()
+                    area_list[dig].append([patch_img, label_data[key], desc_area])
 
             self.sub_path.append(area_list)
 
@@ -266,7 +265,7 @@ class CustomDataset(Dataset):
         return reduction_value, json_name, area_name, meta, patch_img
 
     def norm_reg(self, meta, idx_area):
-        item_list = list()
+        item_list = dict()
         type_class = {
             "0": ["pigmentation_count"],
             "1": ["forehead_moisture", "forehead_elasticity_R2"],
@@ -278,23 +277,32 @@ class CustomDataset(Dataset):
         }
 
         for item in type_class[f"{idx_area}"]:
-            item_class = item.split("_")[-1]
-            if meta["equipment"][item] == "Er":
-                item_list.append(np.nan)
+            split_list = item.split("_")
+            dig_v = split_list[-1]
+            # if meta["equipment"][item] == "Er":
+            #     item_list.append(np.nan)
+            dig = split_list[-1]
+            if dig in ["Ra", "R2"]:
+                dig = split_list[-2]
+
+            if dig_v == "R2":
+                item_list[dig] = meta["equipment"][item]
+
+            elif dig_v == "moisture":
+                item_list[dig] = meta["equipment"][item] / 100
+
+            elif dig_v == "Ra":
+                item_list[dig] = meta["equipment"][item] / 100
+
+            elif dig_v == "count":
+                item_list[dig] = meta["equipment"][item] / 350
+
+            elif dig_v == "pore":
+                item_list[dig] = meta["equipment"][item] / 3000
+
             else:
-                if item_class == "R2":
-                    item_list.append(meta["equipment"][item])
+                assert 0, "dig_v is not here"
 
-                elif item_class in ["moisture", "Ra"]:
-                    item_list.append(meta["equipment"][item] / 100)
-
-                elif item_class == "count":
-                    item_list.append(meta["equipment"][item] / 350)
-
-                elif item_class == "pore":
-                    item_list.append(meta["equipment"][item] / 3000)
-
-                else:
-                    assert 0, "item_class is not here"
+            item_list[dig] = round(item_list[dig], 5)
 
         return item_list

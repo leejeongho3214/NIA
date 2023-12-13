@@ -70,8 +70,8 @@ def adjust_learning_rate(optimizer, epoch, args):
         param_group["lr"] = lr
 
 
-def save_checkpoint(model, args, epoch, m_idx, best_loss):
-    checkpoint_dir = os.path.join(args.output_dir, args.mode, args.name, str(m_idx))
+def save_checkpoint(model, args, epoch, m_dig, best_loss):
+    checkpoint_dir = os.path.join(args.output_dir, args.mode, args.name, str(m_dig))
     mkdir(checkpoint_dir)
     model_to_save = model.module if hasattr(model, "module") else model
     torch.save(
@@ -127,33 +127,21 @@ class Model_test(object):
             "count": AverageMeter(),
         }
 
-        self.equip_loss = {
-            "0": {"count": 1},
-            "1": {"moisture": 1, "elasticity": 1},
-            "3": {"wrinkle": 1},
-            "4": {"wrinkle": 1},
-            "5": {"moisture": 1, "elasticity": 1, "pore": 1},
-            "6": {"moisture": 1, "elasticity": 1, "pore": 1},
-            "8": {"moisture": 1, "elasticity": 1},
-        }
         self.criterion = (
             nn.CrossEntropyLoss() if self.args.mode == "class" else nn.L1Loss()
         )
 
         self.phase = None
-        self.m_idx = 0
+        self.m_dig = 0
         self.model = None
         self.update_c = 0
+        
+        self.pred = list()
+        self.gt = list()
 
-    def choice(self, m_idx):
-        if m_idx in [4, 6]:
-            m_idx -= 1
-            self.flag = True
-        else:
-            self.flag = False
-
-        self.model = copy.deepcopy(self.model_list[m_idx])
-        self.m_idx = m_idx
+    def choice(self, m_dig):
+        self.model = copy.deepcopy(self.model_list[m_dig])
+        self.m_dig = m_dig
 
     def acc_avg(self, name):
         return round(self.test_class_acc[name].avg * 100, 2)
@@ -161,24 +149,21 @@ class Model_test(object):
     def loss_avg(self, name):
         return round(self.test_regresion_mae[name].avg, 4)
 
-    def print_total(self, iter):
+    def print_total(self):
         if self.args.mode == "class":
             self.logger.info(
                 f"pigmentation: {self.acc_avg('pigmentation')}%(T: {self.test_class_acc['pigmentation'].sum} / F: {self.test_class_acc['pigmentation'].count - self.test_class_acc['pigmentation'].sum}) // wrinkle: {self.acc_avg('wrinkle')}%(T: {self.test_class_acc['wrinkle'].sum} / F: {self.test_class_acc['wrinkle'].count - self.test_class_acc['wrinkle'].sum}) // sagging: {self.acc_avg('sagging')}%(T: {self.test_class_acc['sagging'].sum} / F: {self.test_class_acc['sagging'].count - self.test_class_acc['sagging'].sum}) // pore: {self.acc_avg('pore')}%(T: {self.test_class_acc['pore'].sum} / F: {self.test_class_acc['pore'].count - self.test_class_acc['pore'].sum}) // dryness: {self.acc_avg('dryness')}%(T: {self.test_class_acc['dryness'].sum} / F: {self.test_class_acc['dryness'].count - self.test_class_acc['dryness'].sum})"
             )
-
             self.logger.info(
-                f"[{iter} / {len(self.test_loader)}]Total Average Acc => {((self.acc_avg('pigmentation') + self.acc_avg('wrinkle') + self.acc_avg('sagging') + self.acc_avg('pore') + self.acc_avg('dryness') ) / 5):.2f}%"
+                f"Total Average Acc => {((self.acc_avg('pigmentation') + self.acc_avg('wrinkle') + self.acc_avg('sagging') + self.acc_avg('pore') + self.acc_avg('dryness') ) / 5):.2f}%"
             )
-
         else:
             self.logger.info(
                 f"count: {self.loss_avg('count')} // moisture: {self.loss_avg('moisture')} // wrinkle: {self.loss_avg('wrinkle')} // elasticity: {self.loss_avg('elasticity')} // pore: {self.loss_avg('pore')}"
             )
             self.logger.info(
-                f"[{iter} / {len(self.test_loader)}] Total Average MAE => {((self.loss_avg('count') + self.loss_avg('moisture') + self.loss_avg('wrinkle') +self.loss_avg('elasticity') + self.loss_avg('pore')) / 5):.3f}"
+                f"Total Average MAE => {((self.loss_avg('count') + self.loss_avg('moisture') + self.loss_avg('wrinkle') +self.loss_avg('elasticity') + self.loss_avg('pore')) / 5):.3f}"
             )
-
         self.logger.info("============" * 15)
 
     def match_img(self, vis_img, img):
@@ -196,125 +181,101 @@ class Model_test(object):
                     nan_list.append(batch_idx)
         return nan_list
 
-    def get_test_loss(self, pred_p, label, area_num, patch_list):
-        patch_list[area_num].append(dict())
-        for idx, name in enumerate(self.equip_loss[area_num]):
-            dig = name.split("_")[-1]
-            gt = label[:, idx: idx + 1]
-            if torch.isnan(gt): 
-                continue
-            
-            pred = pred_p[:, idx: idx + 1]
-            self.test_regresion_mae[name].update(
-                self.criterion(pred, gt).item(), batch_size=pred.shape[0]
-            )
-            self.logger.info(
-                patch_list[area_num][2][0]
-                + f"({dig})"
-                + f"==> Pred: {pred.item():.3f}  /  Gt: {gt.item():.3f}  ==> MAE: {self.criterion(pred, gt).item():.3f}"
-            )
-            
-            self.count[f"{area_num}_{dig}"] += 1
-
-            if dig == "moisture":
-                gt, pred = gt * 100, pred * 100
-            elif dig == "count":
-                gt, pred = gt * 350, pred * 350
-            elif dig == "pore":
-                gt, pred = gt * 3000, pred * 3000
-            patch_list[area_num][3][dig] = [round(gt.item(), 3), round(pred.item(), 3)]
-
-        return patch_list
-
-    def get_test_acc(self, pred, label, patch_list, area_num):
-        gt = (
-            torch.tensor(
-                np.array([label[value].detach().cpu().numpy() for value in label])
-            )
-            .permute(1, 0)
-            .to(device)
+    def get_test_loss(self, pred, gt):
+        self.test_regresion_mae[self.m_dig].update(
+            self.criterion(pred, gt).item(), batch_size=pred.shape[0]
         )
-        num = 0
-        patch_list[area_num].append(dict())
-        for idx, area_name in enumerate(label):
-            dig = area_name.split("_")[-1]
-            if area_name == "forehead_wrinkle":
-                pred_l = torch.argmax(pred[:, num : num + class_num_list["forehead_wrinkle"]], dim=1)
-            else:
-                pred_l = torch.argmax(pred[:, num : num + class_num_list[dig]], dim=1)
-            num += class_num_list[dig]
+        
+        if self.m_dig in ["moisture", "wrinkle"]:
+            gt, pred = gt * 100, pred * 100
+        elif self.m_dig == "count":
+            gt, pred = gt * 350, pred * 350
+        elif self.m_dig == "pore":
+            gt, pred = gt * 3000, pred * 3000
+        
+        self.pred.append([self.m_dig, pred.item()])
+        self.gt.append([self.m_dig, gt.item()])
 
-            score = 0
-            flag = False
-            if abs((pred_l - gt[:, idx]).item()) == 0:
-                score += 1
-                flag = True
-            self.test_class_acc[dig].update_acc(
-                score,
-                pred_l.shape[0],
-            )
-            patch_list[area_num][3][dig] = [int(gt[:, idx].item()), int(pred_l.item())]
-            # self.logger.info(
-            #     patch_list[area_num][2][0]
-            #     + f"({dig})"
-            #     + f"==> Pred: {pred_l.item()}  /  Gt: {gt[:, idx].item()}  ==> {flag} "
-            # )
             
-            self.count[f"{area_num}_{dig}"] += 1
+    def get_test_acc(self, pred, gt, patch_list):
 
+        pred_g = pred.argmax().item()
+        self.pred.append([self.m_dig, pred_g])
+        self.gt.append([self.m_dig, gt.item()])
+        
+        if abs((pred_g - gt).item()) == 0:
+            score = 1
+        else:
+            score = 0 
+            
+        self.test_class_acc[self.m_dig].update_acc(
+            score,
+            1,
+        )
 
         return patch_list
+
+    def save_value(self):
+        path = os.path.join("predictino", self.args.name)
+        mkdir(path)
+        with open(
+            os.path.join(path, f"pred.txt"), "w"
+        ) as p:
+            with open(
+                os.path.join(path, f"gt.txt"), "w"
+            ) as g:
+                for idx in range(len(self.pred)):
+                    p.write(f"{self.pred[idx][0]}, {self.pred[idx][1]} \n")
+                    g.write(f"{self.gt[idx][0]}, {self.gt[idx][1]} \n")
+        g.close()
+        p.close()
 
     def test(self, model_num_class, data_loader):
-        for iter, patch_list in enumerate(data_loader):
-            for model_idx in range(len(model_num_class)):
-                if np.isnan(model_num_class[model_idx]):
-                    continue
 
-                self.choice(model_idx)
-                self.model = self.model_list[self.m_idx]
-                self.model.eval()
+        data_loader = self.test_loader
+        len_dataset = len(data_loader) * len(model_num_class)
+        total_iter = 0
+        for dig in model_num_class:
+            self.choice(dig)
+            self.model = self.model_list[self.m_dig]
+            self.model.eval()
+            for patch_list in data_loader:
+                for item in patch_list[self.m_dig]:
+                    if type(item[1]) == torch.Tensor:
+                        label = item[1].to(device)
+                    else:
+                        for name in item[1]:
+                            item[1][name] = item[1][
+                                name
+                            ].to(device)
+                        label = item[1]
 
-                data_loader = self.test_loader
-                area_num = str(self.m_idx + 1) if self.flag else str(self.m_idx)
+                    if label == {}:
+                        continue        ## 눈가/볼 영역이 없는 경우
+                    img = item[0].to(device)
 
-                if type(patch_list[area_num][1]) == torch.Tensor:
-                    label = patch_list[area_num][1].to(device)
-                else:
-                    for name in patch_list[area_num][1]:
-                        patch_list[area_num][1][name] = patch_list[area_num][1][
-                            name
-                        ].to(device)
-                    label = patch_list[area_num][1]
+                    if img.shape[-1] > 128:
+                        img_l = img[:, :, :, :128]
+                        img_r = img[:, :, :, 128:]
+                        pred = self.model.to(device)(img_l)
+                        pred = self.model.to(device)(img_r) + pred
 
-                if label == {}:
-                    continue        ## 눈가/볼 영역이 없는 경우
+                    elif img.shape[-2] > 128:
+                        img_l = img[:, :, :128, :]
+                        img_r = img[:, :, 128:, :]
+                        pred = self.model.to(device)(img_l)
+                        pred = self.model.to(device)(img_r) + pred
+
+                    else:
+                        pred = self.model.to(device)(img)
+
+                    if self.args.mode == "class":
+                        _ = self.get_test_acc(pred, label, patch_list)
+                    else:
+                        _ = self.get_test_loss(pred, label.to(device))
+                        
+                total_iter += 1 
+                print(f"count =>->=> {total_iter}/{len_dataset}", end="\r")
                 
-                img = patch_list[area_num][0].to(device)
-
-                if area_num in [4, 6]:
-                    img = torch.flip(img, dims=[3])
-
-                if img.shape[-1] > 128:
-                    img_l = img[:, :, :, :128]
-                    img_r = img[:, :, :, 128:]
-                    pred = self.model.to(device)(img_l)
-                    pred = self.model.to(device)(img_r) + pred
-
-                elif img.shape[-2] > 128:
-                    img_l = img[:, :, :128, :]
-                    img_r = img[:, :, 128:, :]
-                    pred = self.model.to(device)(img_l)
-                    pred = self.model.to(device)(img_r) + pred
-
-                else:
-                    pred = self.model.to(device)(img)
-
-                if self.args.mode == "class":
-                    _ = self.get_test_acc(pred, label, patch_list, area_num)
-
-                else:
-                    _ = self.get_test_loss(pred, label.to(device), area_num, patch_list)
-            self.print_total(iter)
-            
+        self.print_total()
         if self.args.log: [self.logger.info(f"{key} => {self.count[key]} 장") for key in self.count]

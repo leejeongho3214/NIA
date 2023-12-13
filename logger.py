@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 from logging import StreamHandler, Handler, getLevelName
-from model import mkdir
+from utils import mkdir
 
 
 # this class is a copy of logging.FileHandler except we end self.close()
