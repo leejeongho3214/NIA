@@ -19,3 +19,4 @@ eval
 
 docker/
 .env
+prediction
