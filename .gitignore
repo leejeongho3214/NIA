@@ -13,7 +13,9 @@ __pycache__/
 *.xlsx
 *.ipynb
 *.pyc
-checkpoint_new
+checkpoint_all/
+checkpoint_F/
+checkpoint_transformer/
 eval/
 
 

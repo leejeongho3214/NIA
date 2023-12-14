@@ -4,8 +4,9 @@ import torch.nn as nn
 import numpy as np
 import copy
 from data_loader import class_num_list
-from utils import get_item, labeling, pred_image, AverageMeter, save_checkpoint
+from utils import get_item, pred_image, AverageMeter, save_checkpoint
 import os
+from utils import labeling
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -188,8 +189,12 @@ class Model(object):
 
         return loss
 
-    def regression(self, pred, label):
-        loss = self.criterion(pred, label.to(device))
+    def regression(self, pred, label, dig):
+        loss = self.criterion(pred[0], label.to(device))
+        
+        self.pred.append([dig, pred[0].item()])
+        self.gt.append([dig, label.item()])
+        
         self.train_loss[self.m_dig].update(
             loss, batch_size=pred.shape[0]
         ) if self.phase == "train" else self.val_loss[self.m_dig].update(
@@ -342,12 +347,12 @@ class Model(object):
             for patch_list in data_loader:
                 for item in patch_list[dig]:
                     img, label = get_item(item, device)
-                    pred = pred_image(self, img)
+                    pred = self.model.to(device)(img)
 
                     if self.args.mode == "class":
                         loss = self.class_loss(pred, label, dig)
                     else:
-                        loss = self.regression(pred, label)
+                        loss = self.regression(pred, label, dig)
 
                     total_iter += 1
                     self.print_loss(total_iter, len(patch_list[dig]))

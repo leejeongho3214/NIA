@@ -3,6 +3,7 @@ import os
 import shutil
 import sys
 import numpy as np
+import torch
 from torchvision import models
 
 from tensorboardX import SummaryWriter
@@ -11,8 +12,7 @@ from utils import mkdir
 from logger import setup_logger
 from data_loader import CustomDataset
 from model import resume_checkpoint, Model
-from torchvision.models import ResNet50_Weights
-import torch.nn as nn
+from vit_pytorch import ViT
 
 import argparse
 from torch.utils import data
@@ -58,7 +58,7 @@ def parse_args():
 
     parser.add_argument(
         "--output_dir",
-        default="checkpoint_new",
+        default="checkpoint_transformer",
         type=str,
     )
 
@@ -112,8 +112,6 @@ def parse_args():
 
     parser.add_argument("--reset", action="store_true")
 
-    parser.add_argument("--normalize", action="store_true")
-
     args = parser.parse_args()
 
     return args
@@ -127,8 +125,6 @@ def main(args):
     mkdir(log_path)
     mkdir(check_path)
     ## Make the directories for save
-
-    model = models.resnet50(weights=None)
 
     model_num_class = (
         {
@@ -150,10 +146,28 @@ def main(args):
 
     args.best_loss, model_list = dict(), dict()
     args.best_loss.update({item: np.inf for item in model_num_class})
-    model_list.update({item: copy.deepcopy(model) for item in model_num_class})
-
     ## Adjust the number of output in model for each region image
     model_dict_path = os.path.join(check_path, "wrinkle", "state_dict.bin")
+    
+    logger = setup_logger(args.name + args.mode, check_path)
+    logger.info(args)
+    logger.info("Command Line: " + " ".join(sys.argv))
+    
+    model_list = dict()   
+    for key, item in model_num_class.items():
+        model = ViT(
+            image_size=256,
+            patch_size=32,
+            num_classes=item,
+            dim = 1024, 
+            depth = 6,
+            heads=16,
+            mlp_dim=2048,
+            dropout=0.5,
+            emb_dropout=0.1
+            
+        )
+        model_list.update({key: model})
 
     if args.reset:
         print(f"\033[90mReseting......{model_dict_path}\033[0m")
@@ -165,16 +179,13 @@ def main(args):
     if os.path.isfile(model_dict_path):
         print(f"\033[92mResuming......{model_dict_path}\033[0m")
 
-        for item in model_num_class:
-            model_list[item] = resume_checkpoint(
+        for key, model in model_list.items():
+            model_list[key] = resume_checkpoint(
                 args,
-                model_list[item],
-                os.path.join(check_path, f"{item}", "state_dict.bin"),
+                model,
+                os.path.join(check_path, f"{key}", "state_dict.bin"),
             )
 
-    logger = setup_logger(args.name + args.mode, check_path)
-    logger.info(args)
-    logger.info("Command Line: " + " ".join(sys.argv))
 
     dataset = CustomDataset(args)
 

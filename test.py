@@ -1,18 +1,14 @@
 import torch
-from torchvision import models
 
 import sys
 import os
-import copy
 from data_loader import CustomDataset
 from model import resume_checkpoint
 from test_model import Model_test
-from torchvision.models import ResNet50_Weights
-import torch.nn as nn
 import argparse
 from logger import setup_logger
 from torch.utils import data
-from utils import save_value
+from vit_pytorch import ViT
 
 torch.manual_seed(523)
 torch.cuda.manual_seed_all(523)
@@ -52,7 +48,7 @@ def parse_args():
     
     parser.add_argument(
         "--output_dir",
-        default="checkpoint_new",
+        default="checkpoint_transformer",
         type=str,
     )
     
@@ -124,20 +120,21 @@ def main(args):
             'moisture': 1}    # pigmentation, pore, wrinkle, elasticity, moisture
     )
     
-    model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
-    model_list = dict()
-    model_list.update({item: copy.deepcopy(model) for item in model_num_class})
-    # Define 8 resnet models for each region
-
-    ## Class Definition
-
-
-    resume_list = list()
-    for item in model_num_class:
-        model_list[item].fc = nn.Linear(
-            model_list[item].fc.in_features, model_num_class[item]
+    model_list = dict()   
+    for key, item in model_num_class.items():
+        model = ViT(
+            image_size=256,
+            patch_size=32,
+            num_classes=item,
+            dim = 1024, 
+            depth = 6,
+            heads=16,
+            mlp_dim=2048,
+            dropout=0.1,
+            emb_dropout=0.1
+            
         )
-        resume_list.append(item)
+        model_list.update({key: model})
 
     ## Adjust the number of output in model for each region image
     model_dict_path = os.path.join(check_path, "wrinkle", "state_dict.bin")
@@ -145,11 +142,11 @@ def main(args):
     if os.path.isfile(model_dict_path):
         logger.info(f"\033[92mResuming......{check_path}\033[0m")
 
-        for idx in resume_list:
-            model_list[idx] = resume_checkpoint(
+        for key, model in model_list.items():
+            model_list[key] = resume_checkpoint(
                 args,
-                model_list[idx],
-                os.path.join(check_path, f"{idx}", "state_dict.bin"),
+                model,
+                os.path.join(check_path, f"{key}", "state_dict.bin"),
             )
 
     dataset = CustomDataset(args)
