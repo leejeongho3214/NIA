@@ -183,15 +183,15 @@ class Model_test(object):
 
     def get_test_loss(self, pred, gt):
         self.test_regresion_mae[self.m_dig].update(
-            self.criterion(pred, gt).item(), batch_size=pred.shape[0]
+            self.criterion(pred[0], gt).item(), batch_size=pred.shape[0]
         )
         
-        if self.m_dig in ["moisture", "wrinkle"]:
-            gt, pred = gt * 100, pred * 100
-        elif self.m_dig == "count":
-            gt, pred = gt * 350, pred * 350
-        elif self.m_dig == "pore":
-            gt, pred = gt * 3000, pred * 3000
+        # if self.m_dig in ["moisture", "wrinkle"]:
+        #     gt, pred = gt * 100, pred * 100
+        # elif self.m_dig == "count":
+        #     gt, pred = gt * 350, pred * 350
+        # elif self.m_dig == "pore":
+        #     gt, pred = gt * 3000, pred * 3000
         
         self.pred.append([self.m_dig, pred.item()])
         self.gt.append([self.m_dig, gt.item()])
@@ -216,7 +216,7 @@ class Model_test(object):
         return patch_list
 
     def save_value(self):
-        path = os.path.join("predictino", self.args.name)
+        path = os.path.join("prediction", self.args.name)
         mkdir(path)
         with open(
             os.path.join(path, f"pred.txt"), "w"

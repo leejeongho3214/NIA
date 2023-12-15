@@ -75,14 +75,11 @@ class CustomDataset(Dataset):
             for item in natsort.natsorted(os.listdir(self.img_path))
             if not item.startswith(".")
         ]
-        transform_list = [transforms.ToTensor()]
-        if self.args.normalize:
-            transform_list.append(
-                transforms.Normalize(
+        transform_list = [transforms.ToTensor(),
+                          transforms.Normalize(
                     [0.24628267, 0.3271797, 0.44643742],
                     [0.1666497, 0.2335198, 0.3375362],
-                )
-            )
+                )]
         self.transform = transforms.Compose(transform_list)
 
         for equ_name in sub_path_list:
@@ -101,7 +98,8 @@ class CustomDataset(Dataset):
                 for img_name in natsort.natsorted(os.listdir(folder_path)):
                     if not img_name.endswith((".png", ".jpg", ".jpeg")):
                         continue
-
+                    if img_name.split('.')[0].split('_')[-1] != "F":
+                        continue
                     self.dataset.append(
                         {
                             "equ_name": equ_name,
@@ -292,13 +290,13 @@ class CustomDataset(Dataset):
                 item_list[dig] = meta["equipment"][item] / 100
 
             elif dig_v == "Ra":
-                item_list[dig] = meta["equipment"][item] / 100
+                item_list[dig] = meta["equipment"][item] / 50
 
             elif dig_v == "count":
                 item_list[dig] = meta["equipment"][item] / 350
 
             elif dig_v == "pore":
-                item_list[dig] = meta["equipment"][item] / 3000
+                item_list[dig] = meta["equipment"][item] / 2600
 
             else:
                 assert 0, "dig_v is not here"

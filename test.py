@@ -52,7 +52,7 @@ def parse_args():
     
     parser.add_argument(
         "--output_dir",
-        default="checkpoint_new",
+        default="checkpoint_F",
         type=str,
     )
     
@@ -124,20 +124,10 @@ def main(args):
             'moisture': 1}    # pigmentation, pore, wrinkle, elasticity, moisture
     )
     
-    model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
     model_list = dict()
-    model_list.update({item: copy.deepcopy(model) for item in model_num_class})
+    model_list.update({key: models.resnet50(weights=None, num_classes = value) for key, value in model_num_class.items()})
     # Define 8 resnet models for each region
 
-    ## Class Definition
-
-
-    resume_list = list()
-    for item in model_num_class:
-        model_list[item].fc = nn.Linear(
-            model_list[item].fc.in_features, model_num_class[item]
-        )
-        resume_list.append(item)
 
     ## Adjust the number of output in model for each region image
     model_dict_path = os.path.join(check_path, "wrinkle", "state_dict.bin")
@@ -145,11 +135,11 @@ def main(args):
     if os.path.isfile(model_dict_path):
         logger.info(f"\033[92mResuming......{check_path}\033[0m")
 
-        for idx in resume_list:
-            model_list[idx] = resume_checkpoint(
+        for key, model in model_list.items():
+            model_list[key] = resume_checkpoint(
                 args,
-                model_list[idx],
-                os.path.join(check_path, f"{idx}", "state_dict.bin"),
+                model,
+                os.path.join(check_path, f"{key}", "state_dict.bin"),
             )
 
     dataset = CustomDataset(args)

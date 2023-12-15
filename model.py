@@ -4,7 +4,7 @@ import torch.nn as nn
 import numpy as np
 import copy
 from data_loader import class_num_list
-from utils import get_item, labeling, pred_image, AverageMeter, save_checkpoint
+from utils import LabelSmoothingCrossEntropy, get_item, labeling, pred_image, AverageMeter, save_checkpoint, save_image
 import os
 
 if torch.cuda.is_available():
@@ -119,7 +119,7 @@ class Model(object):
         }
         self.epoch = 0
         self.criterion = (
-            nn.CrossEntropyLoss(label_smoothing=self.args.label_smooth)
+            LabelSmoothingCrossEntropy()
             if self.args.mode == "class"
             else nn.L1Loss()
         )
@@ -172,24 +172,25 @@ class Model(object):
             return True
 
     def class_loss(self, pred, label, dig):
-        class_num = class_num_list[dig]
-        gt = labeling(label, class_num).to(device)
+        loss = self.criterion(pred, label, smoothing = self.args.smooth)
         pred_p = softmax(pred)
-        loss = self.criterion(pred_p.type(torch.float), gt.type(torch.float))
-
+        
         self.pred.append([dig, pred_p.argmax().item()])
-        self.gt.append([dig, gt.argmax().item()])
+        self.gt.append([dig, label.item()])
 
         self.train_loss[self.m_dig].update(
-            loss, batch_size=gt.shape[0]
+            loss, batch_size= 1
         ) if self.phase == "train" else self.val_loss[self.m_dig].update(
-            loss, batch_size=gt.shape[0]
+            loss, batch_size= 1
         )
 
         return loss
 
-    def regression(self, pred, label):
-        loss = self.criterion(pred, label.to(device))
+    def regression(self, pred, label, dig):
+        loss = self.criterion(pred[0], label.to(device))
+        
+        self.pred.append([dig, pred[0].item()])
+        self.gt.append([dig, label.item()])
         self.train_loss[self.m_dig].update(
             loss, batch_size=pred.shape[0]
         ) if self.phase == "train" else self.val_loss[self.m_dig].update(
@@ -347,7 +348,7 @@ class Model(object):
                     if self.args.mode == "class":
                         loss = self.class_loss(pred, label, dig)
                     else:
-                        loss = self.regression(pred, label)
+                        loss = self.regression(pred, label, dig)
 
                     total_iter += 1
                     self.print_loss(total_iter, len(patch_list[dig]))
@@ -356,6 +357,10 @@ class Model(object):
                         optimizer.zero_grad()
                         loss.backward()
                         optimizer.step()
+                        
+                    if total_iter == 1 and dig == "wrinkle":
+                        save_image(self, patch_list, self.epoch)        
+                
                     
 
             self.print_loss(total_iter, len(patch_list[dig]), final_flag=True)

@@ -58,7 +58,7 @@ def parse_args():
 
     parser.add_argument(
         "--output_dir",
-        default="checkpoint_new",
+        default="checkpoint_F",
         type=str,
     )
 
@@ -67,6 +67,13 @@ def parse_args():
         default=300,
         type=int,
     )
+    
+    parser.add_argument(
+        "--smooth",
+        default=0.1,
+        type=float,
+    )
+    
 
     parser.add_argument(
         "--res",
@@ -112,7 +119,7 @@ def parse_args():
 
     parser.add_argument("--reset", action="store_true")
 
-    parser.add_argument("--normalize", action="store_true")
+
 
     args = parser.parse_args()
 
@@ -127,8 +134,6 @@ def main(args):
     mkdir(log_path)
     mkdir(check_path)
     ## Make the directories for save
-
-    model = models.resnet50(weights=None)
 
     model_num_class = (
         {
@@ -150,7 +155,7 @@ def main(args):
 
     args.best_loss, model_list = dict(), dict()
     args.best_loss.update({item: np.inf for item in model_num_class})
-    model_list.update({item: copy.deepcopy(model) for item in model_num_class})
+    model_list.update({key: models.resnet50(weights=None, num_classes = value) for key, value in model_num_class.items()})
 
     ## Adjust the number of output in model for each region image
     model_dict_path = os.path.join(check_path, "wrinkle", "state_dict.bin")
@@ -165,11 +170,11 @@ def main(args):
     if os.path.isfile(model_dict_path):
         print(f"\033[92mResuming......{model_dict_path}\033[0m")
 
-        for item in model_num_class:
-            model_list[item] = resume_checkpoint(
+        for key, model in model_list.items():
+            model_list[key] = resume_checkpoint(
                 args,
-                model_list[item],
-                os.path.join(check_path, f"{item}", "state_dict.bin"),
+                model,
+                os.path.join(check_path, f"{key}", "state_dict.bin"),
             )
 
     logger = setup_logger(args.name + args.mode, check_path)
@@ -210,7 +215,6 @@ def main(args):
 
         resnet_model.update_m(model_num_class)
         resnet_model.save_value()
-        # Show the result for each value, such as pigmentation and pore, by averaging all of them
         resnet_model.update_e(epoch + 1)
         resnet_model.reset_log(mode=args.mode)
 
