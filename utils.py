@@ -1,8 +1,24 @@
+import cv2
 import torch
 import copy
 import errno
 import os
+import torch.nn as nn
+import torch.nn.functional as F
 
+class LabelSmoothingCrossEntropy(nn.Module):
+    def __init__(self):
+        super(LabelSmoothingCrossEntropy, self).__init__()
+
+    def forward(self, x, target, smoothing=0.1):
+        confidence = 1.0 - smoothing
+        logprobs = F.log_softmax(x, dim=-1)
+        nll_loss = -logprobs.gather(dim=-1, index=target.unsqueeze(1))
+        nll_loss = nll_loss.squeeze(1)
+        smooth_loss = -logprobs.mean(dim=-1)
+        loss = confidence * nll_loss + smoothing * smooth_loss
+        return loss.mean()
+    
 class AverageMeter(object):
     def __init__(self):
         self.reset()
@@ -62,24 +78,26 @@ def pred_image(self, img):
 
 
 def labeling(label, num):
-    template = torch.zeros(num)
-    gt = label.item()
-    if gt == 0:
-        template[0] = 0.6
-        template[1] = 0.3
-        template[2] = 0.1
+    # template = torch.zeros(num)
+    # gt = label.item()
+    # if gt == 0:
+    #     template[0] = 0.6
+    #     template[1] = 0.3
+    #     template[2] = 0.1
 
-    elif gt == num - 1:
-        template[-1] = 0.6
-        template[-2] = 0.3
-        template[-3] = 0.1
+    # elif gt == num - 1:
+    #     template[-1] = 0.6
+    #     template[-2] = 0.3
+    #     template[-3] = 0.1
 
-    else:
-        template[gt] = 0.5
-        template[gt - 1] = 0.25
-        template[gt + 1] = 0.25
+    # else:
+    #     template[gt] = 0.5
+    #     template[gt - 1] = 0.25
+    #     template[gt + 1] = 0.25
 
-    return template.reshape(1, -1)
+    # return template.reshape(1, -1)
+
+    return F.one_hot(label, num)
 
  
 def save_checkpoint(model, args, epoch, m_dig, best_loss):
@@ -125,3 +143,29 @@ def save_value(args, self):
                 g.write(f"{self.gt[idx][0]}, {self.gt[idx][1]} \n")
     g.close()
     p.close()
+    
+def save_image(self, patch_list, epoch):
+    for dig, patches in patch_list.items():
+        img_list = list()
+        for patch in patches:
+            img_list.append(patch[0])
+        
+        try:
+            img = torch.cat(img_list, dim=3)
+        except:
+            try:
+                img = torch.cat(img_list, dim=2)
+            except:
+                continue
+            
+        c_img = img.detach().cpu().numpy()[0].transpose(1, 2, 0)
+        max_v, min_v = c_img.max(), c_img.min()
+        if min_v > 0:
+            min_v = -min_v
+        s_img = (c_img - min_v) * (255.0 / (max_v - min_v))
+
+        path = os.path.join("save_img", self.args.mode, self.args.name, dig)
+        mkdir(path)
+        cv2.imwrite(os.path.join(path, f"epoch_{epoch}.jpg"), s_img)
+
+    return

@@ -1,10 +1,11 @@
 from collections import defaultdict
+import random
 import torch
 import torch.nn as nn
 import numpy as np
 import copy
 from data_loader import class_num_list
-from utils import get_item, pred_image, AverageMeter, save_checkpoint
+from utils import get_item, pred_image, AverageMeter, save_checkpoint, LabelSmoothingCrossEntropy, save_image
 import os
 from utils import labeling
 
@@ -120,7 +121,7 @@ class Model(object):
         }
         self.epoch = 0
         self.criterion = (
-            nn.CrossEntropyLoss(label_smoothing=self.args.label_smooth)
+            LabelSmoothingCrossEntropy()
             if self.args.mode == "class"
             else nn.L1Loss()
         )
@@ -173,18 +174,16 @@ class Model(object):
             return True
 
     def class_loss(self, pred, label, dig):
-        class_num = class_num_list[dig]
-        gt = labeling(label, class_num).to(device)
+        loss = self.criterion(pred, label, smoothing = self.args.smooth)
         pred_p = softmax(pred)
-        loss = self.criterion(pred_p.type(torch.float), gt.type(torch.float))
 
         self.pred.append([dig, pred_p.argmax().item()])
-        self.gt.append([dig, gt.argmax().item()])
+        self.gt.append([dig, label.item()])
 
         self.train_loss[self.m_dig].update(
-            loss, batch_size=gt.shape[0]
+            loss, batch_size=1
         ) if self.phase == "train" else self.val_loss[self.m_dig].update(
-            loss, batch_size=gt.shape[0]
+            loss, batch_size=1
         )
 
         return loss
@@ -344,6 +343,7 @@ class Model(object):
 
         def run_iter():
             total_iter = 0
+            random_num = random.randrange(1, len(data_loader))
             for patch_list in data_loader:
                 for item in patch_list[dig]:
                     img, label = get_item(item, device)
@@ -361,6 +361,8 @@ class Model(object):
                         optimizer.zero_grad()
                         loss.backward()
                         optimizer.step()
+                if total_iter == random_num and dig == "wrinkle":
+                    save_image(self, patch_list, self.epoch)    
                     
 
             self.print_loss(total_iter, len(patch_list[dig]), final_flag=True)

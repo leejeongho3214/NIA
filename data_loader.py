@@ -134,31 +134,13 @@ class CustomDataset(Dataset):
             for idx_area in range(start_idx, 9):
                 try:
                     (
-                        reduction_value,
-                        _,
                         area_name,
                         meta,
-                        ori_patch_img,
+                        patch_img,
                     ) = self.load_img(img_name, angle, idx_area, equ_name, img, args)
 
                 except:
                     continue
-
-                if idx_area != 0:
-                    n_patch_img = cv2.resize(
-                        ori_patch_img,
-                        (
-                            int(ori_patch_img.shape[1] / reduction_value),
-                            int(ori_patch_img.shape[0] / reduction_value),
-                        ),
-                    )
-
-                    patch_img = self.make_double(n_patch_img)
-                    if not isinstance(patch_img, np.ndarray):
-                        continue
-
-                else:
-                    patch_img = cv2.resize(ori_patch_img, (args.res, args.res))
 
                 pil_img = Image.fromarray(patch_img)
                 patch_img = self.transform(pil_img)
@@ -259,10 +241,10 @@ class CustomDataset(Dataset):
 
         area_name = str(int(json_name.split("_")[-1].split(".")[0]))
         patch_img = img[bbox_y[0] : bbox_y[1], bbox_x[0] : bbox_x[1]]
+        height, width = patch_img.shape[0] // 32, patch_img.shape[1] // 32
+        patch_img = cv2.resize(patch_img, (height * 32 , width * 32) )
 
-        reduction_value = max(patch_img.shape) / args.res
-
-        return reduction_value, json_name, area_name, meta, patch_img
+        return area_name, meta, patch_img
 
     def norm_reg(self, meta, idx_area):
         item_list = dict()

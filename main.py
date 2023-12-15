@@ -67,6 +67,13 @@ def parse_args():
         default=300,
         type=int,
     )
+        
+    parser.add_argument(
+        "--smooth",
+        default=0.1,
+        type=float,
+    )
+    
 
     parser.add_argument(
         "--res",
@@ -221,7 +228,7 @@ def main(args):
 
         resnet_model.update_m(model_num_class)
         resnet_model.save_value()
-        # Show the result for each value, such as pigmentation and pore, by averaging all of them
+
         resnet_model.update_e(epoch + 1)
         resnet_model.reset_log(mode=args.mode)
 
