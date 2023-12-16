@@ -199,11 +199,12 @@ class Model_test(object):
             
     def get_test_acc(self, pred, gt, patch_list):
 
-        pred_g = pred.argmax().item()
+        pred_g = softmax(pred).argmax().item()
+        
         self.pred.append([self.m_dig, pred_g])
         self.gt.append([self.m_dig, gt.item()])
         
-        if abs((pred_g - gt).item()) == 0:
+        if abs((pred_g - gt.item())) == 0:
             score = 1
         else:
             score = 0 
@@ -232,36 +233,39 @@ class Model_test(object):
 
     def test(self, model_num_class, data_loader):
 
-        data_loader = self.test_loader
-        len_dataset = len(data_loader) * len(model_num_class)
-        total_iter = 0
-        for dig in model_num_class:
-            self.choice(dig)
-            self.model = self.model_list[self.m_dig]
-            self.model.eval()
-            for patch_list in data_loader:
-                for item in patch_list[self.m_dig]:
-                    if type(item[1]) == torch.Tensor:
-                        label = item[1].to(device)
-                    else:
-                        for name in item[1]:
-                            item[1][name] = item[1][
-                                name
-                            ].to(device)
-                        label = item[1]
+        with torch.no_grad():
+            data_loader = self.test_loader
+            len_dataset = len(data_loader) * len(model_num_class)
+            total_iter = 0
+            for dig in model_num_class:
+                self.choice(dig)
+                self.model = self.model_list[self.m_dig]
+                self.model.eval()
+                
+                for patch_list in data_loader:
+                    for item in patch_list[self.m_dig]:
+                        if type(item[1]) == torch.Tensor:
+                            label = item[1].to(device)
+                        else:
+                            for name in item[1]:
+                                item[1][name] = item[1][
+                                    name
+                                ].to(device)
+                            label = item[1]
 
-                    if label == {}:
-                        continue        ## 눈가/볼 영역이 없는 경우
-                    img = item[0].to(device)
-                    pred = self.model.to(device)(img)
-
-                    if self.args.mode == "class":
-                        _ = self.get_test_acc(pred, label, patch_list)
-                    else:
-                        _ = self.get_test_loss(pred, label.to(device))
+                        if label == {}:
+                            continue        ## 눈가/볼 영역이 없는 경우
                         
-                total_iter += 1 
-                print(f"count =>->=> {total_iter}/{len_dataset}", end="\r")
+                        img = item[0].to(device)
+                        pred = self.model.to(device)(img)
+
+                        if self.args.mode == "class":
+                            _ = self.get_test_acc(pred, label, patch_list)
+                        else:
+                            _ = self.get_test_loss(pred, label.to(device))
+                            
+                    total_iter += 1 
+                    print(f"count =>->=> {total_iter}/{len_dataset}", end="\r")
                 
         self.print_total()
         if self.args.log: [self.logger.info(f"{key} => {self.count[key]} 장") for key in self.count]

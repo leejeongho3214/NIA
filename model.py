@@ -177,8 +177,9 @@ class Model(object):
         loss = self.criterion(pred, label)
         pred_p = softmax(pred)
 
-        self.pred.append([dig, pred_p.argmax().item()])
-        self.gt.append([dig, label.item()])
+        if self.phase == 'valid':
+            self.pred.append([dig, pred_p.argmax().item()])
+            self.gt.append([dig, label.item()])
 
         self.train_loss[self.m_dig].update(
             loss.item(), batch_size=1
