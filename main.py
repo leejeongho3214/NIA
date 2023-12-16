@@ -18,6 +18,10 @@ import argparse
 from torch.utils import data
 
 
+torch.manual_seed(523)
+torch.cuda.manual_seed_all(523)
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
 
@@ -93,11 +97,6 @@ def parse_args():
         type=int,
     )
 
-    parser.add_argument(
-        "--label_smooth",
-        default=0,
-        type=float,
-    )
 
     parser.add_argument(
         "--lr",
@@ -158,8 +157,7 @@ def main(args):
     model_dict_path = os.path.join(check_path, "wrinkle", "state_dict.bin")
     
     logger = setup_logger(args.name + args.mode, check_path)
-    logger.info(args)
-    logger.info("Command Line: " + " ".join(sys.argv))
+
     
     model_list = dict()   
     for key, item in model_num_class.items():
@@ -193,7 +191,9 @@ def main(args):
                 model,
                 os.path.join(check_path, f"{key}", "state_dict.bin"),
             )
-
+            
+    logger.info(args)
+    logger.info("Command Line: " + " ".join(sys.argv))
 
     dataset = CustomDataset(args)
 
@@ -220,15 +220,16 @@ def main(args):
     for epoch in range(args.load_epoch, args.epoch):
         resnet_model.update_e(epoch + 1) if args.load_epoch else None
 
-        for model_idx in model_num_class:
+        for dig, value in model_num_class.items():
             # In regression task, there are no images for 미간, 입술, 턱
-            resnet_model.choice(model_idx)
+            resnet_model.choice(dig)
             # Change the model for each region
-            resnet_model.run(model_idx, phase="train")
-            resnet_model.run(model_idx, phase="valid")
+            resnet_model.run(dig, value, phase="train")
+            resnet_model.run(dig, value, phase="valid")
 
         resnet_model.update_m(model_num_class)
         resnet_model.save_value()
+        resnet_model.save_value1()
 
         resnet_model.update_e(epoch + 1)
         resnet_model.reset_log(mode=args.mode)

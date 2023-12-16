@@ -121,7 +121,7 @@ class Model(object):
         }
         self.epoch = 0
         self.criterion = (
-            (LabelSmoothingCrossEntropy(self.args.smoothing) if not self.args.cross else nn.CrossEntropyLoss())
+            (LabelSmoothingCrossEntropy(self.args.smooth) if not self.args.cross else nn.CrossEntropyLoss())
             if self.args.mode == "class"
             else nn.L1Loss()
         )
@@ -134,6 +134,7 @@ class Model(object):
             self.device,
         ) = (None, 0, None, 0, np.inf, device)
         self.pred, self.gt = list(), list()
+        self.pred_t, self.gt_t = list(), list()
 
     def choice(self, m_dig):
         self.model = copy.deepcopy(self.model_list[m_dig])
@@ -144,6 +145,26 @@ class Model(object):
 
     def loss_avg(self, name):
         return round(self.test_value[name].avg, 4)
+    
+    def labeling(self, label, num):
+        template = torch.zeros(num)
+        gt = label.item()
+        if gt == 0:
+            template[0] = 0.9
+            template[1] = 0.08
+            template[2] = 0.02
+        
+        elif gt == num - 1:
+            template[-1] = 0.9
+            template[-2] = 0.08
+            template[-3] = 0.02
+            
+        else:
+            template[gt] = 0.9
+            template[gt - 1] = 0.05
+            template[gt + 1] = 0.05 
+            
+        return template.reshape(1, -1)
 
     def print_loss(self, iteration, num_dig, final_flag=False):
         dataloader_len = (
@@ -173,13 +194,18 @@ class Model(object):
         if self.update_c > self.args.stop_early:
             return True
 
-    def class_loss(self, pred, label, dig):
-        loss = self.criterion(pred, label)
+    def class_loss(self, pred, label, dig, num_class):
+        gt = self.labeling(label, num_class).cuda()
+        loss = self.criterion(pred, gt)
         pred_p = softmax(pred)
 
         if self.phase == 'valid':
             self.pred.append([dig, pred_p.argmax().item()])
             self.gt.append([dig, label.item()])
+            
+        elif self.phase == 'train':
+            self.pred_t.append([dig, pred_p.argmax().item()])
+            self.gt_t.append([dig, label.item()])       
 
         self.train_loss[self.m_dig].update(
             loss.item(), batch_size=1
@@ -229,10 +255,24 @@ class Model(object):
 
     def save_value(self):
         with open(
-            os.path.join(self.check_path, f"epoch_{self.epoch}_pred.txt"), "w"
+            os.path.join(self.check_path, f"epoch_{self.epoch}_pred_train.txt"), "w"
         ) as p:
             with open(
-                os.path.join(self.check_path, f"epoch_{self.epoch}_gt.txt"), "w"
+                os.path.join(self.check_path, f"epoch_{self.epoch}_gt_train.txt"), "w"
+            ) as g:
+                for idx in range(len(self.pred_t)):
+                    p.write(f"{self.pred_t[idx][0]}, {self.pred_t[idx][1]} \n")
+                    g.write(f"{self.gt_t[idx][0]}, {self.gt_t[idx][1]} \n")
+        g.close()
+        p.close()
+        
+    
+    def save_value1(self):
+        with open(
+            os.path.join(self.check_path, f"epoch_{self.epoch}_pred_val.txt"), "w"
+        ) as p:
+            with open(
+                os.path.join(self.check_path, f"epoch_{self.epoch}_gt_val.txt"), "w"
             ) as g:
                 for idx in range(len(self.pred)):
                     p.write(f"{self.pred[idx][0]}, {self.pred[idx][1]} \n")
@@ -323,7 +363,7 @@ class Model(object):
                 self.criterion(pred, gt).item(), batch_size=pred.shape[0]
             )
 
-    def run(self, dig, phase="train"):
+    def run(self, dig, num_class, phase="train"):
         self.phase = phase
         self.model = (
             copy.deepcopy(self.model_list[self.m_dig])
@@ -351,7 +391,7 @@ class Model(object):
                     pred = self.model.to(device)(img)
 
                     if self.args.mode == "class":
-                        loss = self.class_loss(pred, label, dig)
+                        loss = self.class_loss(pred, label, dig, num_class)
                     else:
                         loss = self.regression(pred, label, dig)
 
