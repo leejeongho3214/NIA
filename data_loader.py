@@ -58,8 +58,7 @@ class CustomDataset(Dataset):
         self.train_list, self.val_list, self.test_list = random_split(
             self.dataset, [0.8, 0.1, 0.1]
         )
-        self.remove_list = defaultdict(int)
-
+        
     def __len__(self):
         return len(self.sub_path)
 
@@ -134,31 +133,13 @@ class CustomDataset(Dataset):
             for idx_area in range(start_idx, 9):
                 try:
                     (
-                        reduction_value,
-                        _,
                         area_name,
                         meta,
-                        ori_patch_img,
+                        patch_img,
                     ) = self.load_img(img_name, angle, idx_area, equ_name, img, args)
 
                 except:
                     continue
-
-                if idx_area != 0:
-                    n_patch_img = cv2.resize(
-                        ori_patch_img,
-                        (
-                            int(ori_patch_img.shape[1] / reduction_value),
-                            int(ori_patch_img.shape[0] / reduction_value),
-                        ),
-                    )
-
-                    patch_img = self.make_double(n_patch_img)
-                    if not isinstance(patch_img, np.ndarray):
-                        continue
-
-                else:
-                    patch_img = cv2.resize(ori_patch_img, (args.res, args.res))
 
                 pil_img = Image.fromarray(patch_img)
                 patch_img = self.transform(pil_img)
@@ -191,42 +172,6 @@ class CustomDataset(Dataset):
 
             self.sub_path.append(area_list)
 
-    def make_double(self, n_patch_img):
-        row = n_patch_img.shape[0]
-        col = n_patch_img.shape[1]
-
-        if row < 64:
-            patch_img = np.zeros((128, 256, 3), dtype=np.uint8)
-            patch = cv2.resize(
-                n_patch_img,
-                (
-                    int(n_patch_img.shape[1] * 2),
-                    int(n_patch_img.shape[0] * 2),
-                ),
-            )
-            patch_img[
-                : n_patch_img.shape[0] * 2, : int(n_patch_img.shape[1]) * 2
-            ] = patch
-
-        elif col < 64:
-            patch_img = np.zeros((256, 128, 3), dtype=np.uint8)
-            patch = cv2.resize(
-                n_patch_img,
-                (
-                    int(n_patch_img.shape[1] * 2),
-                    int(n_patch_img.shape[0] * 2),
-                ),
-            )
-            patch_img[
-                : n_patch_img.shape[0] * 2, : int(n_patch_img.shape[1] * 2)
-            ] = patch
-
-        else:
-            patch_img = np.zeros((128, 128, 3), dtype=np.uint8)
-            patch_img[: n_patch_img.shape[0], : n_patch_img.shape[1]] = n_patch_img
-
-        return patch_img
-
     def load_img(self, img_name, angle, idx_area, equ_name, img, args):
         json_name = "_".join(img_name.split("_")[:2]) + f"_{angle}_{idx_area:02d}.json"
         with open(
@@ -254,15 +199,12 @@ class CustomDataset(Dataset):
             max(bbox_point[1], bbox_point[3]),
         ]
 
-        if (bbox_x[1] - bbox_x[0]) < 90 or (bbox_y[1] - bbox_y[0]) < 90:
-            self.remove_list[str(idx_area)] += 1
-
         area_name = str(int(json_name.split("_")[-1].split(".")[0]))
         patch_img = img[bbox_y[0] : bbox_y[1], bbox_x[0] : bbox_x[1]]
+        height, width = patch_img.shape[0] // 32, patch_img.shape[1] // 32
+        patch_img = cv2.resize(patch_img, (width * 32, height * 32) )
 
-        reduction_value = max(patch_img.shape) / args.res
-
-        return reduction_value, json_name, area_name, meta, patch_img
+        return area_name, meta, patch_img
 
     def norm_reg(self, meta, idx_area):
         item_list = dict()

@@ -253,21 +253,7 @@ class Model_test(object):
                     if label == {}:
                         continue        ## 눈가/볼 영역이 없는 경우
                     img = item[0].to(device)
-
-                    if img.shape[-1] > 128:
-                        img_l = img[:, :, :, :128]
-                        img_r = img[:, :, :, 128:]
-                        pred = self.model.to(device)(img_l)
-                        pred = self.model.to(device)(img_r) + pred
-
-                    elif img.shape[-2] > 128:
-                        img_l = img[:, :, :128, :]
-                        img_r = img[:, :, 128:, :]
-                        pred = self.model.to(device)(img_l)
-                        pred = self.model.to(device)(img_r) + pred
-
-                    else:
-                        pred = self.model.to(device)(img)
+                    pred = self.model.to(device)(img)
 
                     if self.args.mode == "class":
                         _ = self.get_test_acc(pred, label, patch_list)

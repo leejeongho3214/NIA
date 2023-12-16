@@ -121,7 +121,7 @@ class Model(object):
         }
         self.epoch = 0
         self.criterion = (
-            LabelSmoothingCrossEntropy()
+            (LabelSmoothingCrossEntropy(self.args.smoothing) if not self.args.cross else nn.CrossEntropyLoss())
             if self.args.mode == "class"
             else nn.L1Loss()
         )
@@ -174,16 +174,16 @@ class Model(object):
             return True
 
     def class_loss(self, pred, label, dig):
-        loss = self.criterion(pred, label, smoothing = self.args.smooth)
+        loss = self.criterion(pred, label)
         pred_p = softmax(pred)
 
         self.pred.append([dig, pred_p.argmax().item()])
         self.gt.append([dig, label.item()])
 
         self.train_loss[self.m_dig].update(
-            loss, batch_size=1
+            loss.item(), batch_size=1
         ) if self.phase == "train" else self.val_loss[self.m_dig].update(
-            loss, batch_size=1
+            loss.item(), batch_size=1
         )
 
         return loss
@@ -195,9 +195,9 @@ class Model(object):
         self.gt.append([dig, label.item()])
         
         self.train_loss[self.m_dig].update(
-            loss, batch_size=pred.shape[0]
+            loss.item(), batch_size=pred.shape[0]
         ) if self.phase == "train" else self.val_loss[self.m_dig].update(
-            loss, batch_size=pred.shape[0]
+            loss.item(), batch_size=pred.shape[0]
         )
 
         return loss
@@ -361,10 +361,10 @@ class Model(object):
                         optimizer.zero_grad()
                         loss.backward()
                         optimizer.step()
+                        
                 if total_iter == random_num and dig == "wrinkle":
                     save_image(self, patch_list, self.epoch)    
                     
-
             self.print_loss(total_iter, len(patch_list[dig]), final_flag=True)
 
         if phase == "train":

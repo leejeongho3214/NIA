@@ -6,17 +6,20 @@ import os
 import torch.nn as nn
 import torch.nn.functional as F
 
-class LabelSmoothingCrossEntropy(nn.Module):
-    def __init__(self):
-        super(LabelSmoothingCrossEntropy, self).__init__()
+from data_loader import area_naming
 
-    def forward(self, x, target, smoothing=0.1):
-        confidence = 1.0 - smoothing
+class LabelSmoothingCrossEntropy(nn.Module):
+    def __init__(self, smoothing):
+        super(LabelSmoothingCrossEntropy, self).__init__()
+        self.smoothing = smoothing
+
+    def forward(self, x, target):
+        confidence = 1.0 - self.smoothing
         logprobs = F.log_softmax(x, dim=-1)
         nll_loss = -logprobs.gather(dim=-1, index=target.unsqueeze(1))
         nll_loss = nll_loss.squeeze(1)
         smooth_loss = -logprobs.mean(dim=-1)
-        loss = confidence * nll_loss + smoothing * smooth_loss
+        loss = confidence * nll_loss + self.smoothing * smooth_loss
         return loss.mean()
     
 class AverageMeter(object):
@@ -146,26 +149,16 @@ def save_value(args, self):
     
 def save_image(self, patch_list, epoch):
     for dig, patches in patch_list.items():
-        img_list = list()
         for patch in patches:
-            img_list.append(patch[0])
-        
-        try:
-            img = torch.cat(img_list, dim=3)
-        except:
-            try:
-                img = torch.cat(img_list, dim=2)
-            except:
-                continue
+            c_img = patch[0].detach().cpu().numpy()[0].transpose(1, 2, 0)
+            max_v, min_v = c_img.max(), c_img.min()
+            if min_v > 0:
+                min_v = -min_v
+            s_img = (c_img - min_v) * (255.0 / (max_v - min_v))
             
-        c_img = img.detach().cpu().numpy()[0].transpose(1, 2, 0)
-        max_v, min_v = c_img.max(), c_img.min()
-        if min_v > 0:
-            min_v = -min_v
-        s_img = (c_img - min_v) * (255.0 / (max_v - min_v))
-
-        path = os.path.join("save_img", self.args.mode, self.args.name, dig)
-        mkdir(path)
-        cv2.imwrite(os.path.join(path, f"epoch_{epoch}.jpg"), s_img)
+            area_n = area_naming[patch[2][0].split('_')[-1]]
+            path = os.path.join("save_img", self.args.mode, self.args.name, dig)
+            mkdir(path)
+            cv2.imwrite(os.path.join(path, f"epoch_{epoch}_{area_n}.jpg"), s_img)
 
     return
