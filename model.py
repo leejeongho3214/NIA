@@ -343,7 +343,7 @@ class Model(object):
             for patch_list in data_loader:
                 for item in patch_list[dig]:
                     img, label = get_item(item, device)
-                    pred = pred_image(self, img)
+                    pred = pred_image(self, img, item[2])
 
                     if self.args.mode == "class":
                         loss = self.class_loss(pred, label, dig)

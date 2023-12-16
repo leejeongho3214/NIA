@@ -1,6 +1,7 @@
 from PIL import Image
 import natsort
 import torch
+import torch.nn.functional as F
 from torchvision import transforms
 import os
 import numpy as np
@@ -133,10 +134,10 @@ class CustomDataset(Dataset):
                 try:
                     (
                         reduction_value,
-                        _,
                         area_name,
                         meta,
                         ori_patch_img,
+                        meta_v
                     ) = self.load_img(img_name, angle, idx_area, equ_name, img, args)
 
                 except:
@@ -185,7 +186,7 @@ class CustomDataset(Dataset):
                     dig = key.split("_")[-1]
                     if dig not in area_list:
                         area_list[dig] = list()
-                    area_list[dig].append([patch_img, label_data[key], desc_area])
+                    area_list[dig].append([patch_img, label_data[key], meta_v, desc_area])
 
             self.sub_path.append(area_list)
 
@@ -259,8 +260,14 @@ class CustomDataset(Dataset):
         patch_img = img[bbox_y[0] : bbox_y[1], bbox_x[0] : bbox_x[1]]
 
         reduction_value = max(patch_img.shape) / args.res
+        
+        age = torch.tensor([round((meta['info']['age'] - 13.0) / 69.0, 5)])
+        gender = 0 if meta['info']['gender'] == 'F' else 1
+        gender_l = F.one_hot(torch.tensor(gender), 2)
+        
+        meta_v = torch.concat([age, gender_l])
 
-        return reduction_value, json_name, area_name, meta, patch_img
+        return reduction_value, area_name, meta, patch_img, meta_v
 
     def norm_reg(self, meta, idx_area):
         item_list = dict()

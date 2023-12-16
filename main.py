@@ -11,8 +11,6 @@ from utils import mkdir
 from logger import setup_logger
 from data_loader import CustomDataset
 from model import resume_checkpoint, Model
-from torchvision.models import ResNet50_Weights
-import torch.nn as nn
 
 import argparse
 from torch.utils import data

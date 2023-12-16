@@ -58,21 +58,21 @@ def get_item(item, device):
     return img, label
 
 
-def pred_image(self, img):
+def pred_image(self, img, meta_v):
     if img.shape[-1] > 128:
         img_l = img[:, :, :, :128]
         img_r = torch.flip(img[:, :, :, 128:], dims=[3])
-        pred = self.model.to(self.device)(img_l)
-        pred = self.model.to(self.device)(img_r) + pred
+        pred = self.model.to(self.device)(img_l, meta_v)
+        pred = self.model.to(self.device)(img_r, meta_v) + pred
 
     elif img.shape[-2] > 128:
         img_l = img[:, :, :128, :]
         img_r = torch.flip(img[:, :, 128:, :], dims=[2])
-        pred = self.model.to(self.device)(img_l)
-        pred = self.model.to(self.device)(img_r) + pred
+        pred = self.model.to(self.device)(img_l, meta_v)
+        pred = self.model.to(self.device)(img_r, meta_v) + pred
 
     else:
-        pred = self.model.to(self.device)(img)
+        pred = self.model.to(self.device)(img, meta_v)
 
     return pred
 
