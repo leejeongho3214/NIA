@@ -5,42 +5,24 @@ import torch.nn as nn
 import numpy as np
 import copy
 from data_loader import class_num_list
-from utils import get_item, pred_image, AverageMeter, save_checkpoint, LabelSmoothingCrossEntropy, save_image
+from utils import (
+    adjust_learning_rate,
+    get_item,
+    pred_image,
+    AverageMeter,
+    save_checkpoint,
+    LabelSmoothingCrossEntropy,
+    save_image,
+    softmax,
+)
 import os
 from utils import labeling
+from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
 else:
     device = torch.device("cpu")
-
-
-def softmax(x):
-    e_x = torch.exp(x - torch.max(x, dim=1, keepdim=True).values)
-
-    return e_x / torch.sum(e_x, dim=1).unsqueeze(dim=1)
-
-
-def adjust_learning_rate(optimizer, epoch, args):
-    """
-    Sets the learning rate to the initial LR decayed by x every y epochs
-    x = 0.1, y = args.num_train_epochs/2.0 = 100
-    """
-    lr = args.lr * (0.1 ** (epoch // (args.epoch / 2.0)))
-    for param_group in optimizer.param_groups:
-        param_group["lr"] = lr
-
-
-def resume_checkpoint(args, model, path):
-    state_dict = torch.load(path, map_location=device)
-    best_loss = state_dict["best_loss"]
-    epoch = state_dict["epoch"]
-    model.load_state_dict(state_dict["model_state"], strict=False)
-    del state_dict
-    args.load_epoch = epoch
-    args.best_loss = best_loss
-
-    return model
 
 
 class Model(object):
@@ -51,7 +33,6 @@ class Model(object):
         train_loader,
         valid_loader,
         logger,
-        writer,
         check_path,
     ):
         super(Model, self).__init__()
@@ -62,7 +43,6 @@ class Model(object):
             self.train_loader,
             self.valid_loader,
             self.best_loss,
-            self.writer,
             self.logger,
             self.check_path,
         ) = (
@@ -72,7 +52,6 @@ class Model(object):
             train_loader,
             valid_loader,
             args.best_loss,
-            writer,
             logger,
             check_path,
         )
@@ -96,6 +75,14 @@ class Model(object):
         )
 
         self.val_loss = copy.deepcopy(self.train_loss)
+        self.class_acc = {
+            "sagging": AverageMeter(),
+            "wrinkle": AverageMeter(),
+            "pore": AverageMeter(),
+            "pigmentation": AverageMeter(),
+            "dryness": AverageMeter(),
+        }
+
         self.keep_acc = {
             "sagging": 0,
             "wrinkle": 0,
@@ -121,7 +108,11 @@ class Model(object):
         }
         self.epoch = 0
         self.criterion = (
-            (LabelSmoothingCrossEntropy(self.args.smooth) if not self.args.cross else nn.CrossEntropyLoss())
+            (
+                LabelSmoothingCrossEntropy(self.args.smooth)
+                if not self.args.cross
+                else nn.CrossEntropyLoss()
+            )
             if self.args.mode == "class"
             else nn.L1Loss()
         )
@@ -145,26 +136,6 @@ class Model(object):
 
     def loss_avg(self, name):
         return round(self.test_value[name].avg, 4)
-    
-    def labeling(self, label, num):
-        template = torch.zeros(num)
-        gt = label.item()
-        if gt == 0:
-            template[0] = 0.9
-            template[1] = 0.08
-            template[2] = 0.02
-        
-        elif gt == num - 1:
-            template[-1] = 0.9
-            template[-2] = 0.08
-            template[-3] = 0.02
-            
-        else:
-            template[gt] = 0.9
-            template[gt - 1] = 0.05
-            template[gt + 1] = 0.05 
-            
-        return template.reshape(1, -1)
 
     def print_loss(self, iteration, num_dig, final_flag=False):
         dataloader_len = (
@@ -181,31 +152,48 @@ class Model(object):
             self.logger.info(
                 f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{iteration}/{dataloader_len}] ---- >  loss: {self.train_loss[self.m_dig].avg if self.phase == 'train' else self.val_loss[self.m_dig].avg:.04f}"
             )
-            self.writer.add_scalar(
-                f"{self.phase}/{self.m_dig}",
-                self.train_loss[self.m_dig].avg
-                if self.args.mode == "class"
-                else self.val_loss[self.m_dig].avg,
-                self.epoch,
-            )
             self.temp_model_list[self.m_dig] = self.model
+            if self.phase == "valid":
+                f_pred = defaultdict(list)
+                f_gt = defaultdict(list)
+                for (key, value), (_, value2) in zip(self.pred, self.gt):
+                    f_pred[key].append(value)
+                    f_gt[key].append(value2)
+                (
+                    macro_precision,
+                    macro_recall,
+                    macro_f1,
+                    _,
+                ) = precision_recall_fscore_support(
+                    f_gt[key], f_pred[key], average="macro", zero_division=1
+                )
+                acc = accuracy_score(f_gt[key], f_pred[key])
+                self.logger.info(
+                    f"[{key}] Macro Precision: {macro_precision:.4f}, Macro Recall: {macro_recall:.4f}, Macro F1: {macro_f1:.4f}, Acc: {acc * 100:.2f}% "
+                )
 
     def stop_early(self):
         if self.update_c > self.args.stop_early:
             return True
 
     def class_loss(self, pred, label, dig, num_class):
-        gt = self.labeling(label, num_class).cuda()
-        loss = self.criterion(pred, gt)
+        gt = labeling(label, num_class, dig).cuda() if self.args.cross else label
+        loss = self.criterion(pred, gt, dig)
         pred_p = softmax(pred)
+        
+        if abs((pred_p.argmax().item() - gt.item())) == 0:
+            score = 1
+        else:
+            score = 0
 
-        if self.phase == 'valid':
+        if self.phase == "valid":
             self.pred.append([dig, pred_p.argmax().item()])
-            self.gt.append([dig, label.item()])
-            
-        elif self.phase == 'train':
+            self.gt.append([dig, gt.item()])
+            self.class_acc[self.m_dig].update_acc(score, 1)
+
+        elif self.phase == "train":
             self.pred_t.append([dig, pred_p.argmax().item()])
-            self.gt_t.append([dig, label.item()])       
+            self.gt_t.append([dig, gt.item()])
 
         self.train_loss[self.m_dig].update(
             loss.item(), batch_size=1
@@ -213,14 +201,15 @@ class Model(object):
             loss.item(), batch_size=1
         )
 
+
         return loss
 
     def regression(self, pred, label, dig):
         loss = self.criterion(pred[0], label.to(device))
-        
+
         self.pred.append([dig, pred[0].item()])
         self.gt.append([dig, label.item()])
-        
+
         self.train_loss[self.m_dig].update(
             loss.item(), batch_size=pred.shape[0]
         ) if self.phase == "train" else self.val_loss[self.m_dig].update(
@@ -265,8 +254,7 @@ class Model(object):
                     g.write(f"{self.gt_t[idx][0]}, {self.gt_t[idx][1]} \n")
         g.close()
         p.close()
-        
-    
+
     def save_value1(self):
         with open(
             os.path.join(self.check_path, f"epoch_{self.epoch}_pred_val.txt"), "w"
@@ -397,15 +385,15 @@ class Model(object):
 
                     total_iter += 1
                     self.print_loss(total_iter, len(patch_list[dig]))
-                    
+
                     if phase == "train":
                         optimizer.zero_grad()
                         loss.backward()
                         optimizer.step()
-                        
+
                 if total_iter == random_num and dig == "wrinkle":
-                    save_image(self, patch_list, self.epoch)    
-                    
+                    save_image(self, patch_list, self.epoch)
+
             self.print_loss(total_iter, len(patch_list[dig]), final_flag=True)
 
         if phase == "train":

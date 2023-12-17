@@ -4,18 +4,18 @@ import shutil
 import sys
 import numpy as np
 import torch
-from torchvision import models
-
-from tensorboardX import SummaryWriter
 import copy
 from utils import mkdir
 from logger import setup_logger
 from data_loader import CustomDataset
-from model import resume_checkpoint, Model
+from model import Model
 from vit_pytorch import ViT
+from utils import resume_checkpoint, labeling, LabelSmoothingCrossEntropy
 
 import argparse
 from torch.utils import data
+ 
+import inspect
 
 
 torch.manual_seed(523)
@@ -34,12 +34,6 @@ def parse_args():
     parser.add_argument(
         "--img_path",
         default="dataset/img",
-        type=str,
-    )
-
-    parser.add_argument(
-        "--loss_dir",
-        default="tensorboard",
         type=str,
     )
 
@@ -62,7 +56,7 @@ def parse_args():
 
     parser.add_argument(
         "--output_dir",
-        default="checkpoint_transformer",
+        default= f"checkpoint/{os.popen('git branch --show-current').readlines()[0].rstrip()}",
         type=str,
     )
 
@@ -125,14 +119,10 @@ def parse_args():
 
 
 def main(args):
-    log_path = os.path.join(args.loss_dir, args.mode, args.name)
     check_path = os.path.join(args.output_dir, args.mode, args.name)
-
-    writer = SummaryWriter(log_path)
-    mkdir(log_path)
     mkdir(check_path)
     ## Make the directories for save
-
+    
     model_num_class = (
         {
             "dryness": 5,
@@ -155,7 +145,6 @@ def main(args):
     args.best_loss.update({item: np.inf for item in model_num_class})
     ## Adjust the number of output in model for each region image
     model_dict_path = os.path.join(check_path, "wrinkle", "state_dict.bin")
-    
     logger = setup_logger(args.name + args.mode, check_path)
 
     
@@ -194,6 +183,8 @@ def main(args):
             
     logger.info(args)
     logger.info("Command Line: " + " ".join(sys.argv))
+    logger.debug(inspect.getsource(labeling) if args.smooth else inspect.getsource(LabelSmoothingCrossEntropy))
+
 
     dataset = CustomDataset(args)
 
@@ -214,7 +205,7 @@ def main(args):
     )
 
     resnet_model = Model(
-        args, model_list, trainset_loader, valset_loader, logger, writer, check_path
+        args, model_list, trainset_loader, valset_loader, logger,  check_path
     )
 
     for epoch in range(args.load_epoch, args.epoch):
@@ -236,8 +227,6 @@ def main(args):
 
         if resnet_model.stop_early():
             break
-
-    writer.close()
 
 
 if __name__ == "__main__":

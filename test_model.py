@@ -1,16 +1,9 @@
 from collections import defaultdict
-import datetime
 import errno
 import os
-import cv2
 import torch
-import cv2
 import torch.nn as nn
-import numpy as np
 import copy
-import torch.nn.functional as F
-from tqdm import tqdm
-from data_loader import class_num_list, area_naming
 
 
 if torch.cuda.is_available():
