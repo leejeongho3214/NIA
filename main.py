@@ -6,13 +6,11 @@ import sys
 import numpy as np
 from torchvision import models
 
-from tensorboardX import SummaryWriter
 import copy
 from utils import mkdir, resume_checkpoint, labeling, LabelSmoothingCrossEntropy
 from logger import setup_logger
 from data_loader import CustomDataset
 from model import Model
-
 
 import argparse
 from torch.utils import data
@@ -108,7 +106,7 @@ def parse_args():
     )
 
     parser.add_argument("--reset", action="store_true")
-
+    parser.add_argument("--cross", action="store_true")
 
 
     args = parser.parse_args()

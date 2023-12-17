@@ -1,16 +1,9 @@
 from collections import defaultdict
-import datetime
 import errno
 import os
-import cv2
 import torch
-import cv2
 import torch.nn as nn
-import numpy as np
 import copy
-import torch.nn.functional as F
-from tqdm import tqdm
-from data_loader import class_num_list, area_naming
 
 
 if torch.cuda.is_available():
@@ -199,11 +192,11 @@ class Model_test(object):
             
     def get_test_acc(self, pred, gt, patch_list):
 
-        pred_g = pred.argmax().item()
+        pred_g = softmax(pred).argmax().item()
         self.pred.append([self.m_dig, pred_g])
         self.gt.append([self.m_dig, gt.item()])
         
-        if abs((pred_g - gt).item()) == 0:
+        if abs((pred_g - gt.item())) == 0:
             score = 1
         else:
             score = 0 
@@ -216,7 +209,7 @@ class Model_test(object):
         return patch_list
 
     def save_value(self):
-        path = os.path.join("prediction", self.args.name)
+        path = os.path.join("prediction", self.args.mode, self.args.name)
         mkdir(path)
         with open(
             os.path.join(path, f"pred.txt"), "w"
@@ -232,50 +225,51 @@ class Model_test(object):
 
     def test(self, model_num_class, data_loader):
 
-        data_loader = self.test_loader
-        len_dataset = len(data_loader) * len(model_num_class)
-        total_iter = 0
-        for dig in model_num_class:
-            self.choice(dig)
-            self.model = self.model_list[self.m_dig]
-            self.model.eval()
-            for patch_list in data_loader:
-                for item in patch_list[self.m_dig]:
-                    if type(item[1]) == torch.Tensor:
-                        label = item[1].to(device)
-                    else:
-                        for name in item[1]:
-                            item[1][name] = item[1][
-                                name
-                            ].to(device)
-                        label = item[1]
+        with torch.no_grad():
+            data_loader = self.test_loader
+            len_dataset = len(data_loader) * len(model_num_class)
+            total_iter = 0
+            for dig in model_num_class:
+                self.choice(dig)
+                self.model = self.model_list[self.m_dig]
+                self.model.eval()
+                for patch_list in data_loader:
+                    for item in patch_list[self.m_dig]:
+                        if type(item[1]) == torch.Tensor:
+                            label = item[1].to(device)
+                        else:
+                            for name in item[1]:
+                                item[1][name] = item[1][
+                                    name
+                                ].to(device)
+                            label = item[1]
 
-                    if label == {}:
-                        continue        ## 눈가/볼 영역이 없는 경우
-                    img = item[0].to(device)
+                        if label == {}:
+                            continue        ## 눈가/볼 영역이 없는 경우
+                        img = item[0].to(device)
 
-                    if img.shape[-1] > 128:
-                        img_l = img[:, :, :, :128]
-                        img_r = img[:, :, :, 128:]
-                        pred = self.model.to(device)(img_l)
-                        pred = self.model.to(device)(img_r) + pred
+                        if img.shape[-1] > 128:
+                            img_l = img[:, :, :, :128]
+                            img_r = img[:, :, :, 128:]
+                            pred = self.model.to(device)(img_l)
+                            pred = self.model.to(device)(img_r) + pred
 
-                    elif img.shape[-2] > 128:
-                        img_l = img[:, :, :128, :]
-                        img_r = img[:, :, 128:, :]
-                        pred = self.model.to(device)(img_l)
-                        pred = self.model.to(device)(img_r) + pred
+                        elif img.shape[-2] > 128:
+                            img_l = img[:, :, :128, :]
+                            img_r = img[:, :, 128:, :]
+                            pred = self.model.to(device)(img_l)
+                            pred = self.model.to(device)(img_r) + pred
 
-                    else:
-                        pred = self.model.to(device)(img)
+                        else:
+                            pred = self.model.to(device)(img)
 
-                    if self.args.mode == "class":
-                        _ = self.get_test_acc(pred, label, patch_list)
-                    else:
-                        _ = self.get_test_loss(pred, label.to(device))
-                        
-                total_iter += 1 
-                print(f"count =>->=> {total_iter}/{len_dataset}", end="\r")
+                        if self.args.mode == "class":
+                            _ = self.get_test_acc(pred, label, patch_list)
+                        else:
+                            _ = self.get_test_loss(pred, label.to(device))
+                            
+                    total_iter += 1 
+                    print(f"count =>->=> {total_iter}/{len_dataset}", end="\r")
                 
         self.print_total()
         if self.args.log: [self.logger.info(f"{key} => {self.count[key]} 장") for key in self.count]

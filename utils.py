@@ -40,13 +40,31 @@ def resume_checkpoint(args, model, path):
     return model
 
 class LabelSmoothingCrossEntropy(nn.Module):
-    def __init__(self):
+    def __init__(self, smoothing):
         super(LabelSmoothingCrossEntropy, self).__init__()
+        self.smoothing = smoothing
 
-    def forward(self, x, target, smoothing=0.1):
+    def forward(self, x, target, dig):
+        gt = target.item()
+        
+        smoothing = 0.5
+        dim = 0
+        if (dig == 'wrinkle' and gt == 1) or (dig == 'pigmentation' and gt ==1):
+            target = torch.tensor([0, 1, 2], device = "cuda")
+            
+        elif dig == 'sagging' and gt == 0:
+            target = torch.tensor([0, 1], device = "cuda")
+            
+        elif (dig == 'pore' and gt ==2) or (dig == 'dryness' and gt ==2):
+            target = torch.tensor([1, 2, 3], device = "cuda")
+            
+        else:
+            smoothing = self.smoothing
+            dim = 1
+
         confidence = 1.0 - smoothing
         logprobs = F.log_softmax(x, dim=-1)
-        nll_loss = -logprobs.gather(dim=-1, index=target.unsqueeze(1))
+        nll_loss = -logprobs.gather(dim=-1, index=target.unsqueeze(dim))
         nll_loss = nll_loss.squeeze(1)
         smooth_loss = -logprobs.mean(dim=-1)
         loss = confidence * nll_loss + smoothing * smooth_loss
@@ -109,27 +127,39 @@ def pred_image(self, img, meta_v):
     return pred
 
 
-def labeling(label, num):
-    # template = torch.zeros(num)
-    # gt = label.item()
-    # if gt == 0:
-    #     template[0] = 0.6
-    #     template[1] = 0.3
-    #     template[2] = 0.1
+def labeling(label, num, dig):
+    template = torch.zeros(num)
+    gt = label.item()
 
-    # elif gt == num - 1:
-    #     template[-1] = 0.6
-    #     template[-2] = 0.3
-    #     template[-3] = 0.1
+    if dig == 'wrinkle' and gt == 1:
+        template[0] = 0.15
+        template[1] = 0.55
+        template[2] = 0.3
+        
+    elif dig == 'sagging' and gt == 0:
+        template[0] = 0.5
+        template[1] = 0.3
+        template[2] = 0.2
+        
+    elif dig == 'pore' and gt ==2:
+        template[1] = 0.3
+        template[2] = 0.5
+        template[3] = 0.2
+        
+    elif dig == 'dryness' and gt ==2:
+        template[1] = 0.25
+        template[2] = 0.5
+        template[3] = 0.25
+        
+    elif dig == 'pigmentation' and gt ==1:
+        template[0] = 0.2
+        template[1] = 0.5
+        template[2] = 0.3
+        
+    else:
+        template[gt] = 1
 
-    # else:
-    #     template[gt] = 0.5
-    #     template[gt - 1] = 0.25
-    #     template[gt + 1] = 0.25
-
-    # return template.reshape(1, -1)
-
-    return F.one_hot(label, num)
+    return template.reshape(1, -1)
 
 
 def save_checkpoint(model, args, epoch, m_dig, best_loss):
@@ -177,26 +207,16 @@ def save_value(args, self):
 
 def save_image(self, patch_list, epoch):
     for dig, patches in patch_list.items():
-        img_list = list()
         for patch in patches:
-            img_list.append(patch[0])
-        
-        try:
-            img = torch.cat(img_list, dim=3)
-        except:
-            try:
-                img = torch.cat(img_list, dim=2)
-            except:
-                continue
+            c_img = patch[0].detach().cpu().numpy()[0].transpose(1, 2, 0)
+            max_v, min_v = c_img.max(), c_img.min()
+            if min_v > 0:
+                min_v = -min_v
+            s_img = (c_img - min_v) * (255.0 / (max_v - min_v))
             
-        c_img = img.detach().cpu().numpy()[0].transpose(1, 2, 0)
-        max_v, min_v = c_img.max(), c_img.min()
-        if min_v > 0:
-            min_v = -min_v
-        s_img = (c_img - min_v) * (255.0 / (max_v - min_v))
-
-        path = os.path.join("save_img", self.args.mode, self.args.name, dig)
-        mkdir(path)
-        cv2.imwrite(os.path.join(path, f"epoch_{epoch}.jpg"), s_img)
+            area_n = area_naming[patch[2][0].split('_')[-1]]
+            path = os.path.join("save_img", self.args.mode, self.args.name, dig)
+            mkdir(path)
+            cv2.imwrite(os.path.join(path, f"epoch_{epoch}_{area_n}.jpg"), s_img)
 
     return

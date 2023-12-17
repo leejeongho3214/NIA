@@ -23,10 +23,6 @@ if torch.cuda.is_available():
 else:
     device = torch.device("cpu")
 
-
-
-
-
 class Model(object):
     def __init__(
         self,
@@ -113,8 +109,11 @@ class Model(object):
             (
                 LabelSmoothingCrossEntropy(self.args.smooth)
                 if not self.args.cross
-                else nn.CrossEntropyLoss())
+                else nn.CrossEntropyLoss()
             )
+            if self.args.mode == "class"
+            else nn.L1Loss()
+        )
         (
             self.phase,
             self.m_dig,
@@ -175,8 +174,8 @@ class Model(object):
     def stop_early(self):
         if self.update_c > self.args.stop_early:
             return True
-
-    def class_loss(self, pred, label, dig):
+        
+    def class_loss(self, pred, label, dig, num_class):
         if self.args.cross:
             gt = labeling(label, num_class, dig).cuda()
             loss = self.criterion(pred, gt, dig) 
@@ -383,7 +382,7 @@ class Model(object):
                     pred = pred_image(self, img, item[2])
 
                     if self.args.mode == "class":
-                        loss = self.class_loss(pred, label, dig) if self.args.cross else self.class_loss(pred, label, dig, num_class)
+                        loss = self.class_loss(pred, label, dig, num_class)
                     else:
                         loss = self.regression(pred, label, dig)
 

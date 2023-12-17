@@ -12,7 +12,6 @@ import torch.nn as nn
 import argparse
 from logger import setup_logger
 from torch.utils import data
-from utils import save_value
 
 torch.manual_seed(523)
 torch.cuda.manual_seed_all(523)
@@ -52,7 +51,7 @@ def parse_args():
     
     parser.add_argument(
         "--output_dir",
-        default="checkpoint_F",
+        default= f"checkpoint/{os.popen('git branch --show-current').readlines()[0].rstrip()}",
         type=str,
     )
     
