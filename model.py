@@ -177,11 +177,11 @@ class Model(object):
 
     def class_loss(self, pred, label, dig, num_class):
         if self.args.cross:
-            gt = labeling(label, num_class, dig).cuda()
-            loss = self.criterion(pred, gt, dig) 
-        else:
             gt = label
             loss = self.criterion(pred, gt) 
+        else:
+            gt = labeling(label, num_class, dig).cuda()
+            loss = self.criterion(pred, gt, dig) 
         pred_p = softmax(pred)
         
         if abs((pred_p.argmax().item() - gt.item())) == 0:
@@ -382,7 +382,7 @@ class Model(object):
                     pred = self.model.to(device)(img)
 
                     if self.args.mode == "class":
-                        loss = self.class_loss(pred, label, dig) if self.args.cross else self.class_loss(pred, label, dig, num_class)
+                        loss = self.class_loss(pred, label, dig, num_class)
                     else:
                         loss = self.regression(pred, label, dig)
 
