@@ -1,44 +1,30 @@
 from collections import defaultdict
+import random
 import torch
 import torch.nn as nn
 import numpy as np
 import copy
 from data_loader import class_num_list
-from utils import LabelSmoothingCrossEntropy, get_item, labeling, pred_image, AverageMeter, save_checkpoint, save_image
+from utils import (
+    adjust_learning_rate,
+    get_item,
+    AverageMeter,
+    pred_image,
+    save_checkpoint,
+    LabelSmoothingCrossEntropy,
+    save_image,
+    softmax,
+)
 import os
-
+from utils import labeling
+from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 if torch.cuda.is_available():
     device = torch.device("cuda")
 else:
     device = torch.device("cpu")
 
 
-def softmax(x):
-    e_x = torch.exp(x - torch.max(x, dim=1, keepdim=True).values)
 
-    return e_x / torch.sum(e_x, dim=1).unsqueeze(dim=1)
-
-
-def adjust_learning_rate(optimizer, epoch, args):
-    """
-    Sets the learning rate to the initial LR decayed by x every y epochs
-    x = 0.1, y = args.num_train_epochs/2.0 = 100
-    """
-    lr = args.lr * (0.1 ** (epoch // (args.epoch / 2.0)))
-    for param_group in optimizer.param_groups:
-        param_group["lr"] = lr
-
-
-def resume_checkpoint(args, model, path):
-    state_dict = torch.load(path, map_location=device)
-    best_loss = state_dict["best_loss"]
-    epoch = state_dict["epoch"]
-    model.load_state_dict(state_dict["model_state"], strict=False)
-    del state_dict
-    args.load_epoch = epoch
-    args.best_loss = best_loss
-
-    return model
 
 
 class Model(object):
@@ -49,7 +35,6 @@ class Model(object):
         train_loader,
         valid_loader,
         logger,
-        writer,
         check_path,
     ):
         super(Model, self).__init__()
@@ -60,7 +45,6 @@ class Model(object):
             self.train_loader,
             self.valid_loader,
             self.best_loss,
-            self.writer,
             self.logger,
             self.check_path,
         ) = (
@@ -70,7 +54,6 @@ class Model(object):
             train_loader,
             valid_loader,
             args.best_loss,
-            writer,
             logger,
             check_path,
         )
@@ -94,6 +77,14 @@ class Model(object):
         )
 
         self.val_loss = copy.deepcopy(self.train_loss)
+        self.class_acc = {
+            "sagging": AverageMeter(),
+            "wrinkle": AverageMeter(),
+            "pore": AverageMeter(),
+            "pigmentation": AverageMeter(),
+            "dryness": AverageMeter(),
+        }
+
         self.keep_acc = {
             "sagging": 0,
             "wrinkle": 0,
@@ -119,10 +110,11 @@ class Model(object):
         }
         self.epoch = 0
         self.criterion = (
-            LabelSmoothingCrossEntropy()
-            if self.args.mode == "class"
-            else nn.L1Loss()
-        )
+            (
+                LabelSmoothingCrossEntropy(self.args.smooth)
+                if not self.args.cross
+                else nn.CrossEntropyLoss())
+            )
         (
             self.phase,
             self.m_dig,
@@ -132,6 +124,7 @@ class Model(object):
             self.device,
         ) = (None, 0, None, 0, np.inf, device)
         self.pred, self.gt = list(), list()
+        self.pred_t, self.gt_t = list(), list()
 
     def choice(self, m_dig):
         self.model = copy.deepcopy(self.model_list[m_dig])
@@ -158,43 +151,73 @@ class Model(object):
             self.logger.info(
                 f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{iteration}/{dataloader_len}] ---- >  loss: {self.train_loss[self.m_dig].avg if self.phase == 'train' else self.val_loss[self.m_dig].avg:.04f}"
             )
-            self.writer.add_scalar(
-                f"{self.phase}/{self.m_dig}",
-                self.train_loss[self.m_dig].avg
-                if self.args.mode == "class"
-                else self.val_loss[self.m_dig].avg,
-                self.epoch,
-            )
+
             self.temp_model_list[self.m_dig] = self.model
+            if self.phase == "valid":
+                f_pred = defaultdict(list)
+                f_gt = defaultdict(list)
+                for (key, value), (_, value2) in zip(self.pred, self.gt):
+                    f_pred[key].append(value)
+                    f_gt[key].append(value2)
+                (
+                    macro_precision,
+                    macro_recall,
+                    macro_f1,
+                    _,
+                ) = precision_recall_fscore_support(
+                    f_gt[key], f_pred[key], average="macro", zero_division=1
+                )
+                acc = accuracy_score(f_gt[key], f_pred[key])
+                self.logger.info(
+                    f"[{key}] Macro Precision: {macro_precision:.4f}, Macro Recall: {macro_recall:.4f}, Macro F1: {macro_f1:.4f}, Acc: {acc * 100:.2f}% "
+                )
 
     def stop_early(self):
         if self.update_c > self.args.stop_early:
             return True
 
     def class_loss(self, pred, label, dig):
-        loss = self.criterion(pred, label, smoothing = self.args.smooth)
+        if self.args.cross:
+            gt = labeling(label, num_class, dig).cuda()
+            loss = self.criterion(pred, gt, dig) 
+        else:
+            gt = label
+            loss = self.criterion(pred, gt) 
         pred_p = softmax(pred)
         
-        self.pred.append([dig, pred_p.argmax().item()])
-        self.gt.append([dig, label.item()])
+        if abs((pred_p.argmax().item() - gt.item())) == 0:
+            score = 1
+        else:
+            score = 0
+
+        if self.phase == "valid":
+            self.pred.append([dig, pred_p.argmax().item()])
+            self.gt.append([dig, gt.item()])
+            self.class_acc[self.m_dig].update_acc(score, 1)
+
+        elif self.phase == "train":
+            self.pred_t.append([dig, pred_p.argmax().item()])
+            self.gt_t.append([dig, gt.item()])
 
         self.train_loss[self.m_dig].update(
-            loss, batch_size= 1
+            loss.item(), batch_size=1
         ) if self.phase == "train" else self.val_loss[self.m_dig].update(
-            loss, batch_size= 1
+            loss.item(), batch_size=1
         )
+
 
         return loss
 
     def regression(self, pred, label, dig):
         loss = self.criterion(pred[0], label.to(device))
-        
+
         self.pred.append([dig, pred[0].item()])
         self.gt.append([dig, label.item()])
+
         self.train_loss[self.m_dig].update(
-            loss, batch_size=pred.shape[0]
+            loss.item(), batch_size=pred.shape[0]
         ) if self.phase == "train" else self.val_loss[self.m_dig].update(
-            loss, batch_size=pred.shape[0]
+            loss.item(), batch_size=pred.shape[0]
         )
 
         return loss
@@ -225,10 +248,23 @@ class Model(object):
 
     def save_value(self):
         with open(
-            os.path.join(self.check_path, f"epoch_{self.epoch}_pred.txt"), "w"
+            os.path.join(self.check_path, f"epoch_{self.epoch}_pred_train.txt"), "w"
         ) as p:
             with open(
-                os.path.join(self.check_path, f"epoch_{self.epoch}_gt.txt"), "w"
+                os.path.join(self.check_path, f"epoch_{self.epoch}_gt_train.txt"), "w"
+            ) as g:
+                for idx in range(len(self.pred_t)):
+                    p.write(f"{self.pred_t[idx][0]}, {self.pred_t[idx][1]} \n")
+                    g.write(f"{self.gt_t[idx][0]}, {self.gt_t[idx][1]} \n")
+        g.close()
+        p.close()
+
+    def save_value1(self):
+        with open(
+            os.path.join(self.check_path, f"epoch_{self.epoch}_pred_val.txt"), "w"
+        ) as p:
+            with open(
+                os.path.join(self.check_path, f"epoch_{self.epoch}_gt_val.txt"), "w"
             ) as g:
                 for idx in range(len(self.pred)):
                     p.write(f"{self.pred[idx][0]}, {self.pred[idx][1]} \n")
@@ -319,7 +355,7 @@ class Model(object):
                 self.criterion(pred, gt).item(), batch_size=pred.shape[0]
             )
 
-    def run(self, dig, phase="train"):
+    def run(self, dig, num_class, phase="train"):
         self.phase = phase
         self.model = (
             copy.deepcopy(self.model_list[self.m_dig])
@@ -340,13 +376,14 @@ class Model(object):
 
         def run_iter():
             total_iter = 0
+            random_num = random.randrange(1, len(data_loader))
             for patch_list in data_loader:
                 for item in patch_list[dig]:
                     img, label = get_item(item, device)
                     pred = pred_image(self, img, item[2])
 
                     if self.args.mode == "class":
-                        loss = self.class_loss(pred, label, dig)
+                        loss = self.class_loss(pred, label, dig) if self.args.cross else self.class_loss(pred, label, dig, num_class)
                     else:
                         loss = self.regression(pred, label, dig)
 
@@ -358,8 +395,8 @@ class Model(object):
                         loss.backward()
                         optimizer.step()
                         
-                    if total_iter == 1 and dig == "wrinkle":
-                        save_image(self, patch_list, self.epoch)        
+                if total_iter == random_num and dig == "wrinkle":
+                    save_image(self, patch_list, self.epoch)   
                 
                     
 

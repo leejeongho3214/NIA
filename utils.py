@@ -5,7 +5,39 @@ import errno
 import os
 import torch.nn as nn
 import torch.nn.functional as F
+from data_loader import area_naming
 
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+else:
+    device = torch.device("cpu")
+
+def softmax(x):
+    e_x = torch.exp(x - torch.max(x, dim=1, keepdim=True).values)
+
+    return e_x / torch.sum(e_x, dim=1).unsqueeze(dim=1)
+
+
+def adjust_learning_rate(optimizer, epoch, args):
+    """
+    Sets the learning rate to the initial LR decayed by x every y epochs
+    x = 0.1, y = args.num_train_epochs/2.0 = 100
+    """
+    lr = args.lr * (0.1 ** (epoch // (args.epoch / 2.0)))
+    for param_group in optimizer.param_groups:
+        param_group["lr"] = lr
+
+
+def resume_checkpoint(args, model, path):
+    state_dict = torch.load(path, map_location=device)
+    best_loss = state_dict["best_loss"]
+    epoch = state_dict["epoch"]
+    model.load_state_dict(state_dict["model_state"], strict=False)
+    del state_dict
+    args.load_epoch = epoch
+    args.best_loss = best_loss
+
+    return model
 
 class LabelSmoothingCrossEntropy(nn.Module):
     def __init__(self):

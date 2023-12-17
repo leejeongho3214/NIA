@@ -1,3 +1,4 @@
+import inspect
 import os
 
 import shutil
@@ -7,10 +8,11 @@ from torchvision import models
 
 from tensorboardX import SummaryWriter
 import copy
-from utils import mkdir
+from utils import mkdir, resume_checkpoint, labeling, LabelSmoothingCrossEntropy
 from logger import setup_logger
 from data_loader import CustomDataset
-from model import resume_checkpoint, Model
+from model import Model
+
 
 import argparse
 from torch.utils import data
@@ -31,11 +33,6 @@ def parse_args():
         type=str,
     )
 
-    parser.add_argument(
-        "--loss_dir",
-        default="tensorboard",
-        type=str,
-    )
 
     parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
 
@@ -56,7 +53,7 @@ def parse_args():
 
     parser.add_argument(
         "--output_dir",
-        default="checkpoint_F",
+        default= f"checkpoint/{os.popen('git branch --show-current').readlines()[0].rstrip()}",
         type=str,
     )
 
@@ -91,11 +88,6 @@ def parse_args():
         type=int,
     )
 
-    parser.add_argument(
-        "--label_smooth",
-        default=0,
-        type=float,
-    )
 
     parser.add_argument(
         "--lr",
@@ -125,11 +117,8 @@ def parse_args():
 
 
 def main(args):
-    log_path = os.path.join(args.loss_dir, args.mode, args.name)
     check_path = os.path.join(args.output_dir, args.mode, args.name)
 
-    writer = SummaryWriter(log_path)
-    mkdir(log_path)
     mkdir(check_path)
     ## Make the directories for save
 
@@ -178,6 +167,8 @@ def main(args):
     logger = setup_logger(args.name + args.mode, check_path)
     logger.info(args)
     logger.info("Command Line: " + " ".join(sys.argv))
+    logger.debug(inspect.getsource(labeling) if args.smooth else inspect.getsource(LabelSmoothingCrossEntropy))
+
 
     dataset = CustomDataset(args)
 
@@ -198,28 +189,27 @@ def main(args):
     )
 
     resnet_model = Model(
-        args, model_list, trainset_loader, valset_loader, logger, writer, check_path
+        args, model_list, trainset_loader, valset_loader, logger, check_path
     )
 
     for epoch in range(args.load_epoch, args.epoch):
         resnet_model.update_e(epoch + 1) if args.load_epoch else None
 
-        for model_idx in model_num_class:
+        for dig, value in model_num_class.items():
             # In regression task, there are no images for 미간, 입술, 턱
-            resnet_model.choice(model_idx)
+            resnet_model.choice(dig)
             # Change the model for each region
-            resnet_model.run(model_idx, phase="train")
-            resnet_model.run(model_idx, phase="valid")
+            resnet_model.run(dig, value, phase="train")
+            resnet_model.run(dig, value, phase="valid")
 
         resnet_model.update_m(model_num_class)
         resnet_model.save_value()
+        resnet_model.save_value1()
         resnet_model.update_e(epoch + 1)
         resnet_model.reset_log(mode=args.mode)
 
         if resnet_model.stop_early():
             break
-
-    writer.close()
 
 
 if __name__ == "__main__":

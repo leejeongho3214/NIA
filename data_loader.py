@@ -59,7 +59,6 @@ class CustomDataset(Dataset):
         self.train_list, self.val_list, self.test_list = random_split(
             self.dataset, [0.8, 0.1, 0.1]
         )
-        self.remove_list = defaultdict(int)
 
     def __len__(self):
         return len(self.sub_path)
@@ -253,8 +252,6 @@ class CustomDataset(Dataset):
             max(bbox_point[1], bbox_point[3]),
         ]
 
-        if (bbox_x[1] - bbox_x[0]) < 90 or (bbox_y[1] - bbox_y[0]) < 90:
-            self.remove_list[str(idx_area)] += 1
 
         area_name = str(int(json_name.split("_")[-1].split(".")[0]))
         patch_img = img[bbox_y[0] : bbox_y[1], bbox_x[0] : bbox_x[1]]
