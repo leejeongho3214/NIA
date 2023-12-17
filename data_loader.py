@@ -100,6 +100,9 @@ class CustomDataset(Dataset):
                     
                     if img_name.split('.')[0].split('_')[-1] != "F":
                         continue
+                    
+                    pre_name = '/'.join(folder_path.split('/')[2:])
+                    json_name = os.path.join('dataset/label', pre_name)
 
                     self.dataset.append(
                         {

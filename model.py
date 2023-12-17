@@ -8,7 +8,6 @@ from data_loader import class_num_list
 from utils import (
     adjust_learning_rate,
     get_item,
-    pred_image,
     AverageMeter,
     save_checkpoint,
     LabelSmoothingCrossEntropy,
@@ -177,8 +176,12 @@ class Model(object):
             return True
 
     def class_loss(self, pred, label, dig, num_class):
-        gt = labeling(label, num_class, dig).cuda() if self.args.cross else label
-        loss = self.criterion(pred, gt, dig)
+        if self.args.cross:
+            gt = labeling(label, num_class, dig).cuda()
+            loss = self.criterion(pred, gt, dig) 
+        else:
+            gt = label
+            loss = self.criterion(pred, gt) 
         pred_p = softmax(pred)
         
         if abs((pred_p.argmax().item() - gt.item())) == 0:
@@ -379,7 +382,7 @@ class Model(object):
                     pred = self.model.to(device)(img)
 
                     if self.args.mode == "class":
-                        loss = self.class_loss(pred, label, dig, num_class)
+                        loss = self.class_loss(pred, label, dig) if self.args.cross else self.class_loss(pred, label, dig, num_class)
                     else:
                         loss = self.regression(pred, label, dig)
 
