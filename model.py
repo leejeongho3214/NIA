@@ -177,11 +177,11 @@ class Model(object):
         
     def class_loss(self, pred, label, dig, num_class):
         if self.args.cross:
-            gt = labeling(label, num_class, dig).cuda()
-            loss = self.criterion(pred, gt, dig) 
-        else:
             gt = label
             loss = self.criterion(pred, gt) 
+        else:
+            gt = labeling(label, num_class, dig).cuda()
+            loss = self.criterion(pred, gt, dig) 
         pred_p = softmax(pred)
         
         if abs((pred_p.argmax().item() - gt.item())) == 0:
