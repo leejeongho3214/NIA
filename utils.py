@@ -1,17 +1,38 @@
 import cv2
 import torch
-import copy
 import errno
 import os
 import torch.nn as nn
 import torch.nn.functional as F
 
-from data_loader import area_naming
-
 if torch.cuda.is_available():
     device = torch.device("cuda")
 else:
     device = torch.device("cpu")
+
+area_naming = {
+    "0": "all",
+    "1": "forehead",
+    "2": "glabellus",
+    "3": "l_peroucular",
+    "4": "r_peroucular",
+    "5": "l_cheek",
+    "6": "r_cheek",
+    "7": "lip",
+    "8": "chin",
+}
+
+
+def mkdir(path):
+    # if it is the current folder, skip.
+    # otherwise the original code will raise FileNotFoundError
+    if path == "":
+        return
+    try:
+        os.makedirs(path)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
 
 
 def softmax(x):
@@ -49,18 +70,18 @@ class LabelSmoothingCrossEntropy(nn.Module):
 
     def forward(self, x, target, dig):
         gt = target.item()
-        
+
         smoothing = 0.5
         dim = 0
-        if (dig == 'wrinkle' and gt == 1) or (dig == 'pigmentation' and gt ==1):
-            target = torch.tensor([0, 1, 2], device = "cuda")
-            
-        elif dig == 'sagging' and gt == 0:
-            target = torch.tensor([0, 1], device = "cuda")
-            
-        elif (dig == 'pore' and gt ==2) or (dig == 'dryness' and gt ==2):
-            target = torch.tensor([1, 2, 3], device = "cuda")
-            
+        if (dig == "wrinkle" and gt == 1) or (dig == "pigmentation" and gt == 1):
+            target = torch.tensor([0, 1, 2], device="cuda")
+
+        elif dig == "sagging" and gt == 0:
+            target = torch.tensor([0, 1], device="cuda")
+
+        elif (dig == "pore" and gt == 2) or (dig == "dryness" and gt == 2):
+            target = torch.tensor([1, 2, 3], device="cuda")
+
         else:
             smoothing = self.smoothing
             dim = 1
@@ -72,7 +93,8 @@ class LabelSmoothingCrossEntropy(nn.Module):
         smooth_loss = -logprobs.mean(dim=-1)
         loss = confidence * nll_loss + smoothing * smooth_loss
         return loss.mean()
-    
+
+
 class AverageMeter(object):
     def __init__(self):
         self.reset()
@@ -102,13 +124,11 @@ def get_item(item, device):
 
     else:
         for name in item[1]:
-            item[1][name] = item[1][name].to(
-                device
-            )
+            item[1][name] = item[1][name].to(device)
         label = item[1]
 
     img = item[0].to(device)
-    
+
     return img, label
 
 
@@ -127,7 +147,7 @@ def pred_image(self, img):
 
     else:
         pred = self.model.to(self.device)(img)
-        
+
     return pred
 
 
@@ -135,35 +155,36 @@ def labeling(label, num, dig):
     template = torch.zeros(num)
     gt = label.item()
 
-    if dig == 'wrinkle' and gt == 1:
+    if dig == "wrinkle" and gt == 1:
         template[0] = 0.15
         template[1] = 0.55
         template[2] = 0.3
-        
-    elif dig == 'sagging' and gt == 0:
+
+    elif dig == "sagging" and gt == 0:
         template[0] = 0.5
         template[1] = 0.3
         template[2] = 0.2
-        
-    elif dig == 'pore' and gt ==2:
+
+    elif dig == "pore" and gt == 2:
         template[1] = 0.3
         template[2] = 0.5
         template[3] = 0.2
-        
-    elif dig == 'dryness' and gt ==2:
+
+    elif dig == "dryness" and gt == 2:
         template[1] = 0.25
         template[2] = 0.5
         template[3] = 0.25
-        
-    elif dig == 'pigmentation' and gt ==1:
+
+    elif dig == "pigmentation" and gt == 1:
         template[0] = 0.2
         template[1] = 0.5
         template[2] = 0.3
-        
+
     else:
         template[gt] = 1
 
     return template.reshape(1, -1)
+
 
 def save_checkpoint(model, args, epoch, m_dig, best_loss):
     checkpoint_dir = os.path.join(args.output_dir, args.mode, args.name, str(m_dig))
@@ -184,43 +205,25 @@ def save_checkpoint(model, args, epoch, m_dig, best_loss):
     )
     return checkpoint_dir
 
-def mkdir(path):
-    # if it is the current folder, skip.
-    # otherwise the original code will raise FileNotFoundError
-    if path == "":
-        return
-    try:
-        os.makedirs(path)
-    except OSError as e:
-        if e.errno != errno.EEXIST:
-            raise
-        
+
 def save_value(args, self):
     mkdir(args.name)
-    with open(
-        os.path.join(args.name, f"pred.txt"), "w"
-    ) as p:
-        with open(
-            os.path.join(args.name, f"gt.txt"), "w"
-        ) as g:
+    with open(os.path.join(args.name, f"pred.txt"), "w") as p:
+        with open(os.path.join(args.name, f"gt.txt"), "w") as g:
             for idx in range(len(self.pred)):
                 p.write(f"{self.pred[idx][0]}, {self.pred[idx][1]} \n")
                 g.write(f"{self.gt[idx][0]}, {self.gt[idx][1]} \n")
     g.close()
     p.close()
-    
-def save_image(self, patch_list, epoch):
-    for dig, patches in patch_list.items():
-        for patch in patches:
-            c_img = patch[0].detach().cpu().numpy()[0].transpose(1, 2, 0)
-            max_v, min_v = c_img.max(), c_img.min()
-            if min_v > 0:
-                min_v = -min_v
-            s_img = (c_img - min_v) * (255.0 / (max_v - min_v))
-            
-            area_n = area_naming[patch[2][0].split('_')[-1]]
-            path = os.path.join("save_img", self.args.mode, self.args.name, dig)
-            mkdir(path)
-            cv2.imwrite(os.path.join(path, f"epoch_{epoch}_{area_n}.jpg"), s_img)
 
-    return
+
+def save_image(self, img):
+    c_img =img.detach().cpu().numpy()[0].transpose(1, 2, 0)
+    max_v, min_v = c_img.max(), c_img.min()
+    if min_v > 0:
+        min_v = -min_v
+    s_img = (c_img - min_v) * (255.0 / (max_v - min_v))
+
+    path = os.path.join("save_img", self.args.mode, self.args.name, self.m_dig)
+    mkdir(path)
+    cv2.imwrite(os.path.join(path, f"epoch_{self.epoch}_{self.m_dig}.jpg"), s_img)

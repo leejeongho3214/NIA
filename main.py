@@ -5,18 +5,16 @@ import sys
 import numpy as np
 import torch
 import copy
-from utils import mkdir
 from logger import setup_logger
 from data_loader import CustomDataset
 from model import Model
 from vit_pytorch import ViT
-from utils import resume_checkpoint, labeling, LabelSmoothingCrossEntropy
+from utils import resume_checkpoint, labeling, LabelSmoothingCrossEntropy, mkdir
 
 import argparse
 from torch.utils import data
  
 import inspect
-
 
 torch.manual_seed(523)
 torch.cuda.manual_seed_all(523)
@@ -187,7 +185,6 @@ def main(args):
 
 
     dataset = CustomDataset(args)
-
     dataset.load_dataset(args, "train")
     trainset_loader = data.DataLoader(
         dataset=copy.deepcopy(dataset),
@@ -205,18 +202,13 @@ def main(args):
     )
 
     resnet_model = Model(
-        args, model_list, trainset_loader, valset_loader, logger,  check_path
+        args, model_list, trainset_loader, valset_loader, logger,  check_path, model_num_class
     )
 
     for epoch in range(args.load_epoch, args.epoch):
         resnet_model.update_e(epoch + 1) if args.load_epoch else None
-
-        for dig, value in model_num_class.items():
-            # In regression task, there are no images for 미간, 입술, 턱
-            resnet_model.choice(dig)
-            # Change the model for each region
-            resnet_model.run(dig, value, phase="train")
-            resnet_model.run(dig, value, phase="valid")
+        resnet_model.run(phase = 'train')
+        resnet_model.run(phase = 'valid')
 
         resnet_model.update_m(model_num_class)
         resnet_model.save_value()
