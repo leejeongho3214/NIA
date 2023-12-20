@@ -2,6 +2,7 @@ from collections import defaultdict
 import random
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 import copy
 from data_loader import class_num_list
@@ -15,7 +16,7 @@ from utils import (
     softmax,
 )
 import os
-from utils import labeling
+from torch.utils import data
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
 if torch.cuda.is_available():
@@ -170,15 +171,14 @@ class Model(object):
         if self.update_c > self.args.stop_early:
             return True
 
-    def class_loss(self, pred, label):
-        if self.args.cross:
-            gt = labeling(label, self.model_num_class[self.m_dig], self.m_dig).cuda()
-            
-            loss = self.criterion(pred, gt)
-        else:
-            gt = label
-            loss = self.criterion(pred, gt, self.m_dig)
+    def class_loss(self, pred, gt):
         pred_p = softmax(pred)
+        if self.args.cross:
+            label = F.one_hot(gt, self.model_num_class[self.m_dig]).type(torch.float16)
+            loss = self.criterion(pred_p, label)
+        else:
+            loss = self.criterion(pred, gt, self.m_dig)
+        
 
         if abs((pred_p.argmax().item() - gt.item())) == 0:
             score = 1
@@ -352,6 +352,8 @@ class Model(object):
     def run(self, phase="train"):
         self.phase = phase
         data_loader = self.train_loader if self.phase == "train" else self.valid_loader
+        
+        
 
         def run_iter():
             random_num = random.randrange(1, len(data_loader))
@@ -372,11 +374,21 @@ class Model(object):
                 adjust_learning_rate(optimizer, self.epoch, self.args)
                 self.model_num = self.model_num_class[self.m_dig]
                 
-                for iter, (img, label, img_name, dig_p) in enumerate(datalist):
-                    img_name, dig = img_name[0], dig_p[0]
+                loader_datalist = data.DataLoader(
+                        dataset=copy.deepcopy(datalist),
+                        batch_size=self.args.batch_size,
+                        num_workers=self.args.num_workers,
+                        shuffle=True if self.phase == "train" else False,
+                     )
+                
+                
+                for iter, (img, label, img_name, dig_p) in enumerate(loader_datalist):
+                    if iter == 10:
+                        break
+                    img_name, dig = img_name[0][0], dig_p[0][0]
                     if dig != self.m_dig:
                         assert 0, "This is not same with dig"
-                    img, label = img.to(device), label.to(device)
+                    img, label = img[0].to(device), label[0].to(device)
                     pred = self.model.to(device)(img)
 
                     if self.args.mode == "class":

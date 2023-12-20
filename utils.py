@@ -151,41 +151,6 @@ def pred_image(self, img):
     return pred
 
 
-def labeling(label, num, dig):
-    template = torch.zeros(num)
-    gt = label.item()
-
-    if dig == "wrinkle" and gt == 1:
-        template[0] = 0.15
-        template[1] = 0.55
-        template[2] = 0.3
-
-    elif dig == "sagging" and gt == 0:
-        template[0] = 0.5
-        template[1] = 0.3
-        template[2] = 0.2
-
-    elif dig == "pore" and gt == 2:
-        template[1] = 0.3
-        template[2] = 0.5
-        template[3] = 0.2
-
-    elif dig == "dryness" and gt == 2:
-        template[1] = 0.25
-        template[2] = 0.5
-        template[3] = 0.25
-
-    elif dig == "pigmentation" and gt == 1:
-        template[0] = 0.2
-        template[1] = 0.5
-        template[2] = 0.3
-
-    else:
-        template[gt] = 1
-
-    return template.reshape(1, -1)
-
-
 def save_checkpoint(model, args, epoch, m_dig, best_loss):
     checkpoint_dir = os.path.join(args.output_dir, args.mode, args.name, str(m_dig))
     mkdir(checkpoint_dir)
@@ -224,6 +189,6 @@ def save_image(self, img):
         min_v = -min_v
     s_img = (c_img - min_v) * (255.0 / (max_v - min_v))
 
-    path = os.path.join("save_img", self.args.mode, self.args.name, self.m_dig)
+    path = os.path.join("save_img", os.popen('git branch --show-current').readlines()[0].rstrip(), self.args.mode, self.args.name, self.m_dig)
     mkdir(path)
     cv2.imwrite(os.path.join(path, f"epoch_{self.epoch}_{self.m_dig}.jpg"), s_img)

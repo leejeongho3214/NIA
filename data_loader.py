@@ -131,7 +131,7 @@ class CustomDataset(Dataset):
         area_list = defaultdict(lambda: defaultdict(list))
         sub_path = defaultdict(list)
 
-        for dig, grade, class_dict in tqdm(data_list.datasets, desc="Class"):
+        for dig, grade, class_dict in tqdm(data_list.datasets, desc=f"{mode}_class"):
             for idx, i_path in enumerate(tqdm(sorted(class_dict), desc=f"{dig}_{grade}")):
                 if idx == self.args.data_num:
                     break

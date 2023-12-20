@@ -9,7 +9,7 @@ from logger import setup_logger
 from data_loader import CustomDataset
 from model import Model
 from vit_pytorch import ViT
-from utils import resume_checkpoint, labeling, LabelSmoothingCrossEntropy, mkdir
+from utils import resume_checkpoint, LabelSmoothingCrossEntropy, mkdir
 
 import argparse
 from torch.utils import data
@@ -104,7 +104,7 @@ def parse_args():
 
     parser.add_argument(
         "--num_workers",
-        default=4,
+        default=0,
         type=int,
     )
 
@@ -181,7 +181,6 @@ def main(args):
             
     logger.info(args)
     logger.info("Command Line: " + " ".join(sys.argv))
-    logger.debug(inspect.getsource(labeling) if args.smooth else inspect.getsource(LabelSmoothingCrossEntropy))
 
 
     dataset = CustomDataset(args)
