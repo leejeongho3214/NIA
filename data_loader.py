@@ -69,6 +69,7 @@ class CustomDataset(Dataset):
     def load_list(self, args):
         self.img_path = args.img_path
         self.json_path = args.json_path
+
         sub_path_list = [
             item
             for item in natsort.natsorted(os.listdir(self.img_path))
@@ -114,10 +115,14 @@ class CustomDataset(Dataset):
                                 if list(json_meta["annotations"].keys())[0] == "acne":
                                     continue
                                 for dig_n, grade in json_meta["annotations"].items():
-                                    dig = dig_n.split("_")[-1]
+                                    dig, area = dig_n.split("_")[-1],dig_n.split("_")[-2]
+                                    if dig in ["wrinkle", "pigmentation"]:      ## Only one area per each class
+                                        if area != "forehead":
+                                            continue
                                     self.json_dict[dig][str(grade)].append(
                                         os.path.join(pre_name, j_name.split(".")[0])
                                     )
+
 
     def load_dataset(self, args, mode):
         self.sub_path = defaultdict(list)
@@ -154,10 +159,13 @@ class CustomDataset(Dataset):
                 desc_area = "Sub_" + s_list[0]+ "_Equ_"+ s_list[1]+ "_Angle_"+ s_list[2]+ "_Area_"+ s_list[3]
 
                 for key in label_data:
-                    dig = key.split("_")[-1]
-                    area_list[dig][str(label_data[key])].append(
-                        [patch_img, label_data[key], desc_area, dig]
-                    )
+                    dig_p = key.split("_")[-1]
+                    if dig == dig_p:
+                        area_list[dig][str(label_data[key])].append(
+                            [patch_img, label_data[key], desc_area, dig]
+                        )
+                    if idx == self.args.data_num:
+                        break 
 
         for dig, class_dict in area_list.items():
             grade_list = [
@@ -173,7 +181,6 @@ class CustomDataset(Dataset):
         
         for k, v in sub_path.items():
             self.sub_path[k] = [item for items in v for item in items]
-
         del sub_path, area_list
 
     def load_img(self, img_name, angle, idx_area, equ_name, img, args):
