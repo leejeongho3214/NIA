@@ -126,7 +126,7 @@ class Model(object):
             self.update_c,
             self.stop_loss,
             self.device,
-        ) = (None, 0, None, 0, np.inf, device)
+        ) = (None, None, None, 0, np.inf, device)
         self.pred, self.gt = list(), list()
         self.pred_t, self.gt_t = list(), list()
 
@@ -172,14 +172,13 @@ class Model(object):
             return True
 
     def class_loss(self, pred, gt):
+        
         pred_p = softmax(pred)
         if self.args.cross:
-            label = F.one_hot(gt, self.model_num_class[self.m_dig]).type(torch.float16)
-            loss = self.criterion(pred_p, label)
+            loss = self.criterion(pred_p, gt)
         else:
-            loss = self.criterion(pred, gt, self.m_dig)
+            loss = self.criterion(pred_p, gt, self.m_dig)
         
-
         if abs((pred_p.argmax().item() - gt.item())) == 0:
             score = 1
         else:
@@ -352,8 +351,6 @@ class Model(object):
     def run(self, phase="train"):
         self.phase = phase
         data_loader = self.train_loader if self.phase == "train" else self.valid_loader
-        
-        
 
         def run_iter():
             random_num = random.randrange(1, len(data_loader))
@@ -380,11 +377,9 @@ class Model(object):
                         num_workers=self.args.num_workers,
                         shuffle=True if self.phase == "train" else False,
                      )
-                
+                del datalist
                 
                 for iter, (img, label, img_name, dig_p) in enumerate(loader_datalist):
-                    if iter == 10:
-                        break
                     img_name, dig = img_name[0][0], dig_p[0][0]
                     if dig != self.m_dig:
                         assert 0, "This is not same with dig"
@@ -396,7 +391,7 @@ class Model(object):
                     else:
                         loss = self.regression(pred, label)
 
-                    self.print_loss(iter, len(datalist))
+                    self.print_loss(iter, len(loader_datalist))
 
                     if phase == "train":
                         optimizer.zero_grad()
@@ -406,7 +401,7 @@ class Model(object):
                     if iter == random_num:
                         save_image(self, img)
 
-                self.print_loss(iter, len(datalist), final_flag=True)
+                self.print_loss(iter, len(loader_datalist), final_flag=True)
 
         if phase == "train":
             run_iter()
