@@ -15,6 +15,7 @@ from model import Model
 import argparse
 from torch.utils import data
 
+git_name = os.popen('git branch --show-current').readlines()[0].rstrip()
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -51,7 +52,7 @@ def parse_args():
 
     parser.add_argument(
         "--output_dir",
-        default= f"checkpoint/{os.popen('git branch --show-current').readlines()[0].rstrip()}",
+        default= f"checkpoint/{git_name}",
         type=str,
     )
 
@@ -116,7 +117,6 @@ def parse_args():
 
 def main(args):
     check_path = os.path.join(args.output_dir, args.mode, args.name)
-
     mkdir(check_path)
     ## Make the directories for save
 
@@ -149,24 +149,27 @@ def main(args):
         print(f"\033[90mReseting......{model_dict_path}\033[0m")
         if os.path.isdir(check_path):
             shutil.rmtree(check_path)
-            mkdir(check_path)
+            
+        args.save_img = os.path.join("save_img", git_name, args.mode, args.name)
+        if os.path.isdir(args.save_img):
+            shutil.rmtree(args.save_img)
     # If there is check-point, load that
+    
+    else:
+        if os.path.isfile(model_dict_path):
+            print(f"\033[92mResuming......{model_dict_path}\033[0m")
 
-    if os.path.isfile(model_dict_path):
-        print(f"\033[92mResuming......{model_dict_path}\033[0m")
-
-        for key, model in model_list.items():
-            model_list[key] = resume_checkpoint(
-                args,
-                model,
-                os.path.join(check_path, f"{key}", "state_dict.bin"),
-            )
+            for key, model in model_list.items():
+                model_list[key] = resume_checkpoint(
+                    args,
+                    model,
+                    os.path.join(check_path, f"{key}", "state_dict.bin"),
+                )
 
     logger = setup_logger(args.name + args.mode, check_path)
     logger.info(args)
     logger.info("Command Line: " + " ".join(sys.argv))
     logger.debug(inspect.getsource(labeling) if args.smooth else inspect.getsource(LabelSmoothingCrossEntropy))
-
 
     dataset = CustomDataset(args)
 
@@ -187,22 +190,18 @@ def main(args):
     )
 
     resnet_model = Model(
-        args, model_list, trainset_loader, valset_loader, logger, check_path
+        args, model_list, trainset_loader, valset_loader, logger, check_path, model_num_class
     )
 
     for epoch in range(args.load_epoch, args.epoch):
         resnet_model.update_e(epoch + 1) if args.load_epoch else None
-
-        for dig, value in model_num_class.items():
-            # In regression task, there are no images for 미간, 입술, 턱
-            resnet_model.choice(dig)
-            # Change the model for each region
-            resnet_model.run(dig, value, phase="train")
-            resnet_model.run(dig, value, phase="valid")
+        resnet_model.run(phase = 'train')
+        resnet_model.run(phase = 'valid')
 
         resnet_model.update_m(model_num_class)
         resnet_model.save_value()
         resnet_model.save_value1()
+
         resnet_model.update_e(epoch + 1)
         resnet_model.reset_log(mode=args.mode)
 

@@ -1,6 +1,7 @@
 *.jpg
 *.jpeg
 *.json
+*.pyc
 img/
 label/
 vis/

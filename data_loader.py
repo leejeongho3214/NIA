@@ -9,8 +9,19 @@ import cv2
 import json
 from collections import defaultdict
 from tqdm import tqdm
-from torch.utils.data import random_split
-from torch.utils.data import Dataset
+from torch.utils.data import random_split, ConcatDataset, Dataset
+
+
+def mkdir(path):
+    # if it is the current folder, skip.
+    # otherwise the original code will raise FileNotFoundError
+    if path == "":
+        return
+    try:
+        os.makedirs(path)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
 
 folder_name = {
     "F": "01",
@@ -56,38 +67,54 @@ class CustomDataset(Dataset):
     def __init__(self, args):
         self.args = args
         self.load_list(args)
-        self.train_list, self.val_list, self.test_list = random_split(
-            self.dataset, [0.8, 0.1, 0.1]
+        train_list, val_list, test_list = list(), list(), list()
+
+        for dig, class_dict in self.json_dict.items():
+            for grade, name_list in class_dict.items():
+                if len(name_list) < 10:
+                    name_list = name_list * (10 // len(name_list) + 1)
+                t, v, tt = random_split(name_list, [0.8, 0.1, 0.1])
+                train_list.append([dig, grade, t])
+                val_list.append([dig, grade, v])
+                test_list.append([dig, grade, tt])
+
+        self.train_list, self.val_list, self.test_list = (
+            ConcatDataset(train_list),
+            ConcatDataset(val_list),
+            ConcatDataset(test_list),
         )
 
     def __len__(self):
         return len(self.sub_path)
 
     def __getitem__(self, idx):
-        return self.sub_path[idx]
+        idx_list = list(self.sub_path.keys())
+        return idx_list[idx], self.sub_path[idx_list[idx]]
 
     def load_list(self, args):
         self.img_path = args.img_path
-        self.dataset = list()
         self.json_path = args.json_path
         sub_path_list = [
             item
             for item in natsort.natsorted(os.listdir(self.img_path))
             if not item.startswith(".")
         ]
-        transform_list = [transforms.ToTensor(),
-                          transforms.Normalize(
-                    [0.24628267, 0.3271797, 0.44643742],
-                    [0.1666497, 0.2335198, 0.3375362],
-                )]
+        transform_list = [
+            transforms.ToTensor(),
+            transforms.Normalize(
+                [0.24628267, 0.3271797, 0.44643742],
+                [0.1666497, 0.2335198, 0.3375362],
+            ),
+        ]
         self.transform = transforms.Compose(transform_list)
-
+        self.json_dict = defaultdict(lambda: defaultdict(list))
         for equ_name in sub_path_list:
             if equ_name.startswith(".") or int(equ_name) not in self.args.equ:
                 continue
 
-            for sub_fold in natsort.natsorted(
-                os.listdir(os.path.join(self.img_path, equ_name))
+            for sub_fold in tqdm(
+                natsort.natsorted(os.listdir(os.path.join(self.img_path, equ_name))),
+                desc="path loading..",
             ):
                 if sub_fold.startswith(".") or not os.path.exists(
                     os.path.join(self.json_path, equ_name, sub_fold)
@@ -98,20 +125,53 @@ class CustomDataset(Dataset):
                 for img_name in natsort.natsorted(os.listdir(folder_path)):
                     if not img_name.endswith((".png", ".jpg", ".jpeg")):
                         continue
-                    if img_name.split('.')[0].split('_')[-1] != "F":
+                    if img_name.split(".")[0].split("_")[-1] != "F":
                         continue
-                    self.dataset.append(
-                        {
-                            "equ_name": equ_name,
-                            "folder_path": folder_path,
-                            "img_name": img_name,
-                        }
-                    )
-
-        self.dataset = self.dataset[: self.args.data_num]
+                    pre_name = "/".join(folder_path.split("/")[2:])
+                    json_name = os.path.join("dataset/label", pre_name)
+                    img_name = os.path.join("dataset/img", pre_name)
+                    save_name = os.path.join("dataset/cropped_img", pre_name)
+                    img = cv2.imread(os.path.join(img_name, f"{sub_fold}_{equ_name}_F.jpg"))
+                    
+                    for j_name in os.listdir(json_name):
+                        if j_name.split("_")[2] == "F":
+                            with open(os.path.join(json_name, j_name), "r") as f:
+                                json_meta = json.load(f)
+                                if list(json_meta["annotations"].keys())[0] == "acne":
+                                    continue
+                                
+                                try:
+                                    bbox = json_meta['images']['bbox']
+                                    center = (int((bbox[0] + bbox[2])/2), int((bbox[1]+bbox[3])/2))
+                                    length = int(max(bbox[2] - bbox[0], bbox[3] - bbox[1]) / 2)
+                                    patch_img = img[max(0, center[1] - length) : center[1] + length, max(0, center[0] - length) : center[0] + length]
+                                    if not os.path.isdir(save_name):
+                                        mkdir(save_name)
+                                    cv2.imwrite(os.path.join(save_name, f"{json_meta['info']['filename'].split('.')[0]}_{json_meta['images']['facepart']:02}.jpg"), patch_img)
+                                
+                                except:
+                                    print(json_meta['images']['bbox'])
+                                    continue
+                                
+                                # for dig_n, grade in json_meta["annotations"].items():
+                                #     dig, area = (
+                                #         dig_n.split("_")[-1],
+                                #         dig_n.split("_")[-2],
+                                #     )
+                                    # if dig in [
+                                    #     "wrinkle",
+                                    #     "pigmentation",
+                                    # ]:  ## Only one area per each class
+                                    #     if area != "forehead":
+                                    #         continue
+                                    # self.json_dict[dig][str(grade)].append(
+                                    #     # os.path.join(pre_name, j_name.split(".")[0])
+                                    # )
+                                    
+                                    
 
     def load_dataset(self, args, mode):
-        self.sub_path = list()
+        self.sub_path = defaultdict(list)
         data_list = (
             self.train_list
             if mode == "train"
@@ -119,111 +179,69 @@ class CustomDataset(Dataset):
             if mode == "val"
             else self.test_list
         )
-        for value in tqdm(data_list):
-            equ_name = value["equ_name"]
-            folder_path = value["folder_path"]
-            sub_fold = folder_path.split("/")[-1]
-            img_name = value["img_name"]
+        area_list = defaultdict(lambda: defaultdict(list))
+        sub_path = defaultdict(list)
 
-            angle = img_name.split(".")[0].split("_")[-1]
-            img = cv2.imread(os.path.join(folder_path, img_name))
-            area_list = dict()
-            start_idx = 1 if args.mode == "class" else 0
-            for idx_area in range(start_idx, 9):
-                try:
-                    (
-                        reduction_value,
-                        area_name,
-                        meta,
-                        ori_patch_img,
-                        meta_v
-                    ) = self.load_img(img_name, angle, idx_area, equ_name, img, args)
+        for dig, grade, class_dict in tqdm(data_list.datasets, desc=f"{mode}_class"):
+            for idx, i_path in enumerate(
+                tqdm(sorted(class_dict), desc=f"{dig}_{grade}")
+            ):
+                if idx == self.args.data_num:
+                    break
+                p_img = cv2.imread(os.path.join("dataset/cropped_img", i_path + ".jpg"))
+                r_value = 256 / max(p_img.shape)
 
-                except:
-                    continue
-
-                if idx_area != 0:
-                    n_patch_img = cv2.resize(
-                        ori_patch_img,
-                        (
-                            int(ori_patch_img.shape[1] / reduction_value),
-                            int(ori_patch_img.shape[0] / reduction_value),
-                        ),
-                    )
-
-                    patch_img = self.make_double(n_patch_img)
-                    if not isinstance(patch_img, np.ndarray):
-                        continue
-
-                else:
-                    patch_img = cv2.resize(ori_patch_img, (args.res, args.res))
-
-                pil_img = Image.fromarray(patch_img)
+                pil_img = np.zeros([256, 256, 3])
+                r_img = cv2.resize(
+                    p_img,
+                    (int(p_img.shape[1] * r_value), int(p_img.shape[0] * r_value)),
+                )
+                pil_img[: r_img.shape[0], : r_img.shape[1]] = r_img
+                pil_img = Image.fromarray(pil_img.astype(np.uint8))
                 patch_img = self.transform(pil_img)
+
+                with open(os.path.join("dataset/label", i_path + ".json"), "r") as f:
+                    meta = json.load(f)
+
                 label_data = (
                     meta["annotations"] if args.mode == "class" else meta["equipment"]
                 )
 
-                if type(label_data) != dict:
-                    continue
-
-                if args.mode != "class":
-                    label_data = self.norm_reg(meta, idx_area)
-
+                s_list = i_path.split("/")[-1].split("_")
                 desc_area = (
                     "Sub_"
-                    + sub_fold
+                    + s_list[0]
                     + "_Equ_"
-                    + equ_name
+                    + s_list[1]
                     + "_Angle_"
-                    + angle
+                    + s_list[2]
                     + "_Area_"
-                    + area_name
+                    + s_list[3]
                 )
-
                 for key in label_data:
-                    dig = key.split("_")[-1]
-                    if dig not in area_list:
-                        area_list[dig] = list()
-                    area_list[dig].append([patch_img, label_data[key], meta_v, desc_area])
+                    dig_p = key.split("_")[-1]
+                    if dig == dig_p:
+                        area_list[dig][str(label_data[key])].append(
+                            [patch_img, label_data[key], desc_area, dig]
+                        )
+                    if idx == self.args.data_num:
+                        break
 
-            self.sub_path.append(area_list)
+        for dig, class_dict in area_list.items():
+            grade_list = [
+                len(total_list) for _, total_list in sorted((class_dict.items()))
+            ]
+            guide_num = max(grade_list)
 
-    def make_double(self, n_patch_img):
-        row = n_patch_img.shape[0]
-        col = n_patch_img.shape[1]
+            for grade, total_list in sorted(class_dict.items()):
+                mul_num, remain_num = guide_num // len(total_list), guide_num % len(
+                    total_list
+                )
+                sub_path[dig].append(total_list * mul_num + total_list[:remain_num])
 
-        if row < 64:
-            patch_img = np.zeros((128, 256, 3), dtype=np.uint8)
-            patch = cv2.resize(
-                n_patch_img,
-                (
-                    int(n_patch_img.shape[1] * 2),
-                    int(n_patch_img.shape[0] * 2),
-                ),
-            )
-            patch_img[
-                : n_patch_img.shape[0] * 2, : int(n_patch_img.shape[1]) * 2
-            ] = patch
-
-        elif col < 64:
-            patch_img = np.zeros((256, 128, 3), dtype=np.uint8)
-            patch = cv2.resize(
-                n_patch_img,
-                (
-                    int(n_patch_img.shape[1] * 2),
-                    int(n_patch_img.shape[0] * 2),
-                ),
-            )
-            patch_img[
-                : n_patch_img.shape[0] * 2, : int(n_patch_img.shape[1] * 2)
-            ] = patch
-
-        else:
-            patch_img = np.zeros((128, 128, 3), dtype=np.uint8)
-            patch_img[: n_patch_img.shape[0], : n_patch_img.shape[1]] = n_patch_img
-
-        return patch_img
+        for k, v in sub_path.items():
+            self.sub_path[k] = [item for items in v for item in items]
+        del sub_path, area_list
 
     def load_img(self, img_name, angle, idx_area, equ_name, img, args):
         json_name = "_".join(img_name.split("_")[:2]) + f"_{angle}_{idx_area:02d}.json"
@@ -252,16 +270,15 @@ class CustomDataset(Dataset):
             max(bbox_point[1], bbox_point[3]),
         ]
 
-
         area_name = str(int(json_name.split("_")[-1].split(".")[0]))
         patch_img = img[bbox_y[0] : bbox_y[1], bbox_x[0] : bbox_x[1]]
 
         reduction_value = max(patch_img.shape) / args.res
-        
-        age = torch.tensor([round((meta['info']['age'] - 13.0) / 69.0, 5)])
-        gender = 0 if meta['info']['gender'] == 'F' else 1
+
+        age = torch.tensor([round((meta["info"]["age"] - 13.0) / 69.0, 5)])
+        gender = 0 if meta["info"]["gender"] == "F" else 1
         gender_l = F.one_hot(torch.tensor(gender), 2)
-        
+
         meta_v = torch.concat([age, gender_l])
 
         return reduction_value, area_name, meta, patch_img, meta_v

@@ -108,21 +108,21 @@ def get_item(item, device):
     return img, label
 
 
-def pred_image(self, img, meta_v):
+def pred_image(self, img):
     if img.shape[-1] > 128:
         img_l = img[:, :, :, :128]
         img_r = torch.flip(img[:, :, :, 128:], dims=[3])
-        pred = self.model.to(self.device)(img_l, meta_v)
-        pred = self.model.to(self.device)(img_r, meta_v) + pred
+        pred = self.model.to(self.device)(img_l)
+        pred = self.model.to(self.device)(img_r) + pred
 
     elif img.shape[-2] > 128:
         img_l = img[:, :, :128, :]
         img_r = torch.flip(img[:, :, 128:, :], dims=[2])
-        pred = self.model.to(self.device)(img_l, meta_v)
-        pred = self.model.to(self.device)(img_r, meta_v) + pred
+        pred = self.model.to(self.device)(img_l)
+        pred = self.model.to(self.device)(img_r) + pred
 
     else:
-        pred = self.model.to(self.device)(img, meta_v)
+        pred = self.model.to(self.device)(img)
 
     return pred
 
@@ -205,18 +205,13 @@ def save_value(args, self):
     p.close()
 
 
-def save_image(self, patch_list, epoch):
-    for dig, patches in patch_list.items():
-        for patch in patches:
-            c_img = patch[0].detach().cpu().numpy()[0].transpose(1, 2, 0)
-            max_v, min_v = c_img.max(), c_img.min()
-            if min_v > 0:
-                min_v = -min_v
-            s_img = (c_img - min_v) * (255.0 / (max_v - min_v))
-            
-            area_n = area_naming[patch[2][0].split('_')[-1]]
-            path = os.path.join("save_img", self.args.mode, self.args.name, dig)
-            mkdir(path)
-            cv2.imwrite(os.path.join(path, f"epoch_{epoch}_{area_n}.jpg"), s_img)
+def save_image(self, img):
+    c_img =img.detach().cpu().numpy()[0].transpose(1, 2, 0)
+    max_v, min_v = c_img.max(), c_img.min()
+    if min_v > 0:
+        min_v = -min_v
+    s_img = (c_img - min_v) * (255.0 / (max_v - min_v))
 
-    return
+    path = os.path.join(self.args.save_img, self.m_dig)
+    mkdir(path)
+    cv2.imwrite(os.path.join(path, f"epoch_{self.epoch}_{self.m_dig}.jpg"), s_img)

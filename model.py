@@ -16,12 +16,14 @@ from utils import (
     softmax,
 )
 import os
-from utils import labeling
+from torch.utils import data
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
+
 if torch.cuda.is_available():
     device = torch.device("cuda")
 else:
     device = torch.device("cpu")
+
 
 class Model(object):
     def __init__(
@@ -32,6 +34,7 @@ class Model(object):
         valid_loader,
         logger,
         check_path,
+        model_num_class,
     ):
         super(Model, self).__init__()
         (
@@ -43,6 +46,7 @@ class Model(object):
             self.best_loss,
             self.logger,
             self.check_path,
+            self.model_num_class,
         ) = (
             args,
             model_list,
@@ -52,6 +56,7 @@ class Model(object):
             args.best_loss,
             logger,
             check_path,
+            model_num_class,
         )
 
         self.train_loss = (
@@ -121,13 +126,9 @@ class Model(object):
             self.update_c,
             self.stop_loss,
             self.device,
-        ) = (None, 0, None, 0, np.inf, device)
+        ) = (None, None, None, 0, np.inf, device)
         self.pred, self.gt = list(), list()
         self.pred_t, self.gt_t = list(), list()
-
-    def choice(self, m_dig):
-        self.model = copy.deepcopy(self.model_list[m_dig])
-        self.m_dig = m_dig
 
     def acc_avg(self, name):
         return round(self.test_value[name].avg * 100, 2)
@@ -135,12 +136,7 @@ class Model(object):
     def loss_avg(self, name):
         return round(self.test_value[name].avg, 4)
 
-    def print_loss(self, iteration, num_dig, final_flag=False):
-        dataloader_len = (
-            len(self.train_loader) * num_dig
-            if self.phase == "train"
-            else len(self.valid_loader) * num_dig
-        )
+    def print_loss(self, iteration, dataloader_len, final_flag=False):
         print(
             f"\rEpoch: {self.epoch} [{self.phase}][{self.m_dig}][{iteration}/{dataloader_len}] ---- >  loss: {self.train_loss[self.m_dig].avg if self.phase == 'train' else self.val_loss[self.m_dig].avg:.04f}",
             end="",
@@ -174,36 +170,33 @@ class Model(object):
     def stop_early(self):
         if self.update_c > self.args.stop_early:
             return True
-        
-    def class_loss(self, pred, label, dig, num_class):
-        if self.args.cross:
-            gt = label
-            loss = self.criterion(pred, gt) 
-        else:
-            gt = labeling(label, num_class, dig).cuda()
-            loss = self.criterion(pred, gt, dig) 
+
+    def class_loss(self, pred, gt):
         pred_p = softmax(pred)
-        
+        if self.args.cross:
+            loss = self.criterion(pred_p, gt)
+        else:
+            loss = self.criterion(pred_p, gt, self.m_dig)
+
         if abs((pred_p.argmax().item() - gt.item())) == 0:
             score = 1
         else:
             score = 0
 
         if self.phase == "valid":
-            self.pred.append([dig, pred_p.argmax().item()])
-            self.gt.append([dig, gt.item()])
+            self.pred.append([self.m_dig, pred_p.argmax().item()])
+            self.gt.append([self.m_dig, gt.item()])
             self.class_acc[self.m_dig].update_acc(score, 1)
 
         elif self.phase == "train":
-            self.pred_t.append([dig, pred_p.argmax().item()])
-            self.gt_t.append([dig, gt.item()])
+            self.pred_t.append([self.m_dig, pred_p.argmax().item()])
+            self.gt_t.append([self.m_dig, gt.item()])
 
         self.train_loss[self.m_dig].update(
             loss.item(), batch_size=1
         ) if self.phase == "train" else self.val_loss[self.m_dig].update(
             loss.item(), batch_size=1
         )
-
 
         return loss
 
@@ -354,52 +347,60 @@ class Model(object):
                 self.criterion(pred, gt).item(), batch_size=pred.shape[0]
             )
 
-    def run(self, dig, num_class, phase="train"):
+    def run(self, phase="train"):
         self.phase = phase
-        self.model = (
-            copy.deepcopy(self.model_list[self.m_dig])
-            if self.phase == "train"
-            else self.temp_model_list[self.m_dig]
-        )
-        self.model.train() if self.phase == "train" else self.model.eval()
-
-        optimizer = torch.optim.Adam(
-            params=list(self.model.parameters()),
-            lr=self.args.lr,
-            betas=(0.9, 0.999),
-            weight_decay=0,
-        )
-
-        adjust_learning_rate(optimizer, self.epoch, self.args)
         data_loader = self.train_loader if self.phase == "train" else self.valid_loader
 
         def run_iter():
-            total_iter = 0
             random_num = random.randrange(1, len(data_loader))
-            for patch_list in data_loader:
-                for item in patch_list[dig]:
-                    img, label = get_item(item, device)
-                    pred = pred_image(self, img, item[2])
+            for dig, datalist in data_loader:
+                self.m_dig = dig[0]
+                self.model = (
+                    copy.deepcopy(self.model_list[self.m_dig])
+                    if self.phase == "train"
+                    else self.temp_model_list[self.m_dig]
+                )
+                self.model.train() if self.phase == "train" else self.model.eval()
+                optimizer = torch.optim.Adam(
+                    params=list(self.model.parameters()),
+                    lr=self.args.lr,
+                    betas=(0.9, 0.999),
+                    weight_decay=0,
+                )
+                adjust_learning_rate(optimizer, self.epoch, self.args)
+                self.model_num = self.model_num_class[self.m_dig]
+
+                loader_datalist = data.DataLoader(
+                    dataset=copy.deepcopy(datalist),
+                    batch_size=self.args.batch_size,
+                    num_workers=self.args.num_workers,
+                    shuffle=True if self.phase == "train" else False,
+                )
+                del datalist
+
+                for iter, (img, label, img_name, dig_p) in enumerate(loader_datalist):
+                    img_name, dig = img_name[0][0], dig_p[0][0]
+                    if dig != self.m_dig:
+                        assert 0, "This is not same with dig"
+                    img, label = img[0].to(device), label[0].to(device)
+                    pred = self.model.to(device)(img)
 
                     if self.args.mode == "class":
-                        loss = self.class_loss(pred, label, dig, num_class)
+                        loss = self.class_loss(pred, label)
                     else:
-                        loss = self.regression(pred, label, dig)
+                        loss = self.regression(pred, label)
 
-                    total_iter += 1
-                    self.print_loss(total_iter, len(patch_list[dig]))
-                    
+                    self.print_loss(iter, len(loader_datalist))
+
                     if phase == "train":
                         optimizer.zero_grad()
                         loss.backward()
                         optimizer.step()
-                        
-                if total_iter == random_num and dig == "wrinkle":
-                    save_image(self, patch_list, self.epoch)   
-                
-                    
 
-            self.print_loss(total_iter, len(patch_list[dig]), final_flag=True)
+                    if iter == random_num:
+                        save_image(self, img)
+
+                self.print_loss(iter, len(loader_datalist), final_flag=True)
 
         if phase == "train":
             run_iter()
