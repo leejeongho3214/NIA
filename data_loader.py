@@ -23,6 +23,7 @@ def mkdir(path):
         if e.errno != errno.EEXIST:
             raise
 
+
 folder_name = {
     "F": "01",
     "Fb": "07",
@@ -131,44 +132,31 @@ class CustomDataset(Dataset):
                     json_name = os.path.join("dataset/label", pre_name)
                     img_name = os.path.join("dataset/img", pre_name)
                     save_name = os.path.join("dataset/cropped_img", pre_name)
-                    img = cv2.imread(os.path.join(img_name, f"{sub_fold}_{equ_name}_F.jpg"))
-                    
+                    img = cv2.imread(
+                        os.path.join(img_name, f"{sub_fold}_{equ_name}_F.jpg")
+                    )
+
                     for j_name in os.listdir(json_name):
                         if j_name.split("_")[2] == "F":
                             with open(os.path.join(json_name, j_name), "r") as f:
                                 json_meta = json.load(f)
                                 if list(json_meta["annotations"].keys())[0] == "acne":
                                     continue
-                                
-                                try:
-                                    bbox = json_meta['images']['bbox']
-                                    center = (int((bbox[0] + bbox[2])/2), int((bbox[1]+bbox[3])/2))
-                                    length = int(max(bbox[2] - bbox[0], bbox[3] - bbox[1]) / 2)
-                                    patch_img = img[max(0, center[1] - length) : center[1] + length, max(0, center[0] - length) : center[0] + length]
-                                    if not os.path.isdir(save_name):
-                                        mkdir(save_name)
-                                    cv2.imwrite(os.path.join(save_name, f"{json_meta['info']['filename'].split('.')[0]}_{json_meta['images']['facepart']:02}.jpg"), patch_img)
-                                
-                                except:
-                                    print(json_meta['images']['bbox'])
-                                    continue
-                                
-                                # for dig_n, grade in json_meta["annotations"].items():
-                                #     dig, area = (
-                                #         dig_n.split("_")[-1],
-                                #         dig_n.split("_")[-2],
-                                #     )
-                                    # if dig in [
-                                    #     "wrinkle",
-                                    #     "pigmentation",
-                                    # ]:  ## Only one area per each class
-                                    #     if area != "forehead":
-                                    #         continue
-                                    # self.json_dict[dig][str(grade)].append(
-                                    #     # os.path.join(pre_name, j_name.split(".")[0])
-                                    # )
-                                    
-                                    
+
+                                for dig_n, grade in json_meta["annotations"].items():
+                                    dig, area = (
+                                        dig_n.split("_")[-1],
+                                        dig_n.split("_")[-2],
+                                    )
+                                    if dig in [
+                                        "wrinkle",
+                                        "pigmentation",
+                                    ]:  ## Only one area per each class
+                                        if area != "forehead":
+                                            continue
+                                    self.json_dict[dig][str(grade)].append(
+                                        os.path.join(pre_name, j_name.split(".")[0])
+                                    )
 
     def load_dataset(self, args, mode):
         self.sub_path = defaultdict(list)
