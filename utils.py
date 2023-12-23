@@ -127,39 +127,27 @@ def pred_image(self, img):
     return pred
 
 
-def labeling(label, num, dig):
+def labeling(gt, num):
     template = torch.zeros(num)
-    gt = label.item()
+    label = gt.item()
+    
+    if label == 0:
+        template[0] = 0.8
+        template[1] = 0.1
 
-    if dig == 'wrinkle' and gt == 1:
-        template[0] = 0.15
-        template[1] = 0.55
-        template[2] = 0.3
-        
-    elif dig == 'sagging' and gt == 0:
-        template[0] = 0.5
-        template[1] = 0.3
-        template[2] = 0.2
-        
-    elif dig == 'pore' and gt ==2:
-        template[1] = 0.3
-        template[2] = 0.5
-        template[3] = 0.2
-        
-    elif dig == 'dryness' and gt ==2:
-        template[1] = 0.25
-        template[2] = 0.5
-        template[3] = 0.25
-        
-    elif dig == 'pigmentation' and gt ==1:
-        template[0] = 0.2
-        template[1] = 0.5
-        template[2] = 0.3
-        
+    elif label == num - 1:
+        template[-1] = 0.8
+        template[-2] = 0.1
+
     else:
-        template[gt] = 1
+        template[label] = 0.7
+        template[label - 1] = 0.1
+        template[label + 1] = 0.1
+    
+    zero_index = torch.where(template == 0)[0]
+    template[zero_index] = 0.1 / len(zero_index)
 
-    return template.reshape(1, -1)
+    return template.reshape(1, -1).cuda()
 
 
 def save_checkpoint(model, args, epoch, m_dig, best_loss):

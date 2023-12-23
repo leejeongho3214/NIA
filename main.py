@@ -150,9 +150,9 @@ def main(args):
         if os.path.isdir(check_path):
             shutil.rmtree(check_path)
             
-        args.save_img = os.path.join("save_img", git_name, args.mode, args.name)
-        if os.path.isdir(args.save_img):
-            shutil.rmtree(args.save_img)
+    args.save_img = os.path.join("save_img", git_name, args.mode, args.name)
+    if os.path.isdir(args.save_img):
+        shutil.rmtree(args.save_img)
     # If there is check-point, load that
     
     else:

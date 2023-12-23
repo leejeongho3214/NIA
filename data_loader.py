@@ -131,10 +131,6 @@ class CustomDataset(Dataset):
                     pre_name = "/".join(folder_path.split("/")[2:])
                     json_name = os.path.join("dataset/label", pre_name)
                     img_name = os.path.join("dataset/img", pre_name)
-                    save_name = os.path.join("dataset/cropped_img", pre_name)
-                    img = cv2.imread(
-                        os.path.join(img_name, f"{sub_fold}_{equ_name}_F.jpg")
-                    )
 
                     for j_name in os.listdir(json_name):
                         if j_name.split("_")[2] == "F":

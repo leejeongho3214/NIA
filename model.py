@@ -9,6 +9,7 @@ from utils import (
     adjust_learning_rate,
     get_item,
     AverageMeter,
+    labeling,
     pred_image,
     save_checkpoint,
     LabelSmoothingCrossEntropy,
@@ -174,7 +175,9 @@ class Model(object):
     def class_loss(self, pred, gt):
         pred_p = softmax(pred)
         if self.args.cross:
-            loss = self.criterion(pred_p, gt)
+            num = pred.shape[-1]
+            label = labeling(gt, num)
+            loss = self.criterion(pred_p, label)
         else:
             loss = self.criterion(pred_p, gt, self.m_dig)
 
