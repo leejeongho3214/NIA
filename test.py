@@ -3,22 +3,21 @@ from torchvision import models
 
 import sys
 import os
-import copy
 from data_loader import CustomDataset
-from model import resume_checkpoint
 from test_model import Model_test
-from torchvision.models import ResNet50_Weights
-import torch.nn as nn
 import argparse
 from logger import setup_logger
 from torch.utils import data
+
+from utils import resume_checkpoint
 
 torch.manual_seed(523)
 torch.cuda.manual_seed_all(523)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
-    
+git_name = os.popen('git branch --show-current').readlines()[0].rstrip()
+
 def parse_args():
     parser = argparse.ArgumentParser()
 
@@ -33,31 +32,10 @@ def parse_args():
         default="dataset/img",
         type=str,
     )
-    
-    parser.add_argument(
-        "--data",
-        default="test",
-        type=str,
-    )
-    
-    parser.add_argument(
-        "--data_num",
-        default=-1,
-        type=int,
-    )      
-    parser.add_argument(
-            "--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+"
-        )
-    
-    parser.add_argument(
-        "--output_dir",
-        default= f"checkpoint/{os.popen('git branch --show-current').readlines()[0].rstrip()}",
-        type=str,
-    )
-    
-    parser.add_argument("--train", action="store_true")
-    
-    parser.add_argument("--log", action="store_true")
+
+    parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
+
+    parser.add_argument("--stop_early", type=int, default=30)
 
     parser.add_argument(
         "--mode",
@@ -73,16 +51,49 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--output_dir",
+        default= f"checkpoint/{git_name}",
+        type=str,
+    )
+
+    parser.add_argument(
+        "--epoch",
+        default=300,
+        type=int,
+    )
+    
+    parser.add_argument(
+        "--smooth",
+        default=0.1,
+        type=float,
+    )
+    
+
+    parser.add_argument(
         "--res",
         default=128,
         type=int,
     )
+
     parser.add_argument(
-        "--label_smooth",
-        default=0.5,
+        "--data_num",
+        default=-1,
+        type=int,
+    )
+
+    parser.add_argument(
+        "--load_epoch",
+        default=0,
+        type=int,
+    )
+
+
+    parser.add_argument(
+        "--lr",
+        default=1e-3,
         type=float,
     )
-        
+
     parser.add_argument(
         "--batch_size",
         default=1,
@@ -94,8 +105,9 @@ def parse_args():
         default=4,
         type=int,
     )
-    
-    parser.add_argument("--normalize", action="store_true")
+
+    parser.add_argument("--reset", action="store_true")
+    parser.add_argument("--cross", action="store_true")
 
     args = parser.parse_args()
 
@@ -103,11 +115,13 @@ def parse_args():
 
 
 def main(args):
-    check_path = os.path.join(args.output_dir, args.mode, args.name)
+    args.save_path = os.path.join(git_name, args.mode, args.name)
+    check_path = os.path.join("checkpoint", args.save_path)
     ## Make the directories for save
 
-    logger = setup_logger(args.name, "eval/" + args.mode, filename=args.name + ".txt")
+    logger = setup_logger(args.name, os.path.join("eval", args.save_path), filename=args.name + ".txt")
     logger.info("Command Line: " + " ".join(sys.argv))
+    
     model_num_class = (
         {'dryness': 5, 
          'pigmentation': 6,
@@ -155,7 +169,7 @@ def main(args):
     resnet_model = Model_test(args, model_list, testset_loader, logger)
     # If the model's acc is higher than best acc, it saves this model
     logger.info("Inferece ...")
-    resnet_model.test(model_num_class, testset_loader)
+    resnet_model.test(testset_loader)
     logger.info("Finish!")
     resnet_model.save_value()
 

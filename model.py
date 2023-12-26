@@ -7,14 +7,13 @@ import copy
 from data_loader import class_num_list
 from utils import (
     adjust_learning_rate,
-    get_item,
     AverageMeter,
     labeling,
-    pred_image,
     save_checkpoint,
     LabelSmoothingCrossEntropy,
     save_image,
     softmax,
+    img_save,
 )
 import os
 from torch.utils import data
@@ -137,17 +136,13 @@ class Model(object):
     def loss_avg(self, name):
         return round(self.test_value[name].avg, 4)
 
-    def print_loss(self, iteration, dataloader_len, final_flag=False):
+    def print_loss(self, dataloader_len, final_flag=False):
         print(
-            f"\rEpoch: {self.epoch} [{self.phase}][{self.m_dig}][{iteration}/{dataloader_len}] ---- >  loss: {self.train_loss[self.m_dig].avg if self.phase == 'train' else self.val_loss[self.m_dig].avg:.04f}",
+            f"\rEpoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss[self.m_dig].avg if self.phase == 'train' else self.val_loss[self.m_dig].avg:.04f}",
             end="",
         )
 
         if final_flag:
-            self.logger.info(
-                f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{iteration}/{dataloader_len}] ---- >  loss: {self.train_loss[self.m_dig].avg if self.phase == 'train' else self.val_loss[self.m_dig].avg:.04f}"
-            )
-
             self.temp_model_list[self.m_dig] = self.model
             if self.phase == "valid":
                 f_pred = defaultdict(list)
@@ -167,33 +162,38 @@ class Model(object):
                 self.logger.info(
                     f"[{key}] Macro Precision: {macro_precision:.4f}, Macro Recall: {macro_recall:.4f}, Macro F1: {macro_f1:.4f}, Acc: {acc * 100:.2f}% "
                 )
+            else:
+                self.logger.info(
+                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss[self.m_dig].avg if self.phase == 'train' else self.val_loss[self.m_dig].avg:.04f}"
+                )
 
     def stop_early(self):
         if self.update_c > self.args.stop_early:
             return True
 
-    def class_loss(self, pred, gt):
-        pred_p = softmax(pred)
+    def class_loss(self, pred, gt, weight):
+        # pred_p = softmax(pred)
         if self.args.cross:
             num = pred.shape[-1]
-            label = labeling(gt, num)
-            loss = self.criterion(pred_p, label)
+            # label = labeling(gt, num)
+            loss = self.criterion(pred, gt, torch.tensor(weight).to(device))
         else:
-            loss = self.criterion(pred_p, gt, self.m_dig)
+            # loss = self.criterion(pred_p, gt, self.m_dig)
+            loss = self.criterion(pred, gt, self.m_dig)
 
-        if abs((pred_p.argmax().item() - gt.item())) == 0:
+        if abs((pred.argmax().item() - gt.item())) == 0:
             score = 1
         else:
             score = 0
 
-        if self.phase == "valid":
-            self.pred.append([self.m_dig, pred_p.argmax().item()])
+        if self.phase == "train":
+            self.pred_t.append([self.m_dig, pred.argmax().item()])
+            self.gt_t.append([self.m_dig, gt.item()])
+
+        elif self.phase == "valid":
+            self.pred.append([self.m_dig, pred.argmax().item()])
             self.gt.append([self.m_dig, gt.item()])
             self.class_acc[self.m_dig].update_acc(score, 1)
-
-        elif self.phase == "train":
-            self.pred_t.append([self.m_dig, pred_p.argmax().item()])
-            self.gt_t.append([self.m_dig, gt.item()])
 
         self.train_loss[self.m_dig].update(
             loss.item(), batch_size=1
@@ -254,7 +254,6 @@ class Model(object):
         g.close()
         p.close()
 
-    def save_value1(self):
         with open(
             os.path.join(self.check_path, f"epoch_{self.epoch}_pred_val.txt"), "w"
         ) as p:
@@ -356,10 +355,10 @@ class Model(object):
 
         def run_iter():
             random_num = random.randrange(1, len(data_loader))
-            for dig, datalist in data_loader:
+            for dig, datalist, class_num_dict in data_loader:
                 self.m_dig = dig[0]
                 self.model = (
-                    copy.deepcopy(self.model_list[self.m_dig])
+                    self.model_list[self.m_dig]
                     if self.phase == "train"
                     else self.temp_model_list[self.m_dig]
                 )
@@ -371,7 +370,6 @@ class Model(object):
                     weight_decay=0,
                 )
                 adjust_learning_rate(optimizer, self.epoch, self.args)
-                self.model_num = self.model_num_class[self.m_dig]
 
                 loader_datalist = data.DataLoader(
                     dataset=copy.deepcopy(datalist),
@@ -379,31 +377,38 @@ class Model(object):
                     num_workers=self.args.num_workers,
                     shuffle=True if self.phase == "train" else False,
                 )
+                
+                loss_weight = [len(datalist) / (len(class_num_dict[self.m_dig]) * v.item()) for v in dict(sorted(class_num_dict[self.m_dig].items())).values()]    
+                
                 del datalist
-
-                for iter, (img, label, img_name, dig_p) in enumerate(loader_datalist):
-                    img_name, dig = img_name[0][0], dig_p[0][0]
+                for self.iter, (img, label, img_name, dig_p) in enumerate(
+                    loader_datalist
+                ):
+                    self.area, dig = img_name[0][0].split("_")[-1], dig_p[0][0]
                     if dig != self.m_dig:
                         assert 0, "This is not same with dig"
                     img, label = img[0].to(device), label[0].to(device)
                     pred = self.model.to(device)(img)
 
                     if self.args.mode == "class":
-                        loss = self.class_loss(pred, label)
+                        loss = self.class_loss(pred, label, loss_weight)
                     else:
                         loss = self.regression(pred, label)
 
-                    self.print_loss(iter, len(loader_datalist))
+                    if self.args.img:
+                        img_save(self, img, label)
+                    else:
+                        if self.iter == random_num:
+                            save_image(self, img)
+
+                    self.print_loss(len(loader_datalist))
 
                     if phase == "train":
                         optimizer.zero_grad()
                         loss.backward()
                         optimizer.step()
 
-                    if iter == random_num:
-                        save_image(self, img)
-
-                self.print_loss(iter, len(loader_datalist), final_flag=True)
+                self.print_loss(len(loader_datalist), final_flag=True)
 
         if phase == "train":
             run_iter()

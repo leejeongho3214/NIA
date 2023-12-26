@@ -1,3 +1,4 @@
+import errno
 from PIL import Image
 import natsort
 import torch
@@ -90,7 +91,7 @@ class CustomDataset(Dataset):
 
     def __getitem__(self, idx):
         idx_list = list(self.sub_path.keys())
-        return idx_list[idx], self.sub_path[idx_list[idx]]
+        return idx_list[idx], self.sub_path[idx_list[idx]], self.train_num
 
     def load_list(self, args):
         self.img_path = args.img_path
@@ -156,6 +157,7 @@ class CustomDataset(Dataset):
 
     def load_dataset(self, args, mode):
         self.sub_path = defaultdict(list)
+        self.train_num = defaultdict(lambda: defaultdict(int))
         data_list = (
             self.train_list
             if mode == "train"
@@ -181,7 +183,10 @@ class CustomDataset(Dataset):
                     (int(p_img.shape[1] * r_value), int(p_img.shape[0] * r_value)),
                 )
                 pil_img[: r_img.shape[0], : r_img.shape[1]] = r_img
+                if i_path.split('_')[-1] in ["04", "06"]:
+                    pil_img = cv2.flip(pil_img, 1)
                 pil_img = Image.fromarray(pil_img.astype(np.uint8))
+
                 patch_img = self.transform(pil_img)
 
                 with open(os.path.join("dataset/label", i_path + ".json"), "r") as f:
@@ -210,22 +215,32 @@ class CustomDataset(Dataset):
                         )
                     if idx == self.args.data_num:
                         break
+        
+        if mode in ['test', 'valid']:
+            for k, v in area_list.items():
+                self.sub_path[k] = [item for items in v.values() for item in items]
+            return 
+        
+        for k, v in area_list.items():
+            self.sub_path[k] = [item for items in v.values() for item in items]
+            for items in v.values():
+                self.train_num[items[0][-1]][str(items[0][1])] = len(items)
+                
+        # for dig, class_dict in area_list.items():
+        #     grade_list = [
+        #         len(total_list) for _, total_list in sorted((class_dict.items()))
+        #     ]
+        #     guide_num = max(grade_list)
 
-        for dig, class_dict in area_list.items():
-            grade_list = [
-                len(total_list) for _, total_list in sorted((class_dict.items()))
-            ]
-            guide_num = max(grade_list)
+        #     for grade, total_list in sorted(class_dict.items()):
+        #         mul_num, remain_num = guide_num // len(total_list), guide_num % len(
+        #             total_list
+        #         )
+        #         sub_path[dig].append(total_list * mul_num + total_list[:remain_num])
 
-            for grade, total_list in sorted(class_dict.items()):
-                mul_num, remain_num = guide_num // len(total_list), guide_num % len(
-                    total_list
-                )
-                sub_path[dig].append(total_list * mul_num + total_list[:remain_num])
-
-        for k, v in sub_path.items():
-            self.sub_path[k] = [item for items in v for item in items]
-        del sub_path, area_list
+        # for k, v in sub_path.items():
+        #     self.sub_path[k] = [item for items in v for item in items]
+        # del sub_path, area_list
 
     def load_img(self, img_name, angle, idx_area, equ_name, img, args):
         json_name = "_".join(img_name.split("_")[:2]) + f"_{angle}_{idx_area:02d}.json"

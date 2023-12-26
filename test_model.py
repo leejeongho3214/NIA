@@ -4,7 +4,7 @@ import os
 import torch
 import torch.nn as nn
 import copy
-
+from torch.utils import data
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -190,7 +190,7 @@ class Model_test(object):
         self.gt.append([self.m_dig, gt.item()])
 
             
-    def get_test_acc(self, pred, gt, patch_list):
+    def get_test_acc(self, pred, gt):
 
         pred_g = softmax(pred).argmax().item()
         self.pred.append([self.m_dig, pred_g])
@@ -206,10 +206,8 @@ class Model_test(object):
             1,
         )
 
-        return patch_list
-
     def save_value(self):
-        path = os.path.join("prediction", self.args.mode, self.args.name)
+        path = os.path.join("prediction", self.args.path)
         mkdir(path)
         with open(
             os.path.join(path, f"pred.txt"), "w"
@@ -223,53 +221,30 @@ class Model_test(object):
         g.close()
         p.close()
 
-    def test(self, model_num_class, data_loader):
-
+    def test(self, data_loader):
         with torch.no_grad():
             data_loader = self.test_loader
-            len_dataset = len(data_loader) * len(model_num_class)
-            total_iter = 0
-            for dig in model_num_class:
-                self.choice(dig)
-                self.model = self.model_list[self.m_dig]
+            for dig, datalist in data_loader:
+                m_dig = dig[0]
+                self.model = copy.deepcopy(self.model_list[m_dig])
                 self.model.eval()
-                for patch_list in data_loader:
-                    for item in patch_list[self.m_dig]:
-                        if type(item[1]) == torch.Tensor:
-                            label = item[1].to(device)
-                        else:
-                            for name in item[1]:
-                                item[1][name] = item[1][
-                                    name
-                                ].to(device)
-                            label = item[1]
-
-                        if label == {}:
-                            continue        ## 눈가/볼 영역이 없는 경우
-                        img = item[0].to(device)
-
-                        if img.shape[-1] > 128:
-                            img_l = img[:, :, :, :128]
-                            img_r = img[:, :, :, 128:]
-                            pred = self.model.to(device)(img_l)
-                            pred = self.model.to(device)(img_r) + pred
-
-                        elif img.shape[-2] > 128:
-                            img_l = img[:, :, :128, :]
-                            img_r = img[:, :, 128:, :]
-                            pred = self.model.to(device)(img_l)
-                            pred = self.model.to(device)(img_r) + pred
-
-                        else:
-                            pred = self.model.to(device)(img)
-
-                        if self.args.mode == "class":
-                            _ = self.get_test_acc(pred, label, patch_list)
-                        else:
-                            _ = self.get_test_loss(pred, label.to(device))
-                            
-                    total_iter += 1 
-                    print(f"count =>->=> {total_iter}/{len_dataset}", end="\r")
+                loader_datalist = data.DataLoader(
+                    dataset=copy.deepcopy(datalist),
+                    batch_size=self.args.batch_size,
+                    num_workers=self.args.num_workers,
+                    shuffle= False,
+                )
+                # del datalist
+                
+                for iter, (img, label, img_name, dig_p) in enumerate(loader_datalist):
+                    img_name, self.m_dig = img_name[0][0], dig_p[0][0]
+                    img, label = img[0].to(device), label[0].to(device)
+                    pred = self.model.to(device)(img)
+                    
+                    if self.args.mode == "class":
+                        _ = self.get_test_acc(pred, label)
+                    else:
+                        _ = self.get_test_loss(pred, label)
                 
         self.print_total()
-        if self.args.log: [self.logger.info(f"{key} => {self.count[key]} 장") for key in self.count]
+

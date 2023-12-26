@@ -90,7 +90,7 @@ def parse_args():
 
     parser.add_argument(
         "--lr",
-        default=1e-3,
+        default=1e-2,
         type=float,
     )
 
@@ -108,6 +108,7 @@ def parse_args():
 
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--cross", action="store_true")
+    parser.add_argument("--img", action="store_true")
 
 
     args = parser.parse_args()
@@ -178,10 +179,10 @@ def main(args):
         dataset=copy.deepcopy(dataset),
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        shuffle=True,
+        shuffle=False,
     )
 
-    dataset.load_dataset(args, "val")
+    dataset.load_dataset(args, "valid")
     valset_loader = data.DataLoader(
         dataset=dataset,
         batch_size=args.batch_size,
@@ -200,7 +201,6 @@ def main(args):
 
         resnet_model.update_m(model_num_class)
         resnet_model.save_value()
-        resnet_model.save_value1()
 
         resnet_model.update_e(epoch + 1)
         resnet_model.reset_log(mode=args.mode)

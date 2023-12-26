@@ -12,6 +12,7 @@ if torch.cuda.is_available():
 else:
     device = torch.device("cpu")
 
+
 def softmax(x):
     e_x = torch.exp(x - torch.max(x, dim=1, keepdim=True).values)
 
@@ -203,3 +204,14 @@ def save_image(self, img):
     path = os.path.join(self.args.save_img, self.m_dig)
     mkdir(path)
     cv2.imwrite(os.path.join(path, f"epoch_{self.epoch}_{self.m_dig}.jpg"), s_img)
+
+def img_save(self, img, label):
+    c_img =img.detach().cpu().numpy()[0].transpose(1, 2, 0)
+    max_v, min_v = c_img.max(), c_img.min()
+    if min_v > 0:
+        min_v = -min_v
+    s_img = (c_img - min_v) * (255.0 / (max_v - min_v))
+
+    path = os.path.join(self.args.save_img, self.m_dig)
+    mkdir(path)
+    cv2.imwrite(os.path.join(path, f"[{self.iter}]_{area_naming[str(int(self.area))]}_{label.item()}.jpg"), s_img)
