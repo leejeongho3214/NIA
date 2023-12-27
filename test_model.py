@@ -192,7 +192,7 @@ class Model_test(object):
             
     def get_test_acc(self, pred, gt):
 
-        pred_g = softmax(pred).argmax().item()
+        pred_g = pred.argmax().item()
         self.pred.append([self.m_dig, pred_g])
         self.gt.append([self.m_dig, gt.item()])
         
@@ -207,7 +207,7 @@ class Model_test(object):
         )
 
     def save_value(self):
-        path = os.path.join("prediction", self.args.path)
+        path = os.path.join("prediction", self.args.save_path)
         mkdir(path)
         with open(
             os.path.join(path, f"pred.txt"), "w"
@@ -224,7 +224,7 @@ class Model_test(object):
     def test(self, data_loader):
         with torch.no_grad():
             data_loader = self.test_loader
-            for dig, datalist in data_loader:
+            for dig, datalist, _ in data_loader:
                 m_dig = dig[0]
                 self.model = copy.deepcopy(self.model_list[m_dig])
                 self.model.eval()

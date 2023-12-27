@@ -216,15 +216,15 @@ class CustomDataset(Dataset):
                     if idx == self.args.data_num:
                         break
         
-        if mode in ['test', 'valid']:
+        if mode == "test":
             for k, v in area_list.items():
                 self.sub_path[k] = [item for items in v.values() for item in items]
-            return 
-        
-        for k, v in area_list.items():
-            self.sub_path[k] = [item for items in v.values() for item in items]
-            for items in v.values():
-                self.train_num[items[0][-1]][str(items[0][1])] = len(items)
+                
+        else:
+            for k, v in area_list.items():
+                self.sub_path[k] = [item for items in v.values() for item in items]
+                for items in v.values():
+                    self.train_num[items[0][-1]][str(items[0][1])] = len(items)
                 
         # for dig, class_dict in area_list.items():
         #     grade_list = [

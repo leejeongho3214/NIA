@@ -297,11 +297,7 @@ class ResNet(nn.Module):
         # x = torch.concat([x, meta.cuda()], dim = -1)
         # x = self.fcc(x)
 
-        x = self.fc1(x)
-        x = self.relu(x)
-        x = self.fc2(x)
-        x = self.relu(x)
-        x = self.fc3(x)
+        x = self.fc(x)
 
         return x 
         

@@ -8,11 +8,11 @@ from data_loader import class_num_list
 from utils import (
     adjust_learning_rate,
     AverageMeter,
+    FocalLoss,
     labeling,
     save_checkpoint,
     LabelSmoothingCrossEntropy,
     save_image,
-    softmax,
     img_save,
 )
 import os
@@ -110,15 +110,7 @@ class Model(object):
             "8": {"moisture": 1, "elasticity": 1},
         }
         self.epoch = 0
-        self.criterion = (
-            (
-                LabelSmoothingCrossEntropy(self.args.smooth)
-                if not self.args.cross
-                else nn.CrossEntropyLoss()
-            )
-            if self.args.mode == "class"
-            else nn.L1Loss()
-        )
+        self.criterion = (FocalLoss()) if self.args.mode == "class" else nn.L1Loss()
         (
             self.phase,
             self.m_dig,
@@ -173,13 +165,15 @@ class Model(object):
 
     def class_loss(self, pred, gt, weight):
         # pred_p = softmax(pred)
-        if self.args.cross:
-            num = pred.shape[-1]
-            # label = labeling(gt, num)
-            loss = self.criterion(pred, gt, torch.tensor(weight).to(device))
-        else:
-            # loss = self.criterion(pred_p, gt, self.m_dig)
-            loss = self.criterion(pred, gt, self.m_dig)
+
+        # if self.args.cross:
+        num = pred.shape[-1]
+        label = labeling(gt, num)
+        loss = self.criterion(pred, label)
+
+        # else:
+        #     # loss = self.criterion(pred_p, gt, self.m_dig)
+        #     loss = self.criterion(pred, gt, self.m_dig)
 
         if abs((pred.argmax().item() - gt.item())) == 0:
             score = 1
@@ -377,10 +371,13 @@ class Model(object):
                     num_workers=self.args.num_workers,
                     shuffle=True if self.phase == "train" else False,
                 )
-                
-                loss_weight = [len(datalist) / (len(class_num_dict[self.m_dig]) * v.item()) for v in dict(sorted(class_num_dict[self.m_dig].items())).values()]    
-                
+
+                loss_weight = [
+                    len(datalist) / (len(class_num_dict[self.m_dig]) * v.item())
+                    for v in dict(sorted(class_num_dict[self.m_dig].items())).values()
+                ]
                 del datalist
+
                 for self.iter, (img, label, img_name, dig_p) in enumerate(
                     loader_datalist
                 ):
