@@ -2,6 +2,11 @@
 *.jpeg
 *.json
 *.pyc
+*.xlsx
+*.ipynb
+*.pyc
+
+
 img/
 label/
 vis/
@@ -11,16 +16,15 @@ dataset/
 __MACOSX/
 tensorboard/
 __pycache__/
-*.xlsx
-*.ipynb
-*.pyc
+docker/
+.env/
+prediction/
 checkpoint_all/
 checkpoint_F/
 checkpoint_transformer/
 eval/
 class/
+save_img/
 
 
-docker/
-.env
-prediction
+NIA.tar

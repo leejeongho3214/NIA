@@ -170,7 +170,6 @@ def main(args):
     logger = setup_logger(args.name + args.mode, check_path)
     logger.info(args)
     logger.info("Command Line: " + " ".join(sys.argv))
-    logger.debug(inspect.getsource(labeling) if args.smooth else inspect.getsource(LabelSmoothingCrossEntropy))
 
     dataset = CustomDataset(args)
 

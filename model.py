@@ -168,8 +168,7 @@ class Model(object):
 
         # if self.args.cross:
         num = pred.shape[-1]
-        label = labeling(gt, num)
-        loss = self.criterion(pred, label)
+        loss = self.criterion(pred, gt)
 
         # else:
         #     # loss = self.criterion(pred_p, gt, self.m_dig)
