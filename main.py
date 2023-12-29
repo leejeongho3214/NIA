@@ -96,7 +96,7 @@ def parse_args():
 
     parser.add_argument(
         "--batch_size",
-        default=1,
+        default=32,
         type=int,
     )
 
@@ -167,6 +167,11 @@ def main(args):
                     os.path.join(check_path, f"{key}", "state_dict.bin"),
                 )
 
+    for key, model in model_list.items():
+        for name, param in model.named_parameters():
+            if 'layer1' in name or 'layer2' in name or 'layer3' in name:
+                param.requires_grad = False
+            
     logger = setup_logger(args.name + args.mode, check_path)
     logger.info(args)
     logger.info("Command Line: " + " ".join(sys.argv))

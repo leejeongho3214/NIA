@@ -71,6 +71,7 @@ class CustomDataset(Dataset):
         self.load_list(args)
         train_list, val_list, test_list = list(), list(), list()
 
+        max_dig = defaultdict(lambda: defaultdict(int))
         for dig, class_dict in self.json_dict.items():
             for grade, name_list in class_dict.items():
                 if len(name_list) < 10:
