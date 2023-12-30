@@ -96,7 +96,7 @@ def parse_args():
 
     parser.add_argument(
         "--batch_size",
-        default=1,
+        default=32,
         type=int,
     )
 
@@ -156,20 +156,12 @@ def main(args):
             )
 
     dataset = CustomDataset(args)
-    
-    dataset.load_dataset(args, "test")
-    testset_loader = data.DataLoader(
-        dataset=dataset,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        shuffle=False,
-    ) 
-    # Data Loader
+    testset_loader = dataset.load_dataset(args, "test")
 
     resnet_model = Model_test(args, model_list, testset_loader, logger)
     # If the model's acc is higher than best acc, it saves this model
     logger.info("Inferece ...")
-    resnet_model.test(testset_loader)
+    resnet_model.test()
     logger.info("Finish!")
     resnet_model.save_value()
 

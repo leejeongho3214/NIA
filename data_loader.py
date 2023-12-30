@@ -184,7 +184,7 @@ class CustomDataset(Dataset):
                     (int(p_img.shape[1] * r_value), int(p_img.shape[0] * r_value)),
                 )
                 pil_img[: r_img.shape[0], : r_img.shape[1]] = r_img
-                if i_path.split('_')[-1] in ["04", "06"]:
+                if i_path.split("_")[-1] in ["04", "06"]:
                     pil_img = cv2.flip(pil_img, 1)
                 pil_img = Image.fromarray(pil_img.astype(np.uint8))
 
@@ -216,17 +216,14 @@ class CustomDataset(Dataset):
                         )
                     if idx == self.args.data_num:
                         break
-        
-        if mode == "test":
-            for k, v in area_list.items():
-                self.sub_path[k] = [item for items in v.values() for item in items]
-                
-        else:
-            for k, v in area_list.items():
-                self.sub_path[k] = [item for items in v.values() for item in items]
-                for items in v.values():
-                    self.train_num[items[0][-1]][str(items[0][1])] = len(items)
-                
+
+        for k, v in area_list.items():
+            self.sub_path[k] = [item for items in v.values() for item in items]
+            for items in v.values():
+                self.train_num[items[0][-1]][str(items[0][1])] = len(items)
+
+        return self.sub_path
+
         # for dig, class_dict in area_list.items():
         #     grade_list = [
         #         len(total_list) for _, total_list in sorted((class_dict.items()))

@@ -96,7 +96,7 @@ def parse_args():
 
     parser.add_argument(
         "--batch_size",
-        default=32,
+        default=8,
         type=int,
     )
 
@@ -178,21 +178,8 @@ def main(args):
 
     dataset = CustomDataset(args)
 
-    dataset.load_dataset(args, "train")
-    trainset_loader = data.DataLoader(
-        dataset=copy.deepcopy(dataset),
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        shuffle=False,
-    )
-
-    dataset.load_dataset(args, "valid")
-    valset_loader = data.DataLoader(
-        dataset=dataset,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        shuffle=False,
-    )
+    trainset_loader = dataset.load_dataset(args, "train")
+    valset_loader = dataset.load_dataset(args, "valid")
 
     resnet_model = Model(
         args, model_list, trainset_loader, valset_loader, logger, check_path, model_num_class

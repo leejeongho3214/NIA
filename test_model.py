@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import copy
 from torch.utils import data
+from tqdm import tqdm
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -192,18 +193,17 @@ class Model_test(object):
             
     def get_test_acc(self, pred, gt):
 
-        pred_g = pred.argmax().item()
-        self.pred.append([self.m_dig, pred_g])
-        self.gt.append([self.m_dig, gt.item()])
+        pred_v = [item.argmax().item() for item in pred]
+        gt_v = [item.item() for item in gt]
         
-        if abs((pred_g - gt.item())) == 0:
-            score = 1
-        else:
-            score = 0 
+        self.pred.append([self.m_dig, pred_v])
+        self.gt.append([self.m_dig, gt_v])
+        
+        score = sum([p == g for (p, g) in zip(pred_v, gt_v)])
             
         self.test_class_acc[self.m_dig].update_acc(
             score,
-            1,
+            pred.shape[0],
         )
 
     def save_value(self):
@@ -216,17 +216,16 @@ class Model_test(object):
                 os.path.join(path, f"gt.txt"), "w"
             ) as g:
                 for idx in range(len(self.pred)):
-                    p.write(f"{self.pred[idx][0]}, {self.pred[idx][1]} \n")
-                    g.write(f"{self.gt[idx][0]}, {self.gt[idx][1]} \n")
+                    for p_v, g_v in zip(self.pred[idx][1], self.gt[idx][1]):
+                        p.write(f"{self.pred[idx][0]}, {p_v} \n")
+                        g.write(f"{self.gt[idx][0]}, {g_v} \n")
         g.close()
         p.close()
 
-    def test(self, data_loader):
+    def test(self):
         with torch.no_grad():
-            data_loader = self.test_loader
-            for dig, datalist, _ in data_loader:
-                m_dig = dig[0]
-                self.model = copy.deepcopy(self.model_list[m_dig])
+            for self.m_dig, datalist in self.test_loader.items():
+                self.model = copy.deepcopy(self.model_list[self.m_dig])
                 self.model.eval()
                 loader_datalist = data.DataLoader(
                     dataset=copy.deepcopy(datalist),
@@ -234,11 +233,10 @@ class Model_test(object):
                     num_workers=self.args.num_workers,
                     shuffle= False,
                 )
-                # del datalist
+                del datalist
                 
-                for iter, (img, label, img_name, dig_p) in enumerate(loader_datalist):
-                    img_name, self.m_dig = img_name[0][0], dig_p[0][0]
-                    img, label = img[0].to(device), label[0].to(device)
+                for img, label, _, _ in tqdm(loader_datalist, desc = self.m_dig):
+                    img, label = img.to(device), label.to(device)
                     pred = self.model.to(device)(img)
                     
                     if self.args.mode == "class":

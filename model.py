@@ -137,22 +137,26 @@ class Model(object):
         if final_flag:
             self.temp_model_list[self.m_dig] = self.model
             if self.phase == "valid":
-                f_pred = defaultdict(list)
-                f_gt = defaultdict(list)
+                f_pred = list()
+                f_gt = list()
                 for (key, value), (_, value2) in zip(self.pred, self.gt):
-                    f_pred[key].append(value)
-                    f_gt[key].append(value2)
+                    if key != self.m_dig: 
+                        continue
+                    for v, v1 in zip(value, value2):
+                        f_pred.append(v)
+                        f_gt.append(v1)  
+                
                 (
                     macro_precision,
                     macro_recall,
                     macro_f1,
                     _,
                 ) = precision_recall_fscore_support(
-                    f_gt[key], f_pred[key], average="macro", zero_division=1
+                    f_gt, f_pred, average="macro", zero_division=1
                 )
-                acc = accuracy_score(f_gt[key], f_pred[key])
+                acc = accuracy_score(f_gt, f_pred)
                 self.logger.info(
-                    f"[{key}] Macro Precision: {macro_precision:.4f}, Macro Recall: {macro_recall:.4f}, Macro F1: {macro_f1:.4f}, Acc: {acc * 100:.2f}% "
+                    f"[{self.m_dig}] Macro Precision: {macro_precision:.4f}, Macro Recall: {macro_recall:.4f}, Macro F1: {macro_f1:.4f}, Acc: {acc * 100:.2f}% "
                 )
             else:
                 self.logger.info(
@@ -163,35 +167,33 @@ class Model(object):
         if self.update_c > self.args.stop_early:
             return True
 
-    def class_loss(self, pred, gt, weight):
+    def class_loss(self, pred, gt):
         # pred_p = softmax(pred)
 
         # if self.args.cross:
-        num = pred.shape[-1]
         loss = self.criterion(pred, gt)
 
         # else:
         #     # loss = self.criterion(pred_p, gt, self.m_dig)
         #     loss = self.criterion(pred, gt, self.m_dig)
 
-        if abs((pred.argmax().item() - gt.item())) == 0:
-            score = 1
-        else:
-            score = 0
+        pred_v = [item.argmax().item() for item in pred]
+        gt_v = [item.item() for item in gt]
+        score = sum([p == g for (p, g) in zip(pred_v, gt_v)])
 
         if self.phase == "train":
-            self.pred_t.append([self.m_dig, pred.argmax().item()])
-            self.gt_t.append([self.m_dig, gt.item()])
+            self.pred_t.append([self.m_dig, pred_v])
+            self.gt_t.append([self.m_dig, gt_v])
 
         elif self.phase == "valid":
-            self.pred.append([self.m_dig, pred.argmax().item()])
-            self.gt.append([self.m_dig, gt.item()])
-            self.class_acc[self.m_dig].update_acc(score, 1)
+            self.pred.append([self.m_dig, pred_v])
+            self.gt.append([self.m_dig, gt_v])
+            self.class_acc[self.m_dig].update_acc(score, pred.shape[0])
 
         self.train_loss[self.m_dig].update(
-            loss.item(), batch_size=1
+            loss.item(), batch_size=pred.shape[0]
         ) if self.phase == "train" else self.val_loss[self.m_dig].update(
-            loss.item(), batch_size=1
+            loss.item(), batch_size=pred.shape[0]
         )
 
         return loss
@@ -347,9 +349,8 @@ class Model(object):
         data_loader = self.train_loader if self.phase == "train" else self.valid_loader
 
         def run_iter():
-            random_num = random.randrange(1, len(data_loader))
-            for dig, datalist, class_num_dict in data_loader:
-                self.m_dig = dig[0]
+            for self.m_dig, datalist in data_loader.items():
+
                 self.model = (
                     self.model_list[self.m_dig]
                     if self.phase == "train"
@@ -371,31 +372,26 @@ class Model(object):
                     shuffle=True if self.phase == "train" else False,
                 )
 
-                loss_weight = [
-                    len(datalist) / (len(class_num_dict[self.m_dig]) * v.item())
-                    for v in dict(sorted(class_num_dict[self.m_dig].items())).values()
-                ]
                 del datalist
 
-                for self.iter, (img, label, img_name, dig_p) in enumerate(
+                for self.iter, (img, label, _, dig_p) in enumerate(
                     loader_datalist
                 ):
-                    self.area, dig = img_name[0][0].split("_")[-1], dig_p[0][0]
-                    if dig != self.m_dig:
-                        assert 0, "This is not same with dig"
-                    img, label = img[0].to(device), label[0].to(device)
+                    assert all(self.m_dig == item for item in dig_p), "dig not same"
+
+                    img, label = img.to(device), label.to(device)
                     pred = self.model.to(device)(img)
 
                     if self.args.mode == "class":
-                        loss = self.class_loss(pred, label, loss_weight)
+                        loss = self.class_loss(pred, label)
                     else:
                         loss = self.regression(pred, label)
 
-                    if self.args.img:
-                        img_save(self, img, label)
-                    else:
-                        if self.iter == random_num:
-                            save_image(self, img)
+                    # if self.args.img:
+                    #     img_save(self, img, label)
+                    # else:
+                    #     if self.iter == random_num:
+                    #         save_image(self, img)
 
                     self.print_loss(len(loader_datalist))
 
