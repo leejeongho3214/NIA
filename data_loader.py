@@ -102,14 +102,43 @@ class CustomDataset(Dataset):
             for item in natsort.natsorted(os.listdir(self.img_path))
             if not item.startswith(".")
         ]
-        transform_list = [
+        self.transform_test = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(
                 [0.24628267, 0.3271797, 0.44643742],
                 [0.1666497, 0.2335198, 0.3375362],
             ),
-        ]
-        self.transform = transforms.Compose(transform_list)
+        ])
+        
+        self.transform_crop = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.CenterCrop(200),
+            transforms.Resize(256),
+            transforms.Normalize(
+                [0.24628267, 0.3271797, 0.44643742],
+                [0.1666497, 0.2335198, 0.3375362],
+            ),
+        ])
+        
+        self.transform_color = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1),
+            transforms.Normalize(
+                [0.24628267, 0.3271797, 0.44643742],
+                [0.1666497, 0.2335198, 0.3375362],
+            ),
+        ])
+        
+        self.transform_both = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.CenterCrop(200),
+            transforms.Resize(256),
+            transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1),
+            transforms.Normalize(
+                [0.24628267, 0.3271797, 0.44643742],
+                [0.1666497, 0.2335198, 0.3375362],
+            ),
+        ])
         
         self.json_dict = defaultdict(lambda: defaultdict(list))
         for equ_name in sub_path_list:
@@ -169,9 +198,9 @@ class CustomDataset(Dataset):
         )
         area_list = defaultdict(lambda: defaultdict(list))
         
-        def save_dict():
+        def save_dict(transform):
             pil = Image.fromarray(pil_img.astype(np.uint8))
-            patch_img = self.transform(pil)
+            patch_img = transform(pil)
 
             with open(os.path.join("dataset/label", i_path + ".json"), "r") as f:
                 meta = json.load(f)
@@ -218,14 +247,15 @@ class CustomDataset(Dataset):
                 )
                 
                 if mode == "train":
-                    if s_list[3] in ['01', '02', '07', '08']:
-                        save_dict()
-                        pil_img = cv2.flip(pil_img, 1)
-                        save_dict()
-                    else:
-                        save_dict()
+                    for transform in [self.transform_both, self.transform_color, self.transform_crop, self.transform_test]:
+                        if s_list[3] in ['01', '02', '07', '08']:
+                            save_dict(transform)
+                            pil_img = cv2.flip(pil_img, 1)
+                            save_dict(transform)
+                        else:
+                            save_dict(transform)
                 else:
-                    save_dict()
+                    save_dict(self.transform_test)
                     
 
         for k, v in area_list.items():
