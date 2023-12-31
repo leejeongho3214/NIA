@@ -110,6 +110,7 @@ class CustomDataset(Dataset):
             ),
         ]
         self.transform = transforms.Compose(transform_list)
+        
         self.json_dict = defaultdict(lambda: defaultdict(list))
         for equ_name in sub_path_list:
             if equ_name.startswith(".") or int(equ_name) not in self.args.equ:
@@ -167,9 +168,26 @@ class CustomDataset(Dataset):
             else self.test_list
         )
         area_list = defaultdict(lambda: defaultdict(list))
-        sub_path = defaultdict(list)
+        
+        def save_dict():
+            pil = Image.fromarray(pil_img.astype(np.uint8))
+            patch_img = self.transform(pil)
 
-        for dig, grade, class_dict in tqdm(data_list.datasets, desc=f"{mode}_class"):
+            with open(os.path.join("dataset/label", i_path + ".json"), "r") as f:
+                meta = json.load(f)
+
+            label_data = (
+                meta["annotations"] if args.mode == "class" else meta["equipment"]
+            )
+
+            for key in label_data:
+                dig_p = key.split("_")[-1]
+                if dig == dig_p:
+                    area_list[dig][str(label_data[key])].append(
+                        [patch_img, label_data[key], desc_area, dig]
+                    )
+
+        for dig, grade, class_dict in tqdm(data_list.datasets, desc=f"{mode}_class"): 
             for idx, i_path in enumerate(
                 tqdm(sorted(class_dict), desc=f"{dig}_{grade}")
             ):
@@ -186,17 +204,7 @@ class CustomDataset(Dataset):
                 pil_img[: r_img.shape[0], : r_img.shape[1]] = r_img
                 if i_path.split("_")[-1] in ["04", "06"]:
                     pil_img = cv2.flip(pil_img, 1)
-                pil_img = Image.fromarray(pil_img.astype(np.uint8))
-
-                patch_img = self.transform(pil_img)
-
-                with open(os.path.join("dataset/label", i_path + ".json"), "r") as f:
-                    meta = json.load(f)
-
-                label_data = (
-                    meta["annotations"] if args.mode == "class" else meta["equipment"]
-                )
-
+                
                 s_list = i_path.split("/")[-1].split("_")
                 desc_area = (
                     "Sub_"
@@ -208,21 +216,24 @@ class CustomDataset(Dataset):
                     + "_Area_"
                     + s_list[3]
                 )
-                for key in label_data:
-                    dig_p = key.split("_")[-1]
-                    if dig == dig_p:
-                        area_list[dig][str(label_data[key])].append(
-                            [patch_img, label_data[key], desc_area, dig]
-                        )
-                    if idx == self.args.data_num:
-                        break
+                
+                if mode == "train":
+                    if s_list[3] in ['01', '02', '07', '08']:
+                        save_dict()
+                        pil_img = cv2.flip(pil_img, 1)
+                        save_dict()
+                    else:
+                        save_dict()
+                else:
+                    save_dict()
+                    
 
         for k, v in area_list.items():
             self.sub_path[k] = [item for items in v.values() for item in items]
             for items in v.values():
                 self.train_num[items[0][-1]][str(items[0][1])] = len(items)
 
-        return self.sub_path
+        return self.sub_path, self.train_num
 
         # for dig, class_dict in area_list.items():
         #     grade_list = [

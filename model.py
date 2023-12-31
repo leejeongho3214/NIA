@@ -110,7 +110,7 @@ class Model(object):
             "8": {"moisture": 1, "elasticity": 1},
         }
         self.epoch = 0
-        self.criterion = (FocalLoss()) if self.args.mode == "class" else nn.L1Loss()
+        self.criterion = (FocalLoss() if not self.args.cross else nn.CrossEntropyLoss()) if self.args.mode == "class" else nn.L1Loss()
         (
             self.phase,
             self.m_dig,
@@ -167,15 +167,9 @@ class Model(object):
         if self.update_c > self.args.stop_early:
             return True
 
-    def class_loss(self, pred, gt):
-        # pred_p = softmax(pred)
+    def class_loss(self, pred, gt, loss_weight):
 
-        # if self.args.cross:
         loss = self.criterion(pred, gt)
-
-        # else:
-        #     # loss = self.criterion(pred_p, gt, self.m_dig)
-        #     loss = self.criterion(pred, gt, self.m_dig)
 
         pred_v = [item.argmax().item() for item in pred]
         gt_v = [item.item() for item in gt]
@@ -349,7 +343,8 @@ class Model(object):
         data_loader = self.train_loader if self.phase == "train" else self.valid_loader
 
         def run_iter():
-            for self.m_dig, datalist in data_loader.items():
+            data_loader_v, class_num_dict = data_loader
+            for self.m_dig, datalist in data_loader_v.items():
 
                 self.model = (
                     self.model_list[self.m_dig]
@@ -371,7 +366,11 @@ class Model(object):
                     num_workers=self.args.num_workers,
                     shuffle=True if self.phase == "train" else False,
                 )
-
+                loss_weight = torch.tensor([
+                    len(datalist) / (len(class_num_dict[self.m_dig]) * v)
+                    for v in dict(sorted(class_num_dict[self.m_dig].items())).values()
+                ]).to(device)
+                
                 del datalist
 
                 for self.iter, (img, label, _, dig_p) in enumerate(
@@ -383,7 +382,7 @@ class Model(object):
                     pred = self.model.to(device)(img)
 
                     if self.args.mode == "class":
-                        loss = self.class_loss(pred, label)
+                        loss = self.class_loss(pred, label, loss_weight)
                     else:
                         loss = self.regression(pred, label)
 

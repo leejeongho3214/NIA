@@ -223,8 +223,9 @@ class Model_test(object):
         p.close()
 
     def test(self):
+        loader, _ = self.test_loader
         with torch.no_grad():
-            for self.m_dig, datalist in self.test_loader.items():
+            for self.m_dig, datalist in loader.items():
                 self.model = copy.deepcopy(self.model_list[self.m_dig])
                 self.model.eval()
                 loader_datalist = data.DataLoader(
