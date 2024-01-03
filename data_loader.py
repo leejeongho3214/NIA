@@ -71,7 +71,6 @@ class CustomDataset(Dataset):
         self.load_list(args)
         train_list, val_list, test_list = list(), list(), list()
 
-        max_dig = defaultdict(lambda: defaultdict(int))
         for dig, class_dict in self.json_dict.items():
             for grade, name_list in class_dict.items():
                 if len(name_list) < 10:
@@ -120,6 +119,16 @@ class CustomDataset(Dataset):
             ),
         ])
         
+        self.transform_crop1 = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.CenterCrop(210),
+            transforms.Resize(256),
+            transforms.Normalize(
+                [0.24628267, 0.3271797, 0.44643742],
+                [0.1666497, 0.2335198, 0.3375362],
+            ),
+        ])
+        
         self.transform_color = transforms.Compose([
             transforms.ToTensor(),
             transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1),
@@ -158,8 +167,10 @@ class CustomDataset(Dataset):
                 for img_name in natsort.natsorted(os.listdir(folder_path)):
                     if not img_name.endswith((".png", ".jpg", ".jpeg")):
                         continue
+                    
                     if img_name.split(".")[0].split("_")[-1] != "F":
                         continue
+                    
                     pre_name = "/".join(folder_path.split("/")[2:])
                     json_name = os.path.join("dataset/label", pre_name)
                     img_name = os.path.join("dataset/img", pre_name)
@@ -247,7 +258,7 @@ class CustomDataset(Dataset):
                 )
                 
                 if mode == "train":
-                    for transform in [self.transform_both, self.transform_color, self.transform_crop, self.transform_test]:
+                    for transform in [self.transform_test]:
                         if s_list[3] in ['01', '02', '07', '08']:
                             save_dict(transform)
                             pil_img = cv2.flip(pil_img, 1)

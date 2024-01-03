@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import copy
-from data_loader import class_num_list
+from data_loader import class_num_list, mkdir
 from utils import (
     adjust_learning_rate,
     AverageMeter,
@@ -231,11 +231,13 @@ class Model(object):
         return result
 
     def save_value(self):
+        pred_path = os.path.join(self.check_path, "prediction")
+        mkdir(pred_path)
         with open(
-            os.path.join(self.check_path, f"epoch_{self.epoch}_pred_train.txt"), "w"
+            os.path.join(pred_path, f"epoch_{self.epoch}_pred_train.txt"), "w"
         ) as p:
             with open(
-                os.path.join(self.check_path, f"epoch_{self.epoch}_gt_train.txt"), "w"
+                os.path.join(pred_path, f"epoch_{self.epoch}_gt_train.txt"), "w"
             ) as g:
                 for idx in range(len(self.pred_t)):
                     p.write(f"{self.pred_t[idx][0]}, {self.pred_t[idx][1]} \n")
@@ -244,10 +246,10 @@ class Model(object):
         p.close()
 
         with open(
-            os.path.join(self.check_path, f"epoch_{self.epoch}_pred_val.txt"), "w"
+            os.path.join(pred_path, f"epoch_{self.epoch}_pred_val.txt"), "w"
         ) as p:
             with open(
-                os.path.join(self.check_path, f"epoch_{self.epoch}_gt_val.txt"), "w"
+                os.path.join(pred_path, f"epoch_{self.epoch}_gt_val.txt"), "w"
             ) as g:
                 for idx in range(len(self.pred)):
                     p.write(f"{self.pred[idx][0]}, {self.pred[idx][1]} \n")
@@ -341,7 +343,7 @@ class Model(object):
     def run(self, phase="train"):
         self.phase = phase
         data_loader = self.train_loader if self.phase == "train" else self.valid_loader
-
+        
         def run_iter():
             data_loader_v, class_num_dict = data_loader
             for self.m_dig, datalist in data_loader_v.items():
@@ -372,6 +374,7 @@ class Model(object):
                 ]).to(device)
                 
                 del datalist
+                random_num = random.randrange(0, len(loader_datalist))
 
                 for self.iter, (img, label, _, dig_p) in enumerate(
                     loader_datalist
@@ -386,11 +389,11 @@ class Model(object):
                     else:
                         loss = self.regression(pred, label)
 
-                    # if self.args.img:
-                    #     img_save(self, img, label)
-                    # else:
-                    #     if self.iter == random_num:
-                    #         save_image(self, img)
+                    if self.args.img:
+                        img_save(self, img, label)
+                    else:
+                        if self.iter == random_num:
+                            save_image(self, img)
 
                     self.print_loss(len(loader_datalist))
 

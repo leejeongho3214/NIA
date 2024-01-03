@@ -6,6 +6,7 @@ import os
 import torch.nn as nn
 import torch.nn.functional as F
 from data_loader import area_naming
+from torchvision.utils import make_grid
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -219,7 +220,7 @@ def save_value(args, self):
 
 
 def save_image(self, img):
-    c_img =img.detach().cpu().numpy()[0].transpose(1, 2, 0)
+    c_img = make_grid(img, nrow = int(self.args.batch_size / 4)).permute(1, 2, 0).detach().cpu().numpy() 
     max_v, min_v = c_img.max(), c_img.min()
     if min_v > 0:
         min_v = -min_v
