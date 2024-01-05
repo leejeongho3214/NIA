@@ -103,6 +103,7 @@ def resume_checkpoint(args, model, path):
     return model
 
 
+        
 class Model_test(object):
     def __init__(self, args, model_list, testset_loader, logger):
         super(Model_test, self).__init__()
@@ -145,6 +146,7 @@ class Model_test(object):
         self.model = None
         self.update_c = 0
 
+    
     def choice(self, m_idx):
         if m_idx in [4, 6]:
             m_idx -= 1
