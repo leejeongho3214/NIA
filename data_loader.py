@@ -101,54 +101,68 @@ class CustomDataset(Dataset):
             for item in natsort.natsorted(os.listdir(self.img_path))
             if not item.startswith(".")
         ]
-        self.transform_test = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(
-                [0.24628267, 0.3271797, 0.44643742],
-                [0.1666497, 0.2335198, 0.3375362],
-            ),
-        ])
-        
-        self.transform_crop = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.CenterCrop(200),
-            transforms.Resize(256),
-            transforms.Normalize(
-                [0.24628267, 0.3271797, 0.44643742],
-                [0.1666497, 0.2335198, 0.3375362],
-            ),
-        ])
-        
-        self.transform_crop1 = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.CenterCrop(210),
-            transforms.Resize(256),
-            transforms.Normalize(
-                [0.24628267, 0.3271797, 0.44643742],
-                [0.1666497, 0.2335198, 0.3375362],
-            ),
-        ])
-        
-        self.transform_color = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1),
-            transforms.Normalize(
-                [0.24628267, 0.3271797, 0.44643742],
-                [0.1666497, 0.2335198, 0.3375362],
-            ),
-        ])
-        
-        self.transform_both = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.CenterCrop(200),
-            transforms.Resize(256),
-            transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1),
-            transforms.Normalize(
-                [0.24628267, 0.3271797, 0.44643742],
-                [0.1666497, 0.2335198, 0.3375362],
-            ),
-        ])
-        
+        self.transform_test = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    [0.24628267, 0.3271797, 0.44643742],
+                    [0.1666497, 0.2335198, 0.3375362],
+                ),
+            ]
+        )
+
+        self.transform_crop = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.CenterCrop(200),
+                transforms.Resize(256),
+                transforms.Normalize(
+                    [0.24628267, 0.3271797, 0.44643742],
+                    [0.1666497, 0.2335198, 0.3375362],
+                ),
+            ]
+        )
+
+        self.transform_crop1 = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.CenterCrop(210),
+                transforms.Resize(256),
+                transforms.Normalize(
+                    [0.24628267, 0.3271797, 0.44643742],
+                    [0.1666497, 0.2335198, 0.3375362],
+                ),
+            ]
+        )
+
+        self.transform_color = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.ColorJitter(
+                    brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1
+                ),
+                transforms.Normalize(
+                    [0.24628267, 0.3271797, 0.44643742],
+                    [0.1666497, 0.2335198, 0.3375362],
+                ),
+            ]
+        )
+
+        self.transform_both = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.CenterCrop(200),
+                transforms.Resize(256),
+                transforms.ColorJitter(
+                    brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1
+                ),
+                transforms.Normalize(
+                    [0.24628267, 0.3271797, 0.44643742],
+                    [0.1666497, 0.2335198, 0.3375362],
+                ),
+            ]
+        )
+
         self.json_dict = defaultdict(lambda: defaultdict(list))
         for equ_name in sub_path_list:
             if equ_name.startswith(".") or int(equ_name) not in self.args.equ:
@@ -167,35 +181,79 @@ class CustomDataset(Dataset):
                 for img_name in natsort.natsorted(os.listdir(folder_path)):
                     if not img_name.endswith((".png", ".jpg", ".jpeg")):
                         continue
-                    
+
                     if img_name.split(".")[0].split("_")[-1] != "F":
                         continue
-                    
+
                     pre_name = "/".join(folder_path.split("/")[2:])
                     json_name = os.path.join("dataset/label", pre_name)
-                    img_name = os.path.join("dataset/img", pre_name)
 
                     for j_name in os.listdir(json_name):
-                        if j_name.split("_")[2] == "F":
-                            with open(os.path.join(json_name, j_name), "r") as f:
-                                json_meta = json.load(f)
-                                if list(json_meta["annotations"].keys())[0] == "acne":
-                                    continue
+                        # if j_name.split("_")[2] in ["F"]:
+                        if j_name.split("_")[2].startswith("R") and j_name.split("_")[
+                            3
+                        ].split(".")[0] in ["04", "06"]:
+                            continue
+                        if j_name.split("_")[2].startswith("L") and j_name.split("_")[
+                            3
+                        ].split(".")[0] in ["03", "05"]:
+                            continue
 
-                                for dig_n, grade in json_meta["annotations"].items():
-                                    dig, area = (
-                                        dig_n.split("_")[-1],
-                                        dig_n.split("_")[-2],
-                                    )
-                                    if dig in [
-                                        "wrinkle",
-                                        "pigmentation",
-                                    ]:  ## Only one area per each class
-                                        if area != "forehead":
-                                            continue
-                                    self.json_dict[dig][str(grade)].append(
-                                        os.path.join(pre_name, j_name.split(".")[0])
-                                    )
+                        with open(os.path.join(json_name, j_name), "r") as f:
+                            json_meta = json.load(f)
+                            if list(json_meta["annotations"].keys())[0] == "acne":
+                                continue
+
+                            for dig_n, grade in json_meta["annotations"].items():
+                                dig, area = (
+                                    dig_n.split("_")[-1],
+                                    dig_n.split("_")[-2],
+                                )
+                                if dig in [
+                                    "wrinkle",
+                                    "pigmentation",
+                                ]:  ## Only one area per each class
+                                    if area != "forehead":
+                                        continue
+                                self.json_dict[dig][str(grade)].append(
+                                    os.path.join(pre_name, j_name.split(".")[0])
+                                )
+
+                        # img = cv2.imread(
+                        #     f"dataset/img/01/{json_meta['info']['id']}/{json_meta['info']['filename']}"
+                        # )
+                        # bbox = json_meta["images"]["bbox"]
+                        # if bbox == None:
+                        #     continue
+                        
+                        # max_l = max(bbox[3] - bbox[1], bbox[2] - bbox[0]) // 2
+                        # center_p = ((bbox[1] + bbox[3]) // 2, (bbox[0] + bbox[2]) // 2)
+                        # p_img = img[
+                        #     max(0, center_p[0] - max_l) : min(
+                        #         3215, center_p[0] + max_l
+                        #     ),
+                        #     max(0, center_p[1] - max_l) : min(
+                        #         2135, center_p[1] + max_l
+                        #     ),
+                        # ]
+                        # r_value = 256 / max(p_img.shape)
+
+                        # pil_img = np.zeros([256, 256, 3])
+                        # r_img = cv2.resize(
+                        #     p_img,
+                        #     (
+                        #         int(p_img.shape[1] * r_value),
+                        #         int(p_img.shape[0] * r_value),
+                        #     ),
+                        # )
+
+                        # pil_img[: r_img.shape[0], : r_img.shape[1]] = r_img
+                        # mkdir(f"dataset/cropped_img/01/{json_meta['info']['id']}")
+                        # cv2.imwrite(
+                        #     f"dataset/cropped_img/01/{json_meta['info']['id']}/{json_meta['info']['filename'].split('.')[0]}_{json_meta['images']['facepart']:02}.jpg",
+                        #     pil_img,
+                        # )
+
 
     def load_dataset(self, args, mode):
         self.sub_path = defaultdict(list)
@@ -208,7 +266,7 @@ class CustomDataset(Dataset):
             else self.test_list
         )
         area_list = defaultdict(lambda: defaultdict(list))
-        
+
         def save_dict(transform):
             pil = Image.fromarray(pil_img.astype(np.uint8))
             patch_img = transform(pil)
@@ -227,7 +285,7 @@ class CustomDataset(Dataset):
                         [patch_img, label_data[key], desc_area, dig]
                     )
 
-        for dig, grade, class_dict in tqdm(data_list.datasets, desc=f"{mode}_class"): 
+        for dig, grade, class_dict in tqdm(data_list.datasets, desc=f"{mode}_class"):
             for idx, i_path in enumerate(
                 tqdm(sorted(class_dict), desc=f"{dig}_{grade}")
             ):
@@ -244,7 +302,7 @@ class CustomDataset(Dataset):
                 pil_img[: r_img.shape[0], : r_img.shape[1]] = r_img
                 if i_path.split("_")[-1] in ["04", "06"]:
                     pil_img = cv2.flip(pil_img, 1)
-                
+
                 s_list = i_path.split("/")[-1].split("_")
                 desc_area = (
                     "Sub_"
@@ -256,10 +314,10 @@ class CustomDataset(Dataset):
                     + "_Area_"
                     + s_list[3]
                 )
-                
+
                 if mode == "train":
                     for transform in [self.transform_test]:
-                        if s_list[3] in ['01', '02', '07', '08']:
+                        if s_list[3] in ["01", "02", "07", "08"]:
                             save_dict(transform)
                             pil_img = cv2.flip(pil_img, 1)
                             save_dict(transform)
@@ -267,7 +325,6 @@ class CustomDataset(Dataset):
                             save_dict(transform)
                 else:
                     save_dict(self.transform_test)
-                    
 
         for k, v in area_list.items():
             self.sub_path[k] = [item for items in v.values() for item in items]
