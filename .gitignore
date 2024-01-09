@@ -25,6 +25,7 @@ checkpoint_transformer/
 eval/
 class/
 save_img/
+pytorch_grad_cam/
 
 
 NIA.tar

@@ -1,4 +1,3 @@
-import inspect
 import os
 
 import shutil
@@ -6,14 +5,12 @@ import sys
 import numpy as np
 from torchvision import models
 
-import copy
-from utils import mkdir, resume_checkpoint, labeling, LabelSmoothingCrossEntropy
+from utils import mkdir, resume_checkpoint
 from logger import setup_logger
 from data_loader import CustomDataset
 from model import Model
 
 import argparse
-from torch.utils import data
 
 git_name = os.popen('git branch --show-current').readlines()[0].rstrip()
 
@@ -124,10 +121,13 @@ def main(args):
     model_num_class = (
         {
             "dryness": 5,
-            "pigmentation": 6,
+            "pigmentation_forehead": 6,
+            "pigmentation_cheek": 6,
             "pore": 6,
             "sagging": 7,
-            "wrinkle": 7,
+            "wrinkle_forehead": 7,
+            "wrinkle_glabellus": 7,
+            "wrinkle_perocular": 7
         }  # dryness, pigmentation, pore, sagging, wrinkle
         if args.mode == "class"
         else {
@@ -144,17 +144,15 @@ def main(args):
     model_list.update({key: models.resnet50(weights=None, num_classes = value) for key, value in model_num_class.items()})
 
     ## Adjust the number of output in model for each region image
-    model_dict_path = os.path.join(check_path, "wrinkle", "state_dict.bin")
-
+    model_dict_path = os.path.join(check_path, "pore", "state_dict.bin")
+    args.save_img = os.path.join("save_img", git_name, args.mode, args.name)
+    
     if args.reset:
         print(f"\033[90mReseting......{model_dict_path}\033[0m")
         if os.path.isdir(check_path):
             shutil.rmtree(check_path)
-            
-    args.save_img = os.path.join("save_img", git_name, args.mode, args.name)
-    if os.path.isdir(args.save_img):
-        shutil.rmtree(args.save_img)
-    # If there is check-point, load that
+        if os.path.isdir(args.save_img):
+            shutil.rmtree(args.save_img)
     
     else:
         if os.path.isfile(model_dict_path):
@@ -167,10 +165,10 @@ def main(args):
                     os.path.join(check_path, f"{key}", "state_dict.bin"),
                 )
 
-    for key, model in model_list.items():
-        for name, param in model.named_parameters():
-            if 'layer1' in name or 'layer2' in name or 'layer3' in name:
-                param.requires_grad = False
+    # for key, model in model_list.items():
+    #     for name, param in model.named_parameters():
+    #         if 'layer1' in name or 'layer2' in name or 'layer3' in name:
+    #             param.requires_grad = False
             
     logger = setup_logger(args.name + args.mode, check_path)
     logger.info(args)
@@ -178,9 +176,10 @@ def main(args):
 
     dataset = CustomDataset(args)
 
-    trainset_loader = dataset.load_dataset(args, "train")
-    valset_loader = dataset.load_dataset(args, "valid")
-
+    trainset_loader = dataset.load_dataset("train")
+    valset_loader = dataset.load_dataset("valid")
+    
+    
     resnet_model = Model(
         args, model_list, trainset_loader, valset_loader, logger, check_path, model_num_class
     )

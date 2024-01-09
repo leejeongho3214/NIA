@@ -50,8 +50,8 @@ area_naming = {
     "0": "all",
     "1": "forehead",
     "2": "glabellus",
-    "3": "l_peroucular",
-    "4": "r_peroucular",
+    "3": "l_perocular",
+    "4": "r_perocular",
     "5": "l_cheek",
     "6": "r_cheek",
     "7": "lip",
@@ -176,32 +176,55 @@ class CustomDataset(Dataset):
                     os.path.join(self.json_path, equ_name, sub_fold)
                 ):
                     continue
-
                 folder_path = os.path.join(self.img_path, equ_name, sub_fold)
+
                 for img_name in natsort.natsorted(os.listdir(folder_path)):
                     if not img_name.endswith((".png", ".jpg", ".jpeg")):
                         continue
-
                     if img_name.split(".")[0].split("_")[-1] != "F":
                         continue
-
                     pre_name = "/".join(folder_path.split("/")[2:])
                     json_name = os.path.join("dataset/label", pre_name)
 
+                    ## Classifying meaningful images for training from various angles of images
                     for j_name in os.listdir(json_name):
-                        # if j_name.split("_")[2] in ["F"]:
-                        if j_name.split("_")[2].startswith("R") and j_name.split("_")[
-                            3
-                        ].split(".")[0] in ["04", "06"]:
+                        if (
+                            j_name.split("_")[2] == "Ft"
+                            and j_name.split("_")[3].split(".")[0]
+                            in ["01", "02", "03", "04"]
+                        ) or (
+                            j_name.split("_")[2] == "Fb"
+                            and j_name.split("_")[3].split(".")[0]
+                            in ["01", "02",  "03", "04", "05", "06", "07", "08"]
+                        ) or (
+                            j_name.split("_")[2] == "F"
+                            and j_name.split("_")[3].split(".")[0]
+                            in ["03", "04"]
+                        ):
                             continue
-                        if j_name.split("_")[2].startswith("L") and j_name.split("_")[
-                            3
-                        ].split(".")[0] in ["03", "05"]:
+
+                        elif (
+                            j_name.split("_")[2].startswith("R")
+                            and j_name.split("_")[3].split(".")[0] in ["04", "06"]
+                        ) or (
+                            j_name.split("_")[2].startswith("L")
+                            and j_name.split("_")[3].split(".")[0] in ["03", "05"]
+                        ):
+                            continue
+
+                        elif j_name.split("_")[2] in ["R30", "L30"] and j_name.split(
+                            "_"
+                        )[3].split(".")[0] in ["01", "02"]:
                             continue
 
                         with open(os.path.join(json_name, j_name), "r") as f:
                             json_meta = json.load(f)
-                            if list(json_meta["annotations"].keys())[0] == "acne":
+
+                            ## Sorting frontal images and img without bbox values
+                            if (
+                                list(json_meta["annotations"].keys())[0] == "acne"
+                                or json_meta["images"]["bbox"] == None
+                            ):
                                 continue
 
                             for dig_n, grade in json_meta["annotations"].items():
@@ -209,53 +232,17 @@ class CustomDataset(Dataset):
                                     dig_n.split("_")[-1],
                                     dig_n.split("_")[-2],
                                 )
+                                ## Segmenting regions with the same dicrease name
                                 if dig in [
                                     "wrinkle",
                                     "pigmentation",
-                                ]:  ## Only one area per each class
-                                    if area != "forehead":
-                                        continue
+                                ]:
+                                    dig = f"{dig}_{area}"
                                 self.json_dict[dig][str(grade)].append(
                                     os.path.join(pre_name, j_name.split(".")[0])
                                 )
 
-                        # img = cv2.imread(
-                        #     f"dataset/img/01/{json_meta['info']['id']}/{json_meta['info']['filename']}"
-                        # )
-                        # bbox = json_meta["images"]["bbox"]
-                        # if bbox == None:
-                        #     continue
-                        
-                        # max_l = max(bbox[3] - bbox[1], bbox[2] - bbox[0]) // 2
-                        # center_p = ((bbox[1] + bbox[3]) // 2, (bbox[0] + bbox[2]) // 2)
-                        # p_img = img[
-                        #     max(0, center_p[0] - max_l) : min(
-                        #         3215, center_p[0] + max_l
-                        #     ),
-                        #     max(0, center_p[1] - max_l) : min(
-                        #         2135, center_p[1] + max_l
-                        #     ),
-                        # ]
-                        # r_value = 256 / max(p_img.shape)
-
-                        # pil_img = np.zeros([256, 256, 3])
-                        # r_img = cv2.resize(
-                        #     p_img,
-                        #     (
-                        #         int(p_img.shape[1] * r_value),
-                        #         int(p_img.shape[0] * r_value),
-                        #     ),
-                        # )
-
-                        # pil_img[: r_img.shape[0], : r_img.shape[1]] = r_img
-                        # mkdir(f"dataset/cropped_img/01/{json_meta['info']['id']}")
-                        # cv2.imwrite(
-                        #     f"dataset/cropped_img/01/{json_meta['info']['id']}/{json_meta['info']['filename'].split('.')[0]}_{json_meta['images']['facepart']:02}.jpg",
-                        #     pil_img,
-                        # )
-
-
-    def load_dataset(self, args, mode):
+    def load_dataset(self, mode):
         self.sub_path = defaultdict(list)
         self.train_num = defaultdict(lambda: defaultdict(int))
         data_list = (
@@ -270,20 +257,7 @@ class CustomDataset(Dataset):
         def save_dict(transform):
             pil = Image.fromarray(pil_img.astype(np.uint8))
             patch_img = transform(pil)
-
-            with open(os.path.join("dataset/label", i_path + ".json"), "r") as f:
-                meta = json.load(f)
-
-            label_data = (
-                meta["annotations"] if args.mode == "class" else meta["equipment"]
-            )
-
-            for key in label_data:
-                dig_p = key.split("_")[-1]
-                if dig == dig_p:
-                    area_list[dig][str(label_data[key])].append(
-                        [patch_img, label_data[key], desc_area, dig]
-                    )
+            area_list[dig][grade].append([patch_img, int(grade), desc_area, dig])
 
         for dig, grade, class_dict in tqdm(data_list.datasets, desc=f"{mode}_class"):
             for idx, i_path in enumerate(
@@ -291,6 +265,7 @@ class CustomDataset(Dataset):
             ):
                 if idx == self.args.data_num:
                     break
+
                 p_img = cv2.imread(os.path.join("dataset/cropped_img", i_path + ".jpg"))
                 r_value = 256 / max(p_img.shape)
 
@@ -331,23 +306,9 @@ class CustomDataset(Dataset):
             for items in v.values():
                 self.train_num[items[0][-1]][str(items[0][1])] = len(items)
 
+        del area_list
+
         return self.sub_path, self.train_num
-
-        # for dig, class_dict in area_list.items():
-        #     grade_list = [
-        #         len(total_list) for _, total_list in sorted((class_dict.items()))
-        #     ]
-        #     guide_num = max(grade_list)
-
-        #     for grade, total_list in sorted(class_dict.items()):
-        #         mul_num, remain_num = guide_num // len(total_list), guide_num % len(
-        #             total_list
-        #         )
-        #         sub_path[dig].append(total_list * mul_num + total_list[:remain_num])
-
-        # for k, v in sub_path.items():
-        #     self.sub_path[k] = [item for items in v for item in items]
-        # del sub_path, area_list
 
     def load_img(self, img_name, angle, idx_area, equ_name, img, args):
         json_name = "_".join(img_name.split("_")[:2]) + f"_{angle}_{idx_area:02d}.json"

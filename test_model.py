@@ -6,6 +6,7 @@ import torch.nn as nn
 import copy
 from torch.utils import data
 from tqdm import tqdm
+from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -108,9 +109,12 @@ class Model_test(object):
 
         self.test_class_acc = {
             "sagging": AverageMeter(),
-            "wrinkle": AverageMeter(),
+            "wrinkle_forehead": AverageMeter(),
+            "wrinkle_glabellus": AverageMeter(),
+            "wrinkle_perocular": AverageMeter(),
             "pore": AverageMeter(),
-            "pigmentation": AverageMeter(),
+            "pigmentation_forehead": AverageMeter(),
+            "pigmentation_cheek": AverageMeter(),
             "dryness": AverageMeter(),
         }
         self.test_regresion_mae = {
@@ -129,7 +133,7 @@ class Model_test(object):
         self.m_dig = 0
         self.model = None
         self.update_c = 0
-        
+
         self.pred = list()
         self.gt = list()
 
@@ -145,12 +149,13 @@ class Model_test(object):
 
     def print_total(self):
         if self.args.mode == "class":
-            self.logger.info(
-                f"pigmentation: {self.acc_avg('pigmentation')}%(T: {self.test_class_acc['pigmentation'].sum} / F: {self.test_class_acc['pigmentation'].count - self.test_class_acc['pigmentation'].sum}) // wrinkle: {self.acc_avg('wrinkle')}%(T: {self.test_class_acc['wrinkle'].sum} / F: {self.test_class_acc['wrinkle'].count - self.test_class_acc['wrinkle'].sum}) // sagging: {self.acc_avg('sagging')}%(T: {self.test_class_acc['sagging'].sum} / F: {self.test_class_acc['sagging'].count - self.test_class_acc['sagging'].sum}) // pore: {self.acc_avg('pore')}%(T: {self.test_class_acc['pore'].sum} / F: {self.test_class_acc['pore'].count - self.test_class_acc['pore'].sum}) // dryness: {self.acc_avg('dryness')}%(T: {self.test_class_acc['dryness'].sum} / F: {self.test_class_acc['dryness'].count - self.test_class_acc['dryness'].sum})"
-            )
-            self.logger.info(
-                f"Total Average Acc => {((self.acc_avg('pigmentation') + self.acc_avg('wrinkle') + self.acc_avg('sagging') + self.acc_avg('pore') + self.acc_avg('dryness') ) / 5):.2f}%"
-            )
+            # self.logger.info(
+            #     f"pigmentation_forehead: {self.acc_avg('pigmentation_forehead')}% // pigmentation_cheek: {self.acc_avg('pigmentation_cheek')}% // wrinkle_forehead: {self.acc_avg('wrinkle_forehead')}% // wrinkle_glabellus: {self.acc_avg('wrinkle_glabellus')}% // wrinkle_perocular: {self.acc_avg('wrinkle_perocular')}% // sagging: {self.acc_avg('sagging')}% // pore: {self.acc_avg('pore')}% // dryness: {self.acc_avg('dryness')}%"
+            # )
+            # self.logger.info(
+            #     f"Total Average Acc => {((self.acc_avg('pigmentation_forehead') + self.acc_avg('pigmentation_cheek') + self.acc_avg('wrinkle_forehead') +  self.acc_avg('wrinkle_glabellus') +  self.acc_avg('wrinkle_perocular') + self.acc_avg('sagging') + self.acc_avg('pore') + self.acc_avg('dryness') ) / 8):.2f}%"
+            # )
+            pass
         else:
             self.logger.info(
                 f"count: {self.loss_avg('count')} // moisture: {self.loss_avg('moisture')} // wrinkle: {self.loss_avg('wrinkle')} // elasticity: {self.loss_avg('elasticity')} // pore: {self.loss_avg('pore')}"
@@ -158,6 +163,30 @@ class Model_test(object):
             self.logger.info(
                 f"Total Average MAE => {((self.loss_avg('count') + self.loss_avg('moisture') + self.loss_avg('wrinkle') +self.loss_avg('elasticity') + self.loss_avg('pore')) / 5):.3f}"
             )
+
+        pred_d = defaultdict(list)
+        gt_d = defaultdict(list)
+
+        for g, p in zip(self.pred, self.gt):
+            for v in g[1]:
+                gt_d[g[0]].append(v)
+            for w in p[1]:
+                pred_d[p[0]].append(w)
+
+        for k in pred_d.keys():
+            (
+                macro_precision,
+                macro_recall,
+                macro_f1,
+                _,
+            ) = precision_recall_fscore_support(
+                pred_d[k], gt_d[k], average="macro", zero_division=1
+            )
+            acc = accuracy_score(gt_d[k], pred_d[k])
+            self.logger.info(
+                f"[{k}] Macro Precision: {macro_precision:.4f}, Macro Recall: {macro_recall:.4f}, Macro F1: {macro_f1:.4f}, Acc: {acc * 100:.2f}%"
+            )
+
         self.logger.info("============" * 15)
 
     def match_img(self, vis_img, img):
@@ -179,28 +208,19 @@ class Model_test(object):
         self.test_regresion_mae[self.m_dig].update(
             self.criterion(pred[0], gt).item(), batch_size=pred.shape[0]
         )
-        
-        # if self.m_dig in ["moisture", "wrinkle"]:
-        #     gt, pred = gt * 100, pred * 100
-        # elif self.m_dig == "count":
-        #     gt, pred = gt * 350, pred * 350
-        # elif self.m_dig == "pore":
-        #     gt, pred = gt * 3000, pred * 3000
-        
+
         self.pred.append([self.m_dig, pred.item()])
         self.gt.append([self.m_dig, gt.item()])
 
-            
     def get_test_acc(self, pred, gt):
-
         pred_v = [item.argmax().item() for item in pred]
         gt_v = [item.item() for item in gt]
-        
+
         self.pred.append([self.m_dig, pred_v])
         self.gt.append([self.m_dig, gt_v])
-        
+
         score = sum([p == g for (p, g) in zip(pred_v, gt_v)])
-            
+
         self.test_class_acc[self.m_dig].update_acc(
             score,
             pred.shape[0],
@@ -209,12 +229,8 @@ class Model_test(object):
     def save_value(self):
         path = os.path.join("prediction", self.args.save_path)
         mkdir(path)
-        with open(
-            os.path.join(path, f"pred.txt"), "w"
-        ) as p:
-            with open(
-                os.path.join(path, f"gt.txt"), "w"
-            ) as g:
+        with open(os.path.join(path, f"pred.txt"), "w") as p:
+            with open(os.path.join(path, f"gt.txt"), "w") as g:
                 for idx in range(len(self.pred)):
                     for p_v, g_v in zip(self.pred[idx][1], self.gt[idx][1]):
                         p.write(f"{self.pred[idx][0]}, {p_v} \n")
@@ -232,18 +248,17 @@ class Model_test(object):
                     dataset=copy.deepcopy(datalist),
                     batch_size=self.args.batch_size,
                     num_workers=self.args.num_workers,
-                    shuffle= False,
+                    shuffle=False,
                 )
                 del datalist
-                
-                for img, label, _, _ in tqdm(loader_datalist, desc = self.m_dig):
+
+                for img, label, _, _ in tqdm(loader_datalist, desc=self.m_dig):
                     img, label = img.to(device), label.to(device)
                     pred = self.model.to(device)(img)
-                    
+
                     if self.args.mode == "class":
                         _ = self.get_test_acc(pred, label)
                     else:
                         _ = self.get_test_loss(pred, label)
-                
-        self.print_total()
 
+        self.print_total()

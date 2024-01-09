@@ -228,15 +228,8 @@ def save_image(self, img):
 
     path = os.path.join(self.args.save_img, self.m_dig)
     mkdir(path)
-    cv2.imwrite(os.path.join(path, f"epoch_{self.epoch}_{self.m_dig}.jpg"), s_img)
-
-def img_save(self, img, label):
-    c_img =img.detach().cpu().numpy()[0].transpose(1, 2, 0)
-    max_v, min_v = c_img.max(), c_img.min()
-    if min_v > 0:
-        min_v = -min_v
-    s_img = (c_img - min_v) * (255.0 / (max_v - min_v))
-
-    path = os.path.join(self.args.save_img, self.m_dig)
-    mkdir(path)
-    cv2.imwrite(os.path.join(path, f"[{self.iter}]_{area_naming[str(int(self.area))]}_{label.item()}.jpg"), s_img)
+    img_mat = cv2.UMat(s_img)
+    for i, name in enumerate(self.img_names):
+        x, y = (i % 8 * (256 + 2) + 2, i // 8 * (256 + 2) + 20)  # 위치 조절
+        cv2.putText(img_mat, name, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.41, (255, 255, 255), 1, cv2.LINE_AA)
+    cv2.imwrite(os.path.join(path, f"epoch_{self.epoch}_iter_{self.iter}_{self.m_dig}.jpg"), img_mat.get())

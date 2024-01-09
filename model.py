@@ -9,11 +9,9 @@ from utils import (
     adjust_learning_rate,
     AverageMeter,
     FocalLoss,
-    labeling,
     save_checkpoint,
     LabelSmoothingCrossEntropy,
     save_image,
-    img_save,
 )
 import os
 from torch.utils import data
@@ -62,9 +60,12 @@ class Model(object):
         self.train_loss = (
             {
                 "sagging": AverageMeter(),
-                "wrinkle": AverageMeter(),
+                "wrinkle_forehead": AverageMeter(),
+                "wrinkle_glabellus": AverageMeter(),
+                "wrinkle_perocular": AverageMeter(),
                 "pore": AverageMeter(),
-                "pigmentation": AverageMeter(),
+                "pigmentation_forehead": AverageMeter(),
+                "pigmentation_cheek": AverageMeter(),
                 "dryness": AverageMeter(),
             }
             if self.args.mode == "class"
@@ -80,18 +81,24 @@ class Model(object):
         self.val_loss = copy.deepcopy(self.train_loss)
         self.class_acc = {
             "sagging": AverageMeter(),
-            "wrinkle": AverageMeter(),
+            "wrinkle_forehead": AverageMeter(),
+            "wrinkle_glabellus": AverageMeter(),
+            "wrinkle_perocular": AverageMeter(),
             "pore": AverageMeter(),
-            "pigmentation": AverageMeter(),
+            "pigmentation_forehead": AverageMeter(),
+            "pigmentation_cheek": AverageMeter(),
             "dryness": AverageMeter(),
         }
 
         self.keep_acc = {
-            "sagging": 0,
-            "wrinkle": 0,
-            "pore": 0,
-            "pigmentation": 0,
-            "dryness": 0,
+            "sagging": AverageMeter(),
+            "wrinkle_forehead": AverageMeter(),
+            "wrinkle_glabellus": AverageMeter(),
+            "wrinkle_perocular": AverageMeter(),
+            "pore": AverageMeter(),
+            "pigmentation_forehead": AverageMeter(),
+            "pigmentation_cheek": AverageMeter(),
+            "dryness": AverageMeter(),
         }
         self.keep_mae = {
             "moisture": 0,
@@ -287,9 +294,12 @@ class Model(object):
         self.test_value = (
             {
                 "sagging": AverageMeter(),
-                "wrinkle": AverageMeter(),
+                "wrinkle_forehead": AverageMeter(),
+                "wrinkle_glabellus": AverageMeter(),
+                "wrinkle_perocular": AverageMeter(),
                 "pore": AverageMeter(),
-                "pigmentation": AverageMeter(),
+                "pigmentation_forehead": AverageMeter(),
+                "pigmentation_cheek": AverageMeter(),
                 "dryness": AverageMeter(),
             }
             if mode == "class"
@@ -347,7 +357,7 @@ class Model(object):
         def run_iter():
             data_loader_v, class_num_dict = data_loader
             for self.m_dig, datalist in data_loader_v.items():
-
+            
                 self.model = (
                     self.model_list[self.m_dig]
                     if self.phase == "train"
@@ -376,7 +386,7 @@ class Model(object):
                 del datalist
                 random_num = random.randrange(0, len(loader_datalist))
 
-                for self.iter, (img, label, _, dig_p) in enumerate(
+                for self.iter, (img, label, self.img_names, dig_p) in enumerate(
                     loader_datalist
                 ):
                     assert all(self.m_dig == item for item in dig_p), "dig not same"
@@ -390,7 +400,7 @@ class Model(object):
                         loss = self.regression(pred, label)
 
                     if self.args.img:
-                        img_save(self, img, label)
+                        save_image(self, img)
                     else:
                         if self.iter == random_num:
                             save_image(self, img)
@@ -401,7 +411,7 @@ class Model(object):
                         optimizer.zero_grad()
                         loss.backward()
                         optimizer.step()
-
+                
                 self.print_loss(len(loader_datalist), final_flag=True)
 
         if phase == "train":
