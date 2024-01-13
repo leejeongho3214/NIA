@@ -5,12 +5,11 @@ import torch.nn as nn
 import numpy as np
 import copy
 from data_loader import class_num_list, mkdir
+import torch.optim as optim
 from utils import (
-    adjust_learning_rate,
     AverageMeter,
     FocalLoss,
     save_checkpoint,
-    LabelSmoothingCrossEntropy,
     save_image,
 )
 import os
@@ -33,6 +32,7 @@ class Model(object):
         logger,
         check_path,
         model_num_class,
+        writer,
     ):
         super(Model, self).__init__()
         (
@@ -45,6 +45,7 @@ class Model(object):
             self.logger,
             self.check_path,
             self.model_num_class,
+            self.writer,
         ) = (
             args,
             model_list,
@@ -55,6 +56,7 @@ class Model(object):
             logger,
             check_path,
             model_num_class,
+            writer,
         )
 
         self.train_loss = (
@@ -117,7 +119,11 @@ class Model(object):
             "8": {"moisture": 1, "elasticity": 1},
         }
         self.epoch = 0
-        self.criterion = (FocalLoss() if not self.args.cross else nn.CrossEntropyLoss()) if self.args.mode == "class" else nn.L1Loss()
+        self.criterion = (
+            (FocalLoss() if not self.args.cross else nn.CrossEntropyLoss())
+            if self.args.mode == "class"
+            else nn.L1Loss()
+        )
         (
             self.phase,
             self.m_dig,
@@ -143,16 +149,24 @@ class Model(object):
 
         if final_flag:
             self.temp_model_list[self.m_dig] = self.model
+            self.writer.add_scalar(
+                f"{self.phase}/{self.m_dig}",
+                self.train_loss[self.m_dig].avg
+                if self.args.mode == "class"
+                else self.val_loss[self.m_dig].avg,
+                self.epoch,
+            )
+
             if self.phase == "valid":
                 f_pred = list()
                 f_gt = list()
                 for (key, value), (_, value2) in zip(self.pred, self.gt):
-                    if key != self.m_dig: 
+                    if key != self.m_dig:
                         continue
                     for v, v1 in zip(value, value2):
                         f_pred.append(v)
-                        f_gt.append(v1)  
-                
+                        f_gt.append(v1)
+
                 (
                     macro_precision,
                     macro_recall,
@@ -174,8 +188,7 @@ class Model(object):
         if self.update_c > self.args.stop_early:
             return True
 
-    def class_loss(self, pred, gt, loss_weight):
-
+    def class_loss(self, pred, gt):
         loss = self.criterion(pred, gt)
 
         pred_v = [item.argmax().item() for item in pred]
@@ -265,7 +278,7 @@ class Model(object):
         p.close()
 
     def update_m(self, model_num_class):
-        best_loss = 0
+        Update = list()
         for item in model_num_class:
             if self.best_loss[item] > self.val_loss[item].avg:
                 try:
@@ -277,17 +290,17 @@ class Model(object):
                 save_checkpoint(
                     self.model_list[item], self.args, self.epoch, item, self.best_loss
                 )
-            best_loss += self.best_loss[item]
+                Update.append(item)
 
-        if best_loss < self.stop_loss:
+        if len(Update) != 0:
             self.update_c = 0
             self.logger.info(
-                f"[{self.update_c}/{self.args.stop_early}] update ==> Total loss {best_loss:.03f}"
+                f"[{self.update_c}/{self.args.stop_early}] update ==> {Update}"
             )
         else:
             self.update_c += 1
             self.logger.info(
-                f"[{self.update_c}/{self.args.stop_early}] Nothing do not update  ==> Total loss {best_loss:.03f}"
+                f"[{self.update_c}/{self.args.stop_early}] Nothing do not update"
             )
 
     def reset_log(self, mode):
@@ -353,11 +366,9 @@ class Model(object):
     def run(self, phase="train"):
         self.phase = phase
         data_loader = self.train_loader if self.phase == "train" else self.valid_loader
-        
+
         def run_iter():
-            data_loader_v, class_num_dict = data_loader
-            for self.m_dig, datalist in data_loader_v.items():
-            
+            for self.m_dig, datalist in data_loader.items():
                 self.model = (
                     self.model_list[self.m_dig]
                     if self.phase == "train"
@@ -365,37 +376,33 @@ class Model(object):
                 )
                 self.model.train() if self.phase == "train" else self.model.eval()
                 optimizer = torch.optim.Adam(
-                    params=list(self.model.parameters()),
+                    params=self.model.parameters(),
                     lr=self.args.lr,
                     betas=(0.9, 0.999),
                     weight_decay=0,
                 )
-                adjust_learning_rate(optimizer, self.epoch, self.args)
 
+                scheduler = optim.lr_scheduler.StepLR(
+                    optimizer, step_size=30, gamma=0.1
+                )
                 loader_datalist = data.DataLoader(
                     dataset=copy.deepcopy(datalist),
                     batch_size=self.args.batch_size,
                     num_workers=self.args.num_workers,
                     shuffle=True if self.phase == "train" else False,
                 )
-                loss_weight = torch.tensor([
-                    len(datalist) / (len(class_num_dict[self.m_dig]) * v)
-                    for v in dict(sorted(class_num_dict[self.m_dig].items())).values()
-                ]).to(device)
-                
+
                 del datalist
                 random_num = random.randrange(0, len(loader_datalist))
 
                 for self.iter, (img, label, self.img_names, dig_p) in enumerate(
                     loader_datalist
                 ):
-                    assert all(self.m_dig == item for item in dig_p), "dig not same"
-
                     img, label = img.to(device), label.to(device)
-                    pred = self.model.to(device)(img)
+                    pred = self.model(img)
 
                     if self.args.mode == "class":
-                        loss = self.class_loss(pred, label, loss_weight)
+                        loss = self.class_loss(pred, label)
                     else:
                         loss = self.regression(pred, label)
 
@@ -411,7 +418,9 @@ class Model(object):
                         optimizer.zero_grad()
                         loss.backward()
                         optimizer.step()
-                
+
+                if phase == "train":
+                    scheduler.step()
                 self.print_loss(len(loader_datalist), final_flag=True)
 
         if phase == "train":

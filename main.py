@@ -3,8 +3,9 @@ import os
 import shutil
 import sys
 import numpy as np
+import torch
 from torchvision import models
-
+from tensorboardX import SummaryWriter
 from utils import mkdir, resume_checkpoint
 from logger import setup_logger
 from data_loader import CustomDataset
@@ -87,19 +88,19 @@ def parse_args():
 
     parser.add_argument(
         "--lr",
-        default=1e-3,
+        default=0.05,
         type=float,
     )
 
     parser.add_argument(
         "--batch_size",
-        default=32,
+        default=128,
         type=int,
     )
 
     parser.add_argument(
         "--num_workers",
-        default=4,
+        default=8,
         type=int,
     )
 
@@ -116,8 +117,9 @@ def parse_args():
 def main(args):
     check_path = os.path.join(args.output_dir, args.mode, args.name)
     mkdir(check_path)
-    ## Make the directories for save
-
+    log_path = os.path.join("tensorboard", git_name, args.mode, args.name)
+    mkdir(log_path)
+    writer = SummaryWriter(log_path)
     model_num_class = (
         {
             "dryness": 5,
@@ -170,6 +172,10 @@ def main(args):
     #         if 'layer1' in name or 'layer2' in name or 'layer3' in name:
     #             param.requires_grad = False
             
+    for key in model_list:
+        # model_list[key] = torch.nn.DataParallel(model_list[key])
+        model_list[key] = model_list[key].cuda()
+            
     logger = setup_logger(args.name + args.mode, check_path)
     logger.info(args)
     logger.info("Command Line: " + " ".join(sys.argv))
@@ -181,7 +187,7 @@ def main(args):
     
     
     resnet_model = Model(
-        args, model_list, trainset_loader, valset_loader, logger, check_path, model_num_class
+        args, model_list, trainset_loader, valset_loader, logger, check_path, model_num_class, writer
     )
 
     for epoch in range(args.load_epoch, args.epoch):
@@ -190,8 +196,6 @@ def main(args):
         resnet_model.run(phase = 'valid')
 
         resnet_model.update_m(model_num_class)
-        resnet_model.save_value()
-
         resnet_model.update_e(epoch + 1)
         resnet_model.reset_log(mode=args.mode)
 

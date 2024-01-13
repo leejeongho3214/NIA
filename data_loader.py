@@ -79,6 +79,13 @@ class CustomDataset(Dataset):
                 train_list.append([dig, grade, t])
                 val_list.append([dig, grade, v])
                 test_list.append([dig, grade, tt])
+        
+        if len(self.json_dict_train) > 0:
+            for dig, class_dict in self.json_dict_train.items():
+                for grade, name_list in class_dict.items():
+                    if len(name_list) < 10:
+                        name_list = name_list * (10 // len(name_list) + 1)
+                    train_list.append([dig, grade, name_list])
 
         self.train_list, self.val_list, self.test_list = (
             ConcatDataset(train_list),
@@ -164,6 +171,7 @@ class CustomDataset(Dataset):
         )
 
         self.json_dict = defaultdict(lambda: defaultdict(list))
+        self.json_dict_train = defaultdict(lambda: defaultdict(list))
         for equ_name in sub_path_list:
             if equ_name.startswith(".") or int(equ_name) not in self.args.equ:
                 continue
@@ -188,34 +196,60 @@ class CustomDataset(Dataset):
 
                     ## Classifying meaningful images for training from various angles of images
                     for j_name in os.listdir(json_name):
-                        if (
-                            j_name.split("_")[2] == "Ft"
-                            and j_name.split("_")[3].split(".")[0]
-                            in ["01", "02", "03", "04"]
-                        ) or (
-                            j_name.split("_")[2] == "Fb"
-                            and j_name.split("_")[3].split(".")[0]
-                            in ["01", "02",  "03", "04", "05", "06", "07", "08"]
-                        ) or (
-                            j_name.split("_")[2] == "F"
-                            and j_name.split("_")[3].split(".")[0]
-                            in ["03", "04"]
-                        ):
-                            continue
+                        if equ_name == "01":
+                            if (
+                                (
+                                    j_name.split("_")[2] == "Ft"
+                                    and j_name.split("_")[3].split(".")[0]
+                                    in ["01", "02", "03", "04"]
+                                )
+                                or (
+                                    j_name.split("_")[2] == "Fb"
+                                    and j_name.split("_")[3].split(".")[0]
+                                    in ["01", "02", "03", "04", "05", "06", "07", "08"]
+                                )
+                                or (
+                                    j_name.split("_")[2] == "F"
+                                    and j_name.split("_")[3].split(".")[0]
+                                    in ["03", "04"]
+                                )
+                            ):
+                                continue
 
-                        elif (
-                            j_name.split("_")[2].startswith("R")
-                            and j_name.split("_")[3].split(".")[0] in ["04", "06"]
-                        ) or (
-                            j_name.split("_")[2].startswith("L")
-                            and j_name.split("_")[3].split(".")[0] in ["03", "05"]
-                        ):
-                            continue
+                            elif (
+                                j_name.split("_")[2].startswith("R")
+                                and j_name.split("_")[3].split(".")[0] in ["04", "06"]
+                            ) or (
+                                j_name.split("_")[2].startswith("L")
+                                and j_name.split("_")[3].split(".")[0] in ["03", "05"]
+                            ):
+                                continue
 
-                        elif j_name.split("_")[2] in ["R30", "L30"] and j_name.split(
-                            "_"
-                        )[3].split(".")[0] in ["01", "02"]:
-                            continue
+                            elif j_name.split("_")[2] in [
+                                "R30",
+                                "L30",
+                            ] and j_name.split("_")[3].split(".")[0] in ["01", "02"]:
+                                continue
+
+                        elif equ_name == "02":
+                            if (
+                                (
+                                    j_name.split("_")[2] == "F"
+                                    and j_name.split("_")[3].split(".")[0]
+                                    not in ["01", "02", "05", "06", "07", "08"]
+                                )
+                                or (
+                                    j_name.split("_")[2] == "L"
+                                    and j_name.split("_")[3].split(".")[0]
+                                    not in ["02", "04", "06"]
+                                )
+                                or (
+                                    j_name.split("_")[2] == "R"
+                                    and j_name.split("_")[3].split(".")[0]
+                                    not in ["02", "03", "05"]
+                                )
+                            ):
+                                continue
 
                         with open(os.path.join(json_name, j_name), "r") as f:
                             json_meta = json.load(f)
@@ -238,9 +272,15 @@ class CustomDataset(Dataset):
                                     "pigmentation",
                                 ]:
                                     dig = f"{dig}_{area}"
-                                self.json_dict[dig][str(grade)].append(
-                                    os.path.join(pre_name, j_name.split(".")[0])
-                                )
+                                
+                                if equ_name == "01":
+                                    self.json_dict[dig][str(grade)].append(
+                                        os.path.join(pre_name, j_name.split(".")[0])
+                                    )
+                                else:
+                                    self.json_dict_train[dig][str(grade)].append(
+                                        os.path.join(pre_name, j_name.split(".")[0])
+                                    )
 
     def load_dataset(self, mode):
         self.sub_path = defaultdict(list)
@@ -303,12 +343,10 @@ class CustomDataset(Dataset):
 
         for k, v in area_list.items():
             self.sub_path[k] = [item for items in v.values() for item in items]
-            for items in v.values():
-                self.train_num[items[0][-1]][str(items[0][1])] = len(items)
 
         del area_list
 
-        return self.sub_path, self.train_num
+        return self.sub_path
 
     def load_img(self, img_name, angle, idx_area, equ_name, img, args):
         json_name = "_".join(img_name.split("_")[:2]) + f"_{angle}_{idx_area:02d}.json"
