@@ -65,6 +65,109 @@ img_num = {
 }
 
 
+def noramlize_v(key, self):
+    if key == "dryness":
+        a = (
+            transforms.Normalize(
+                [0.3971863, 0.53899115, 0.7918039],
+                [0.00548187, 0.00920583, 0.0188247],
+            )
+            if "2" not in self.args.equ
+            else transforms.Normalize(
+                [0.38747337, 0.5135743, 0.7418671],
+                [0.00517165, 0.00811211, 0.01600054],
+            )
+        )
+    elif key == "pigmentation_forehead":
+        a = (
+            transforms.Normalize(
+                [0.35794356, 0.4875437, 0.67509633],
+                [0.00749865, 0.00930441, 0.01313221],
+            )
+            if "2" not in self.args.equ
+            else transforms.Normalize(
+                [0.3644775, 0.47519714, 0.64031136],
+                [0.01067846, 0.01087018, 0.01358093],
+            )
+        )
+    elif key == "pigmentation_cheek":
+        a = (
+            transforms.Normalize(
+                [0.4236276, 0.57461, 0.81209165],
+                [0.01844954, 0.02865098, 0.0412216],
+            )
+            if "2" not in self.args.equ
+            else transforms.Normalize(
+                [0.41664535, 0.5376691, 0.7362832],
+                [0.01813314, 0.02635618, 0.0385823],
+            )
+        )
+    elif key == "pore":
+        a = (
+            transforms.Normalize(
+                [0.4212271, 0.5735757, 0.8125185],
+                [0.01824168, 0.02863191, 0.04099633],
+            )
+            if "2" not in self.args.equ
+            else transforms.Normalize(
+                [0.41947985, 0.5401359, 0.738836],
+                [0.01840642, 0.02611311, 0.0376912],
+            )
+        )
+    elif key == "sagging":
+        a = (
+            transforms.Normalize(
+                [0.2894094, 0.39513916, 0.55362684],
+                [0.0075179, 0.00886958, 0.01018988],
+            )
+            if "2" not in self.args.equ
+            else transforms.Normalize(
+                [0.2864517, 0.3769295, 0.51980555],
+                [0.00982202, 0.01481378, 0.02048211],
+            )
+        )
+    elif key == "wrinkle_forehead":
+        a = (
+            transforms.Normalize(
+                [0.35502893, 0.4822758, 0.66742766],
+                [0.00764483, 0.00957104, 0.01369465],
+            )
+            if "2" not in self.args.equ
+            else transforms.Normalize(
+                [0.35892627, 0.4686825, 0.63134724],
+                [0.00991173, 0.00985187, 0.01280279],
+            )
+        )
+    elif key == "wrinkle_glabellus":
+        a = (
+            transforms.Normalize(
+                [0.4604649, 0.6125847, 0.85397255],
+                [0.00545718, 0.00695129, 0.009476],
+            )
+            if "2" not in self.args.equ
+            else transforms.Normalize(
+                [0.41069034, 0.5170356, 0.7017539],
+                [0.00623439, 0.00779748, 0.01017918],
+            )
+        )
+    elif key == "wrinkle_perocular":
+        a = (
+            transforms.Normalize(
+                [0.4000641, 0.56431776, 0.7999528],
+                [0.0093093, 0.01803441, 0.02781325],
+            )
+            if "2" not in self.args.equ
+            else transforms.Normalize(
+                [0.4115054, 0.53571254, 0.72633845],
+                [0.01143675, 0.01620491, 0.02333776],
+            )
+        )
+    else:
+        assert 0, "key name is incorrect"
+
+    return a
+
+
 class CustomDataset(Dataset):
     def __init__(self, args):
         self.args = args
@@ -79,7 +182,7 @@ class CustomDataset(Dataset):
                 train_list.append([dig, grade, t])
                 val_list.append([dig, grade, v])
                 test_list.append([dig, grade, tt])
-        
+
         if len(self.json_dict_train) > 0:
             for dig, class_dict in self.json_dict_train.items():
                 for grade, name_list in class_dict.items():
@@ -108,67 +211,6 @@ class CustomDataset(Dataset):
             for item in natsort.natsorted(os.listdir(self.img_path))
             if not item.startswith(".")
         ]
-        self.transform_test = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.Normalize(
-                    [0.24628267, 0.3271797, 0.44643742],
-                    [0.1666497, 0.2335198, 0.3375362],
-                ),
-            ]
-        )
-
-        self.transform_crop = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.CenterCrop(200),
-                transforms.Resize(256),
-                transforms.Normalize(
-                    [0.24628267, 0.3271797, 0.44643742],
-                    [0.1666497, 0.2335198, 0.3375362],
-                ),
-            ]
-        )
-
-        self.transform_crop1 = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.CenterCrop(210),
-                transforms.Resize(256),
-                transforms.Normalize(
-                    [0.24628267, 0.3271797, 0.44643742],
-                    [0.1666497, 0.2335198, 0.3375362],
-                ),
-            ]
-        )
-
-        self.transform_color = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.ColorJitter(
-                    brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1
-                ),
-                transforms.Normalize(
-                    [0.24628267, 0.3271797, 0.44643742],
-                    [0.1666497, 0.2335198, 0.3375362],
-                ),
-            ]
-        )
-
-        self.transform_both = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.CenterCrop(200),
-                transforms.Resize(256),
-                transforms.ColorJitter(
-                    brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1
-                ),
-                transforms.Normalize(
-                    [0.24628267, 0.3271797, 0.44643742],
-                    [0.1666497, 0.2335198, 0.3375362],
-                ),
-            ]
-        )
 
         self.json_dict = defaultdict(lambda: defaultdict(list))
         self.json_dict_train = defaultdict(lambda: defaultdict(list))
@@ -272,7 +314,7 @@ class CustomDataset(Dataset):
                                     "pigmentation",
                                 ]:
                                     dig = f"{dig}_{area}"
-                                
+
                                 if equ_name == "01":
                                     self.json_dict[dig][str(grade)].append(
                                         os.path.join(pre_name, j_name.split(".")[0])
@@ -282,9 +324,8 @@ class CustomDataset(Dataset):
                                         os.path.join(pre_name, j_name.split(".")[0])
                                     )
 
-    def load_dataset(self, mode):
-        self.sub_path = defaultdict(list)
-        self.train_num = defaultdict(lambda: defaultdict(int))
+    def load_dataset(self, mode, dig_k):
+        sub_path = []
         data_list = (
             self.train_list
             if mode == "train"
@@ -294,59 +335,102 @@ class CustomDataset(Dataset):
         )
         area_list = defaultdict(lambda: defaultdict(list))
 
+        transform_test = transforms.Compose(
+            [transforms.ToTensor(), noramlize_v(dig_k, self)]
+        )
+
+
+        transform_crop = transforms.Compose(
+            [
+                transforms.CenterCrop(230),
+                transforms.ToTensor(),
+                transforms.Resize(256, antialias=True),
+                noramlize_v(dig_k, self),
+            ]
+        )
+
+        transform_color = transforms.Compose(
+            [
+                transforms.ColorJitter(
+                    brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1
+                ),
+                transforms.ToTensor(),
+                noramlize_v(dig_k, self),
+            ]
+        )
+
+        transform_both = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.CenterCrop(200),
+                transforms.Resize(256),
+                transforms.ColorJitter(
+                    brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1
+                ),
+                noramlize_v(dig_k, self),
+            ]
+        )
+        
+        transform_list = [transform_test, transform_crop, transform_color]
+        print(transform_list)
+
         def save_dict(transform):
             pil = Image.fromarray(pil_img.astype(np.uint8))
             patch_img = transform(pil)
             area_list[dig][grade].append([patch_img, int(grade), desc_area, dig])
 
         for dig, grade, class_dict in tqdm(data_list.datasets, desc=f"{mode}_class"):
-            for idx, i_path in enumerate(
-                tqdm(sorted(class_dict), desc=f"{dig}_{grade}")
-            ):
-                if idx == self.args.data_num:
-                    break
+            if dig == dig_k:
+                for idx, i_path in enumerate(
+                    tqdm(sorted(class_dict), desc=f"{dig}_{grade}")
+                ):
+                    if idx == self.args.data_num:
+                        break
 
-                p_img = cv2.imread(os.path.join("dataset/cropped_img", i_path + ".jpg"))
-                r_value = 256 / max(p_img.shape)
+                    p_img = cv2.imread(
+                        os.path.join("dataset/cropped_img", i_path + ".jpg")
+                    )
+                    r_value = 256 / max(p_img.shape)
 
-                pil_img = np.zeros([256, 256, 3])
-                r_img = cv2.resize(
-                    p_img,
-                    (int(p_img.shape[1] * r_value), int(p_img.shape[0] * r_value)),
-                )
-                pil_img[: r_img.shape[0], : r_img.shape[1]] = r_img
-                if i_path.split("_")[-1] in ["04", "06"]:
-                    pil_img = cv2.flip(pil_img, 1)
+                    pil_img = np.zeros([256, 256, 3])
+                    r_img = cv2.resize(
+                        p_img,
+                        (int(p_img.shape[1] * r_value), int(p_img.shape[0] * r_value)),
+                    )
+                    pil_img[: r_img.shape[0], : r_img.shape[1]] = r_img
+                    if i_path.split("_")[-1] in ["04", "06"]:
+                        pil_img = cv2.flip(pil_img, 1)
 
-                s_list = i_path.split("/")[-1].split("_")
-                desc_area = (
-                    "Sub_"
-                    + s_list[0]
-                    + "_Equ_"
-                    + s_list[1]
-                    + "_Angle_"
-                    + s_list[2]
-                    + "_Area_"
-                    + s_list[3]
-                )
+                    s_list = i_path.split("/")[-1].split("_")
+                    desc_area = (
+                        "Sub_"
+                        + s_list[0]
+                        + "_Equ_"
+                        + s_list[1]
+                        + "_Angle_"
+                        + s_list[2]
+                        + "_Area_"
+                        + s_list[3]
+                    )
 
-                if mode == "train":
-                    for transform in [self.transform_test]:
-                        if s_list[3] in ["01", "02", "07", "08"]:
-                            save_dict(transform)
-                            pil_img = cv2.flip(pil_img, 1)
-                            save_dict(transform)
-                        else:
-                            save_dict(transform)
-                else:
-                    save_dict(self.transform_test)
+                    if mode == "train":
 
-        for k, v in area_list.items():
-            self.sub_path[k] = [item for items in v.values() for item in items]
+                        
+                        for transform in transform_list:
+                            if s_list[3] in ["01", "02", "07", "08"]:
+                                save_dict(transform)
+                                pil_img = cv2.flip(pil_img, 1)
+                                save_dict(transform)
+                            else:
+                                save_dict(transform)
+                    else:
+                        save_dict(transform_test)
+
+        sub_path = [item for items in area_list[dig_k].values() for item in items]
 
         del area_list
 
-        return self.sub_path
+        return sub_path
 
     def load_img(self, img_name, angle, idx_area, equ_name, img, args):
         json_name = "_".join(img_name.split("_")[:2]) + f"_{angle}_{idx_area:02d}.json"

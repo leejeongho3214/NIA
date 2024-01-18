@@ -1,9 +1,12 @@
 from collections import defaultdict
+import inspect
 import random
 import torch
 import torch.nn as nn
 import numpy as np
 import copy
+
+from tqdm import tqdm
 from data_loader import class_num_list, mkdir
 import torch.optim as optim
 from utils import (
@@ -26,19 +29,20 @@ class Model(object):
     def __init__(
         self,
         args,
-        model_list,
+        model,
         train_loader,
         valid_loader,
         logger,
         check_path,
         model_num_class,
         writer,
+        dig_k,
     ):
-        super(Model, self).__init__()
+        super().__init__()
         (
             self.args,
-            self.model_list,
-            self.temp_model_list,
+            self.model,
+            self.temp_model,
             self.train_loader,
             self.valid_loader,
             self.best_loss,
@@ -46,10 +50,11 @@ class Model(object):
             self.check_path,
             self.model_num_class,
             self.writer,
+            self.m_dig,
         ) = (
             args,
-            model_list,
-            defaultdict(str),
+            model,
+            None,
             train_loader,
             valid_loader,
             args.best_loss,
@@ -57,40 +62,12 @@ class Model(object):
             check_path,
             model_num_class,
             writer,
+            dig_k,
         )
 
-        self.train_loss = (
-            {
-                "sagging": AverageMeter(),
-                "wrinkle_forehead": AverageMeter(),
-                "wrinkle_glabellus": AverageMeter(),
-                "wrinkle_perocular": AverageMeter(),
-                "pore": AverageMeter(),
-                "pigmentation_forehead": AverageMeter(),
-                "pigmentation_cheek": AverageMeter(),
-                "dryness": AverageMeter(),
-            }
-            if self.args.mode == "class"
-            else {
-                "moisture": AverageMeter(),
-                "wrinkle": AverageMeter(),
-                "elasticity": AverageMeter(),
-                "pore": AverageMeter(),
-                "count": AverageMeter(),
-            }
-        )
+        self.train_loss, self.val_loss = AverageMeter(), AverageMeter()
 
-        self.val_loss = copy.deepcopy(self.train_loss)
-        self.class_acc = {
-            "sagging": AverageMeter(),
-            "wrinkle_forehead": AverageMeter(),
-            "wrinkle_glabellus": AverageMeter(),
-            "wrinkle_perocular": AverageMeter(),
-            "pore": AverageMeter(),
-            "pigmentation_forehead": AverageMeter(),
-            "pigmentation_cheek": AverageMeter(),
-            "dryness": AverageMeter(),
-        }
+        self.class_acc = AverageMeter()
 
         self.keep_acc = {
             "sagging": AverageMeter(),
@@ -119,21 +96,25 @@ class Model(object):
             "8": {"moisture": 1, "elasticity": 1},
         }
         self.epoch = 0
-        self.criterion = (
-            (FocalLoss() if not self.args.cross else nn.CrossEntropyLoss())
-            if self.args.mode == "class"
-            else nn.L1Loss()
-        )
+        self.criterion = FocalLoss() if self.args.mode == "class" else nn.L1Loss()
+        self.logger.debug(inspect.getsource(FocalLoss))
+        
         (
             self.phase,
-            self.m_dig,
-            self.model,
             self.update_c,
             self.stop_loss,
             self.device,
-        ) = (None, None, None, 0, np.inf, device)
+        ) = (None, 0, np.inf, device)
         self.pred, self.gt = list(), list()
         self.pred_t, self.gt_t = list(), list()
+
+        self.optimizer = torch.optim.Adam(
+            params=self.model.parameters(),
+            lr=self.args.lr,
+            betas=(0.9, 0.999),
+            weight_decay=0,
+        )
+        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, "min")
 
     def acc_avg(self, name):
         return round(self.test_value[name].avg * 100, 2)
@@ -143,21 +124,27 @@ class Model(object):
 
     def print_loss(self, dataloader_len, final_flag=False):
         print(
-            f"\rEpoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss[self.m_dig].avg if self.phase == 'train' else self.val_loss[self.m_dig].avg:.04f}",
+            f"\rEpoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}",
             end="",
         )
 
         if final_flag:
-            self.temp_model_list[self.m_dig] = self.model
             self.writer.add_scalar(
                 f"{self.phase}/{self.m_dig}",
-                self.train_loss[self.m_dig].avg
-                if self.args.mode == "class"
-                else self.val_loss[self.m_dig].avg,
+                self.train_loss.avg if self.args.mode == "class" else self.val_loss.avg,
                 self.epoch,
             )
 
-            if self.phase == "valid":
+            if self.phase == "Valid":
+                if self.best_loss[self.m_dig] > self.val_loss.avg:
+                    self.best_loss[self.m_dig] = round(self.val_loss.avg, 4)
+                    save_checkpoint(
+                        self.model, self.args, self.epoch, self.m_dig, self.best_loss
+                    )
+                    self.update_c = 0
+                else:
+                    self.update_c += 1
+
                 f_pred = list()
                 f_gt = list()
                 for (key, value), (_, value2) in zip(self.pred, self.gt):
@@ -177,11 +164,14 @@ class Model(object):
                 )
                 acc = accuracy_score(f_gt, f_pred)
                 self.logger.info(
-                    f"[{self.m_dig}] Macro Precision: {macro_precision:.4f}, Macro Recall: {macro_recall:.4f}, Macro F1: {macro_f1:.4f}, Acc: {acc * 100:.2f}% "
+                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.val_loss.avg:.04f}"
+                )
+                self.logger.info(
+                    f"[{self.m_dig}][Lr: {self.optimizer.param_groups[0]['lr']:4f}] [Early Stop: {self.update_c}/{self.args.stop_early}] Macro Precision: {macro_precision:.4f}, Macro Recall: {macro_recall:.4f}, Macro F1: {macro_f1:.4f}, Acc: {acc * 100:.2f}% "
                 )
             else:
                 self.logger.info(
-                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss[self.m_dig].avg if self.phase == 'train' else self.val_loss[self.m_dig].avg:.04f}"
+                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg:.04f}"
                 )
 
     def stop_early(self):
@@ -193,22 +183,16 @@ class Model(object):
 
         pred_v = [item.argmax().item() for item in pred]
         gt_v = [item.item() for item in gt]
-        score = sum([p == g for (p, g) in zip(pred_v, gt_v)])
 
-        if self.phase == "train":
+        if self.phase == "Train":
             self.pred_t.append([self.m_dig, pred_v])
             self.gt_t.append([self.m_dig, gt_v])
+            self.train_loss.update(loss.item(), batch_size=pred.shape[0])
 
-        elif self.phase == "valid":
+        elif self.phase == "Valid":
             self.pred.append([self.m_dig, pred_v])
             self.gt.append([self.m_dig, gt_v])
-            self.class_acc[self.m_dig].update_acc(score, pred.shape[0])
-
-        self.train_loss[self.m_dig].update(
-            loss.item(), batch_size=pred.shape[0]
-        ) if self.phase == "train" else self.val_loss[self.m_dig].update(
-            loss.item(), batch_size=pred.shape[0]
-        )
+            self.val_loss.update(loss.item(), batch_size=pred.shape[0])
 
         return loss
 
@@ -220,7 +204,7 @@ class Model(object):
 
         self.train_loss[self.m_dig].update(
             loss.item(), batch_size=pred.shape[0]
-        ) if self.phase == "train" else self.val_loss[self.m_dig].update(
+        ) if self.phase == "Train" else self.val_loss[self.m_dig].update(
             loss.item(), batch_size=pred.shape[0]
         )
 
@@ -277,154 +261,119 @@ class Model(object):
         g.close()
         p.close()
 
-    def update_m(self, model_num_class):
-        Update = list()
-        for item in model_num_class:
-            if self.best_loss[item] > self.val_loss[item].avg:
-                try:
-                    self.best_loss[item] = round(self.val_loss[item].avg.item(), 4)
-                except:
-                    self.best_loss[item] = round(self.val_loss[item].avg, 4)
-
-                self.model_list[item] = copy.deepcopy(self.temp_model_list[item])
-                save_checkpoint(
-                    self.model_list[item], self.args, self.epoch, item, self.best_loss
-                )
-                Update.append(item)
-
-        if len(Update) != 0:
-            self.update_c = 0
-            self.logger.info(
-                f"[{self.update_c}/{self.args.stop_early}] update ==> {Update}"
-            )
-        else:
-            self.update_c += 1
-            self.logger.info(
-                f"[{self.update_c}/{self.args.stop_early}] Nothing do not update"
-            )
-
-    def reset_log(self, mode):
-        self.test_value = (
-            {
-                "sagging": AverageMeter(),
-                "wrinkle_forehead": AverageMeter(),
-                "wrinkle_glabellus": AverageMeter(),
-                "wrinkle_perocular": AverageMeter(),
-                "pore": AverageMeter(),
-                "pigmentation_forehead": AverageMeter(),
-                "pigmentation_cheek": AverageMeter(),
-                "dryness": AverageMeter(),
-            }
-            if mode == "class"
-            else {
-                "moisture": AverageMeter(),
-                "wrinkle": AverageMeter(),
-                "elasticity": AverageMeter(),
-                "pore": AverageMeter(),
-                "count": AverageMeter(),
-            }
-        )
-
-        self.train_loss = copy.deepcopy(self.test_value)
-        self.val_loss = copy.deepcopy(self.test_value)
+    def reset_log(self):
+        self.train_loss = AverageMeter()
+        self.val_loss = AverageMeter()
         self.pred = list()
         self.gt = list()
 
     def update_e(self, epoch):
         self.epoch = epoch
-        self.stop_loss = sum(self.args.best_loss.values())
 
-    def get_test_acc(self, pred, label):
-        gt = (
-            torch.tensor(
-                np.array([label[value].detach().cpu().numpy() for value in label])
-            )
-            .permute(1, 0)
-            .to(device)
+    def train(self):
+        self.model.train()
+        self.phase = "Train"
+        random_num = random.randrange(0, len(self.train_loader))
+
+        for self.iter, (img, label, self.img_names, _) in enumerate(self.train_loader):
+            img, label = img.to(device), label.to(device)
+            pred = self.model(img)
+
+            if self.args.mode == "class":
+                loss = self.class_loss(pred, label)
+            else:
+                loss = self.regression(pred, label)
+
+            if self.args.img:
+                save_image(self, img)
+            else:
+                if self.iter == random_num:
+                    save_image(self, img)
+
+            self.print_loss(len(self.train_loader))
+
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+        self.print_loss(len(self.train_loader), final_flag=True)
+
+    def valid(self):
+        self.phase = "Valid"
+        with torch.no_grad():
+            self.model.eval()
+            for self.iter, (img, label, self.img_names, _) in enumerate(
+                self.valid_loader
+            ):
+                img, label = img.to(device), label.to(device)
+                pred = self.model(img)
+
+                if self.args.mode == "class":
+                    self.class_loss(pred, label)
+                else:
+                    self.regression(pred, label)
+
+                self.print_loss(len(self.valid_loader))
+
+            self.scheduler.step(self.val_loss.avg)
+            self.print_loss(len(self.valid_loader), final_flag=True)
+
+
+class Model_test(Model):
+    def __init__(self, args, logger):
+        self.args = args
+        self.pred = defaultdict(list)
+        self.gt = defaultdict(list)
+        self.logger = logger
+
+    def test(self, model, testset_loader, key):
+        self.model = model
+        self.testset_loader = testset_loader
+        self.m_dig = key
+        with torch.no_grad():
+            self.model.eval()
+            for self.iter, (img, label, _, _) in enumerate(
+                tqdm(self.testset_loader, desc=self.m_dig)
+            ):
+                img, label = img.to(device), label.to(device)
+                pred = self.model.to(device)(img)
+
+                if self.args.mode == "class":
+                    self.get_test_acc(pred, label)
+                else:
+                    self.get_test_loss(pred, label)
+
+    def save_value(self):
+        path = os.path.join("prediction", self.args.save_path)
+        mkdir(path)
+        with open(os.path.join(path, f"pred.txt"), "w") as p:
+            with open(os.path.join(path, f"gt.txt"), "w") as g:
+                for key in list(self.pred.keys()):
+                    for p_v, g_v in zip(self.pred[key], self.gt[key]):
+                        p.write(f"{key}, {p_v} \n")
+                        g.write(f"{key}, {g_v} \n")
+        g.close()
+        p.close()
+
+    def print_test(self):
+        (
+            macro_precision,
+            macro_recall,
+            macro_f1,
+            _,
+        ) = precision_recall_fscore_support(self.pred[self.m_dig], self.gt[self.m_dig], average="macro", zero_division=1)
+        acc = accuracy_score(self.gt[self.m_dig], self.pred[self.m_dig])
+        self.logger.info(
+            f"[{self.m_dig}] Macro Precision: {macro_precision:.4f}, Macro Recall: {macro_recall:.4f}, Macro F1: {macro_f1:.4f}, Acc: {acc * 100:.2f}% "
         )
-        num = 0
 
-        for idx, area_name in enumerate(label):
-            dig = area_name.split("_")[-1]
-            pred_l = torch.argmax(pred[:, num : num + class_num_list[dig]], dim=1)
-            num += class_num_list[dig]
-            self.test_value[dig].update_acc(
-                (pred_l == gt[:, idx]).sum().item(),
-                pred_l.shape[0],
-            )
+    def get_test_loss(self, pred, gt):
+        self.test_regresion_mae[self.m_dig].update(
+            self.criterion(pred[0], gt).item(), batch_size=pred.shape[0]
+        )
 
-    def get_test_loss(self, pred_p, label, area_num):
-        count = 0
-        for name in self.equip_loss[area_num]:
-            gt = label[:, count : count + self.equip_loss[area_num][name]]
-            pred = pred_p[:, count : count + self.equip_loss[area_num][name]]
-            count += self.equip_loss[area_num][name]
-            self.test_value[name].update(
-                self.criterion(pred, gt).item(), batch_size=pred.shape[0]
-            )
+        self.pred.append([self.m_dig, pred.item()])
+        self.gt.append([self.m_dig, gt.item()])
 
-    def run(self, phase="train"):
-        self.phase = phase
-        data_loader = self.train_loader if self.phase == "train" else self.valid_loader
-
-        def run_iter():
-            for self.m_dig, datalist in data_loader.items():
-                self.model = (
-                    self.model_list[self.m_dig]
-                    if self.phase == "train"
-                    else self.temp_model_list[self.m_dig]
-                )
-                self.model.train() if self.phase == "train" else self.model.eval()
-                optimizer = torch.optim.Adam(
-                    params=self.model.parameters(),
-                    lr=self.args.lr,
-                    betas=(0.9, 0.999),
-                    weight_decay=0,
-                )
-
-                scheduler = optim.lr_scheduler.StepLR(
-                    optimizer, step_size=30, gamma=0.1
-                )
-                loader_datalist = data.DataLoader(
-                    dataset=copy.deepcopy(datalist),
-                    batch_size=self.args.batch_size,
-                    num_workers=self.args.num_workers,
-                    shuffle=True if self.phase == "train" else False,
-                )
-
-                del datalist
-                random_num = random.randrange(0, len(loader_datalist))
-
-                for self.iter, (img, label, self.img_names, dig_p) in enumerate(
-                    loader_datalist
-                ):
-                    img, label = img.to(device), label.to(device)
-                    pred = self.model(img)
-
-                    if self.args.mode == "class":
-                        loss = self.class_loss(pred, label)
-                    else:
-                        loss = self.regression(pred, label)
-
-                    if self.args.img:
-                        save_image(self, img)
-                    else:
-                        if self.iter == random_num:
-                            save_image(self, img)
-
-                    self.print_loss(len(loader_datalist))
-
-                    if phase == "train":
-                        optimizer.zero_grad()
-                        loss.backward()
-                        optimizer.step()
-
-                if phase == "train":
-                    scheduler.step()
-                self.print_loss(len(loader_datalist), final_flag=True)
-
-        if phase == "train":
-            run_iter()
-        else:
-            with torch.no_grad():
-                run_iter()
+    def get_test_acc(self, pred, gt):
+        [self.pred[self.m_dig].append(item.argmax().item()) for item in pred]
+        [self.gt[self.m_dig].append(item.item()) for item in gt]

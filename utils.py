@@ -1,6 +1,6 @@
 import cv2
 import torch
-import copy
+import inspect
 import errno
 import os
 import torch.nn as nn
@@ -122,7 +122,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class FocalLoss(nn.Module):
-    def __init__(self, alpha=1, gamma=2, reduction='mean'):
+    def __init__(self, alpha=1, gamma=3, reduction='mean'):
         super(FocalLoss, self).__init__()
         self.alpha = alpha
         self.gamma = gamma
@@ -139,6 +139,7 @@ class FocalLoss(nn.Module):
             return focal_loss.sum()
         else:
             return focal_loss
+
 
 
 

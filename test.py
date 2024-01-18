@@ -4,10 +4,11 @@ from torchvision import models
 import sys
 import os
 from data_loader import CustomDataset
-from test_model import Model_test
 import argparse
 from logger import setup_logger
 from torch.utils import data
+
+from model import Model_test
 
 from utils import resume_checkpoint
 
@@ -153,31 +154,37 @@ def main(args):
     )
 
     ## Adjust the number of output in model for each region image
-    model_dict_path = os.path.join(check_path, "pore", "state_dict.bin")
 
-    if os.path.isfile(model_dict_path):
-        logger.info(f"\033[92mResuming......{check_path}\033[0m")
-
-        for key, model in model_list.items():
-            model_list[key] = resume_checkpoint(
-                args,
-                model,
-                os.path.join(check_path, f"{key}", "state_dict.bin"),
-            )
+    if os.path.isdir(check_path):
+        for path in os.listdir(check_path):
+            dig_path = os.path.join(check_path, path)
+            if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
+                print(f"\033[92mResuming......{dig_path}\033[0m")
+                model_list[path] = resume_checkpoint(
+                    args,
+                    model_list[path],
+                    os.path.join(check_path, f"{path}", "state_dict.bin"),
+                )
 
     dataset = CustomDataset(args)
-    testset_loader = dataset.load_dataset("test")
-
-    resnet_model = Model_test(args, model_list, testset_loader, logger)
-    # If the model's acc is higher than best acc, it saves this model
-    logger.info("Inferece ...")
-    resnet_model.test()
-    logger.info("Finish!")
+    resnet_model = Model_test(args, logger)
+    
+    for key in model_list:
+        model = model_list[key].cuda()
+        testset= dataset.load_dataset("test", key)
+        testset_loader = data.DataLoader(
+            dataset=testset,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            shuffle=False,
+        )
+        
+        resnet_model.test(model, testset_loader, key)
+        resnet_model.print_test()
     resnet_model.save_value()
 
-    return logger
 
 
 if __name__ == "__main__":
     args = parse_args()
-    logger = main(args)
+    main(args)

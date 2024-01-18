@@ -1,5 +1,6 @@
+import copy
 import os
-
+from torch.utils import data
 import shutil
 import sys
 import numpy as np
@@ -13,7 +14,8 @@ from model import Model
 
 import argparse
 
-git_name = os.popen('git branch --show-current').readlines()[0].rstrip()
+git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -30,10 +32,9 @@ def parse_args():
         type=str,
     )
 
-
     parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
 
-    parser.add_argument("--stop_early", type=int, default=30)
+    parser.add_argument("--stop_early", type=int, default=50)
 
     parser.add_argument(
         "--mode",
@@ -50,22 +51,21 @@ def parse_args():
 
     parser.add_argument(
         "--output_dir",
-        default= f"checkpoint/{git_name}",
+        default=f"checkpoint/{git_name}",
         type=str,
     )
 
     parser.add_argument(
         "--epoch",
-        default=300,
+        default=200,
         type=int,
     )
-    
+
     parser.add_argument(
         "--smooth",
         default=0.1,
         type=float,
     )
-    
 
     parser.add_argument(
         "--res",
@@ -85,7 +85,6 @@ def parse_args():
         type=int,
     )
 
-
     parser.add_argument(
         "--lr",
         default=0.05,
@@ -100,14 +99,12 @@ def parse_args():
 
     parser.add_argument(
         "--num_workers",
-        default=8,
+        default=4,
         type=int,
     )
 
     parser.add_argument("--reset", action="store_true")
-    parser.add_argument("--cross", action="store_true")
     parser.add_argument("--img", action="store_true")
-
 
     args = parser.parse_args()
 
@@ -129,7 +126,7 @@ def main(args):
             "sagging": 7,
             "wrinkle_forehead": 7,
             "wrinkle_glabellus": 7,
-            "wrinkle_perocular": 7
+            "wrinkle_perocular": 7,
         }  # dryness, pigmentation, pore, sagging, wrinkle
         if args.mode == "class"
         else {
@@ -143,66 +140,102 @@ def main(args):
 
     args.best_loss, model_list = dict(), dict()
     args.best_loss.update({item: np.inf for item in model_num_class})
-    model_list.update({key: models.resnet50(weights=None, num_classes = value) for key, value in model_num_class.items()})
+    model_list.update(
+        {
+            key: models.resnet50(weights=None, num_classes=value)
+            for key, value in model_num_class.items()
+        }
+    )
 
     ## Adjust the number of output in model for each region image
-    model_dict_path = os.path.join(check_path, "pore", "state_dict.bin")
     args.save_img = os.path.join("save_img", git_name, args.mode, args.name)
-    
+
     if args.reset:
-        print(f"\033[90mReseting......{model_dict_path}\033[0m")
+        print(f"\033[90mReseting......{check_path}\033[0m")
         if os.path.isdir(check_path):
             shutil.rmtree(check_path)
         if os.path.isdir(args.save_img):
             shutil.rmtree(args.save_img)
-    
-    else:
-        if os.path.isfile(model_dict_path):
-            print(f"\033[92mResuming......{model_dict_path}\033[0m")
 
-            for key, model in model_list.items():
-                model_list[key] = resume_checkpoint(
-                    args,
-                    model,
-                    os.path.join(check_path, f"{key}", "state_dict.bin"),
-                )
+    else:
+        if os.path.isdir(check_path):
+            for path in os.listdir(check_path):
+                dig_path = os.path.join(check_path, path)
+                if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
+                    print(f"\033[92mResuming......{dig_path}\033[0m")
+                    model_list[path] = resume_checkpoint(
+                        args,
+                        model_list[path],
+                        os.path.join(check_path, f"{path}", "state_dict.bin"),
+                    )
 
     # for key, model in model_list.items():
     #     for name, param in model.named_parameters():
     #         if 'layer1' in name or 'layer2' in name or 'layer3' in name:
     #             param.requires_grad = False
-            
-    for key in model_list:
-        # model_list[key] = torch.nn.DataParallel(model_list[key])
-        model_list[key] = model_list[key].cuda()
-            
+
     logger = setup_logger(args.name + args.mode, check_path)
     logger.info(args)
     logger.info("Command Line: " + " ".join(sys.argv))
 
     dataset = CustomDataset(args)
 
-    trainset_loader = dataset.load_dataset("train")
-    valset_loader = dataset.load_dataset("valid")
-    
-    
-    resnet_model = Model(
-        args, model_list, trainset_loader, valset_loader, logger, check_path, model_num_class, writer
-    )
+    for key in model_list:
+        model = model_list[key].cuda()
 
-    for epoch in range(args.load_epoch, args.epoch):
-        resnet_model.update_e(epoch + 1) if args.load_epoch else None
-        resnet_model.run(phase = 'train')
-        resnet_model.run(phase = 'valid')
+        trainset = dataset.load_dataset("train", key)
+        trainset_loader = data.DataLoader(
+            dataset=trainset,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            shuffle=True,
+        )
 
-        resnet_model.update_m(model_num_class)
-        resnet_model.update_e(epoch + 1)
-        resnet_model.reset_log(mode=args.mode)
+        valset = dataset.load_dataset("valid", key)
+        valset_loader = data.DataLoader(
+            dataset=valset,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            shuffle=False,
+        )
 
-        if resnet_model.stop_early():
-            break
+        resnet_model = Model(
+            args,
+            model,
+            trainset_loader,
+            valset_loader,
+            logger,
+            check_path,
+            model_num_class,
+            writer,
+            key,
+        )
+
+        for epoch in range(args.load_epoch, args.epoch):
+            resnet_model.update_e(epoch + 1) if args.load_epoch else None
+            resnet_model.train()
+            resnet_model.valid()
+
+            resnet_model.update_e(epoch + 1)
+            resnet_model.reset_log()
+
+            if resnet_model.stop_early():
+                break
+
+        del trainset_loader, valset_loader
 
 
 if __name__ == "__main__":
     args = parse_args()
     main(args)
+
+
+"""
+    a = list()
+    for img, _, _, _ in trainset_loader:
+        a.append(img[0])
+    b = np.stack(a, axis = 0)
+    print(f"{key} => {b.mean(axis = -1).mean(axis = -1).mean(axis = 0)}")
+    print(f"{key} => {b.std(axis = -1).std(axis = -1).std(axis = 0)}")
+            
+"""
