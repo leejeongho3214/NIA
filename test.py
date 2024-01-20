@@ -10,13 +10,9 @@ from torch.utils import data
 
 from model import Model_test
 
-from utils import resume_checkpoint
+from utils import resume_checkpoint, fix_seed
 
-torch.manual_seed(523)
-torch.cuda.manual_seed_all(523)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
-
+fix_seed(523)
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
 
@@ -108,6 +104,7 @@ def parse_args():
 
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--cross", action="store_true")
+    parser.add_argument("--meta", action="store_true")
 
     args = parser.parse_args()
 
@@ -115,12 +112,11 @@ def parse_args():
 
 
 def main(args):
-    args.save_path = os.path.join(git_name, args.mode, args.name)
-    check_path = os.path.join("checkpoint", args.save_path)
+    args.check_path = os.path.join(args.output_dir, args.mode, args.name)
     ## Make the directories for save
 
     logger = setup_logger(
-        args.name, os.path.join("eval", args.save_path), filename=args.name + ".txt"
+        args.name, os.path.join(args.check_path, "eval"), filename=args.name + ".txt"
     )
     logger.info("Command Line: " + " ".join(sys.argv))
 
@@ -148,41 +144,41 @@ def main(args):
     model_list = dict()
     model_list.update(
         {
-            key: models.resnet50(weights=None, num_classes=value)
+            key: models.resnet50(weights=None, num_classes=value, args=args)
             for key, value in model_num_class.items()
         }
     )
 
     ## Adjust the number of output in model for each region image
 
-    if os.path.isdir(check_path):
-        for path in os.listdir(check_path):
-            dig_path = os.path.join(check_path, path)
+    model_path = os.path.join(args.check_path, "save_model")
+    if os.path.isdir(model_path):
+        for path in os.listdir(model_path):
+            dig_path = os.path.join(model_path, path)
             if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
                 print(f"\033[92mResuming......{dig_path}\033[0m")
                 model_list[path] = resume_checkpoint(
                     args,
                     model_list[path],
-                    os.path.join(check_path, f"{path}", "state_dict.bin"),
+                    os.path.join(dig_path, "state_dict.bin"),
                 )
 
     dataset = CustomDataset(args)
     resnet_model = Model_test(args, logger)
-    
+
     for key in model_list:
         model = model_list[key].cuda()
-        testset= dataset.load_dataset("test", key)
+        testset = dataset.load_dataset("test", key)
         testset_loader = data.DataLoader(
             dataset=testset,
             batch_size=args.batch_size,
             num_workers=args.num_workers,
             shuffle=False,
         )
-        
+
         resnet_model.test(model, testset_loader, key)
         resnet_model.print_test()
     resnet_model.save_value()
-
 
 
 if __name__ == "__main__":

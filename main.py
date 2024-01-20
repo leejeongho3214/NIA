@@ -1,4 +1,5 @@
 import copy
+import inspect
 import os
 from torch.utils import data
 import shutil
@@ -7,13 +8,14 @@ import numpy as np
 import torch
 from torchvision import models
 from tensorboardX import SummaryWriter
-from utils import mkdir, resume_checkpoint
+from utils import FocalLoss, mkdir, resume_checkpoint, fix_seed
 from logger import setup_logger
 from data_loader import CustomDataset
 from model import Model
 
 import argparse
 
+fix_seed(523)
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
 
@@ -62,14 +64,14 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--smooth",
-        default=0.1,
-        type=float,
+        "--res",
+        default=128,
+        type=int,
     )
 
     parser.add_argument(
-        "--res",
-        default=128,
+        "--gamma",
+        default=3,
         type=int,
     )
 
@@ -99,12 +101,13 @@ def parse_args():
 
     parser.add_argument(
         "--num_workers",
-        default=4,
+        default=8,
         type=int,
     )
 
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--img", action="store_true")
+    parser.add_argument("--meta", action="store_true")
 
     args = parser.parse_args()
 
@@ -113,7 +116,7 @@ def parse_args():
 
 def main(args):
     check_path = os.path.join(args.output_dir, args.mode, args.name)
-    mkdir(check_path)
+    mkdir(os.path.join(check_path, "save_model"))
     log_path = os.path.join("tensorboard", git_name, args.mode, args.name)
     mkdir(log_path)
     writer = SummaryWriter(log_path)
@@ -142,41 +145,36 @@ def main(args):
     args.best_loss.update({item: np.inf for item in model_num_class})
     model_list.update(
         {
-            key: models.resnet50(weights=None, num_classes=value)
+            key: models.resnet50(weights=None, num_classes=value, args = args)
             for key, value in model_num_class.items()
         }
     )
 
     ## Adjust the number of output in model for each region image
-    args.save_img = os.path.join("save_img", git_name, args.mode, args.name)
+    args.save_img = os.path.join(check_path, "save_img")
 
     if args.reset:
         print(f"\033[90mReseting......{check_path}\033[0m")
         if os.path.isdir(check_path):
             shutil.rmtree(check_path)
-        if os.path.isdir(args.save_img):
-            shutil.rmtree(args.save_img)
 
     else:
-        if os.path.isdir(check_path):
-            for path in os.listdir(check_path):
-                dig_path = os.path.join(check_path, path)
+        model_path = os.path.join(check_path, "save_model")
+        if os.path.isdir(model_path):
+            for path in os.listdir(model_path):
+                dig_path = os.path.join(model_path, path)
                 if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
                     print(f"\033[92mResuming......{dig_path}\033[0m")
                     model_list[path] = resume_checkpoint(
                         args,
                         model_list[path],
-                        os.path.join(check_path, f"{path}", "state_dict.bin"),
+                        os.path.join(model_path,f"{path}", "state_dict.bin"),
                     )
-
-    # for key, model in model_list.items():
-    #     for name, param in model.named_parameters():
-    #         if 'layer1' in name or 'layer2' in name or 'layer3' in name:
-    #             param.requires_grad = False
-
+                    
     logger = setup_logger(args.name + args.mode, check_path)
     logger.info(args)
     logger.info("Command Line: " + " ".join(sys.argv))
+    logger.debug(inspect.getsource(FocalLoss))
 
     dataset = CustomDataset(args)
 

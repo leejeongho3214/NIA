@@ -169,6 +169,7 @@ class ResNet(nn.Module):
         self,
         block: Type[Union[BasicBlock, Bottleneck]],
         layers: List[int],
+        args,
         num_classes: int = 1000,
         zero_init_residual: bool = False,
         groups: int = 1,
@@ -182,7 +183,7 @@ class ResNet(nn.Module):
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
-
+        self.args = args
         self.inplanes = 64
         self.dilation = 1
         if replace_stride_with_dilation is None:
@@ -211,9 +212,7 @@ class ResNet(nn.Module):
         
         self.fc = nn.Linear(512 * block.expansion, num_classes)
         self.fcc = nn.Linear(512 * block.expansion + 3, 512 * block.expansion)
-        self.fc1 = nn.Linear(512 * block.expansion, int(512 * block.expansion / 8))
-        self.fc2 = nn.Linear(int(512 * block.expansion / 8) , int(512 * block.expansion / 32))
-        self.fc3 = nn.Linear(int(512 * block.expansion / 32), num_classes)
+
         self.dropout = nn.Dropout(p = 0.5)
 
         for m in self.modules():
@@ -277,7 +276,7 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def _forward_impl(self, x: Tensor) -> Tensor:
+    def _forward_impl(self, x: Tensor, meta: Tensor) -> Tensor:
         # See note [TorchScript super()]
         x = self.conv1(x)
         x = self.bn1(x)
@@ -292,17 +291,17 @@ class ResNet(nn.Module):
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
 
-        # x = self.fc(x)
-        
-        # x = torch.concat([x, meta.cuda()], dim = -1)
-        # x = self.fcc(x)
+        if self.args.meta:
+            x = torch.concat([x, meta.cuda()], dim = -1)
+            x = self.fcc(x)
+            x = self.dropout(x)
 
         x = self.fc(x)
 
         return x 
         
-    def forward(self, x: Tensor) -> Tensor:
-        return self._forward_impl(x)
+    def forward(self, x: Tensor, meta: Tensor) -> Tensor:
+        return self._forward_impl(x, meta)
 
 
 def _resnet(

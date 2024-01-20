@@ -1,4 +1,6 @@
+import random
 import cv2
+import numpy as np
 import torch
 import inspect
 import errno
@@ -143,31 +145,8 @@ class FocalLoss(nn.Module):
 
 
 
-def labeling(gt, num):
-    template = torch.zeros(num)
-    label = gt.item()
-    
-    if label == 0:
-        template[0] = 0.85
-        template[1] = 0.1
-
-    elif label == num - 1:
-        template[-1] = 0.85
-        template[-2] = 0.1
-
-    else:
-        template[label] = 0.85
-        template[label - 1] = 0.05
-        template[label + 1] = 0.05
-    
-    zero_index = torch.where(template == 0)[0]
-    template[zero_index] = 0.05 / len(zero_index)
-
-    return template.reshape(1, -1).cuda()
-
-
 def save_checkpoint(model, args, epoch, m_dig, best_loss):
-    checkpoint_dir = os.path.join(args.output_dir, args.mode, args.name, str(m_dig))
+    checkpoint_dir = os.path.join(args.output_dir, args.mode, args.name, "save_model", str(m_dig))
     mkdir(checkpoint_dir)
     model_to_save = model.module if hasattr(model, "module") else model
     torch.save(
@@ -223,3 +202,13 @@ def save_image(self, img):
         x, y = (i % 8 * (256 + 2) + 2, i // 8 * (256 + 2) + 20)  # 위치 조절
         cv2.putText(img_mat, name, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.41, (255, 255, 255), 1, cv2.LINE_AA)
     cv2.imwrite(os.path.join(path, f"epoch_{self.epoch}_iter_{self.iter}_{self.m_dig}.jpg"), img_mat.get())
+
+def fix_seed(random_seed):
+
+    torch.manual_seed(random_seed)
+    torch.cuda.manual_seed(random_seed)
+    torch.cuda.manual_seed_all(random_seed)  # if use multi-GPU
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    np.random.seed(random_seed)
+    random.seed(random_seed)

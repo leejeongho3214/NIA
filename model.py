@@ -66,9 +66,7 @@ class Model(object):
         )
 
         self.train_loss, self.val_loss = AverageMeter(), AverageMeter()
-
         self.class_acc = AverageMeter()
-
         self.keep_acc = {
             "sagging": AverageMeter(),
             "wrinkle_forehead": AverageMeter(),
@@ -96,8 +94,7 @@ class Model(object):
             "8": {"moisture": 1, "elasticity": 1},
         }
         self.epoch = 0
-        self.criterion = FocalLoss() if self.args.mode == "class" else nn.L1Loss()
-        self.logger.debug(inspect.getsource(FocalLoss))
+        self.criterion = FocalLoss(gamma=self.args.gamma) if self.args.mode == "class" else nn.L1Loss()
         
         (
             self.phase,
@@ -275,9 +272,10 @@ class Model(object):
         self.phase = "Train"
         random_num = random.randrange(0, len(self.train_loader))
 
-        for self.iter, (img, label, self.img_names, _) in enumerate(self.train_loader):
+        for self.iter, (img, label, self.img_names, _, meta_v) in enumerate(self.train_loader):
             img, label = img.to(device), label.to(device)
-            pred = self.model(img)
+            pred = self.model(img, meta_v)
+
 
             if self.args.mode == "class":
                 loss = self.class_loss(pred, label)
@@ -301,11 +299,11 @@ class Model(object):
         self.phase = "Valid"
         with torch.no_grad():
             self.model.eval()
-            for self.iter, (img, label, self.img_names, _) in enumerate(
+            for self.iter, (img, label, self.img_names, _, meta_v) in enumerate(
                 self.valid_loader
             ):
                 img, label = img.to(device), label.to(device)
-                pred = self.model(img)
+                pred = self.model(img, meta_v)
 
                 if self.args.mode == "class":
                     self.class_loss(pred, label)
@@ -331,11 +329,11 @@ class Model_test(Model):
         self.m_dig = key
         with torch.no_grad():
             self.model.eval()
-            for self.iter, (img, label, _, _) in enumerate(
+            for self.iter, (img, label, _, _, meta_v) in enumerate(
                 tqdm(self.testset_loader, desc=self.m_dig)
             ):
                 img, label = img.to(device), label.to(device)
-                pred = self.model.to(device)(img)
+                pred = self.model.to(device)(img, meta_v)
 
                 if self.args.mode == "class":
                     self.get_test_acc(pred, label)
@@ -343,7 +341,7 @@ class Model_test(Model):
                     self.get_test_loss(pred, label)
 
     def save_value(self):
-        path = os.path.join("prediction", self.args.save_path)
+        path = os.path.join(self.args.save_path, "prediction")
         mkdir(path)
         with open(os.path.join(path, f"pred.txt"), "w") as p:
             with open(os.path.join(path, f"gt.txt"), "w") as g:

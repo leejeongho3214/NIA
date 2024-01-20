@@ -302,7 +302,13 @@ class CustomDataset(Dataset):
                                 or json_meta["images"]["bbox"] == None
                             ):
                                 continue
+                            
+                            age = torch.tensor([round((json_meta["info"]["age"] - 13.0) / 69.0, 5)])
+                            gender = 0 if json_meta["info"]["gender"] == "F" else 1
+                            gender_l = F.one_hot(torch.tensor(gender), 2)
 
+                            meta_v = torch.concat([age, gender_l])
+                            
                             for dig_n, grade in json_meta["annotations"].items():
                                 dig, area = (
                                     dig_n.split("_")[-1],
@@ -317,11 +323,11 @@ class CustomDataset(Dataset):
 
                                 if equ_name == "01":
                                     self.json_dict[dig][str(grade)].append(
-                                        os.path.join(pre_name, j_name.split(".")[0])
+                                        [os.path.join(pre_name, j_name.split(".")[0]), meta_v]
                                     )
                                 else:
                                     self.json_dict_train[dig][str(grade)].append(
-                                        os.path.join(pre_name, j_name.split(".")[0])
+                                        [os.path.join(pre_name, j_name.split(".")[0]), meta_v]
                                     )
 
     def load_dataset(self, mode, dig_k):
@@ -371,17 +377,17 @@ class CustomDataset(Dataset):
             ]
         )
         
-        transform_list = [transform_test, transform_crop, transform_color]
+        transform_list = [transform_test, transform_crop]
         print(transform_list)
 
         def save_dict(transform):
             pil = Image.fromarray(pil_img.astype(np.uint8))
             patch_img = transform(pil)
-            area_list[dig][grade].append([patch_img, int(grade), desc_area, dig])
+            area_list[dig][grade].append([patch_img, int(grade), desc_area, dig, meta_v])
 
         for dig, grade, class_dict in tqdm(data_list.datasets, desc=f"{mode}_class"):
             if dig == dig_k:
-                for idx, i_path in enumerate(
+                for idx, (i_path, meta_v) in enumerate(
                     tqdm(sorted(class_dict), desc=f"{dig}_{grade}")
                 ):
                     if idx == self.args.data_num:
@@ -413,9 +419,7 @@ class CustomDataset(Dataset):
                         + s_list[3]
                     )
 
-                    if mode == "train":
-
-                        
+                    if mode == "train":                       
                         for transform in transform_list:
                             if s_list[3] in ["01", "02", "07", "08"]:
                                 save_dict(transform)

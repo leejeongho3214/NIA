@@ -95,7 +95,10 @@ def setup_logger(name, path, filename="Evaluation.txt"):
     if not os.path.isfile(path):
         mkdir(path)
         
-    fh = FileHandler(os.path.join(path, filename), encoding='utf-8', mode = 'at')
+    elif os.path.isfile(os.path.join(path, filename)):
+        os.remove(os.path.join(path, filename))
+        
+    fh = FileHandler(os.path.join(path, filename), encoding='utf-8', mode = "at")
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(formatter2)
     logger.addHandler(fh)
