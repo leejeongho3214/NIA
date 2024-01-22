@@ -169,8 +169,9 @@ def noramlize_v(key, self):
 
 
 class CustomDataset(Dataset):
-    def __init__(self, args):
+    def __init__(self, args, logger):
         self.args = args
+        self.logger = logger
         self.load_list(args)
         train_list, val_list, test_list = list(), list(), list()
 
@@ -206,6 +207,7 @@ class CustomDataset(Dataset):
     def load_list(self, args):
         self.img_path = args.img_path
         self.json_path = args.json_path
+        
         sub_path_list = [
             item
             for item in natsort.natsorted(os.listdir(self.img_path))
@@ -214,6 +216,7 @@ class CustomDataset(Dataset):
 
         self.json_dict = defaultdict(lambda: defaultdict(list))
         self.json_dict_train = defaultdict(lambda: defaultdict(list))
+        
         for equ_name in sub_path_list:
             if equ_name.startswith(".") or int(equ_name) not in self.args.equ:
                 continue
@@ -348,8 +351,9 @@ class CustomDataset(Dataset):
 
         transform_crop = transforms.Compose(
             [
-                transforms.CenterCrop(230),
                 transforms.ToTensor(),
+                transforms.FiveCrop(230),
+                transforms.Lambda(lambda crops: torch.stack([(crop) for crop in crops])),
                 transforms.Resize(256, antialias=True),
                 noramlize_v(dig_k, self),
             ]
@@ -361,6 +365,9 @@ class CustomDataset(Dataset):
                     brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1
                 ),
                 transforms.ToTensor(),
+                transforms.FiveCrop(230),
+                transforms.Lambda(lambda crops: torch.stack([(crop) for crop in crops])),
+                transforms.Resize(256, antialias=True),
                 noramlize_v(dig_k, self),
             ]
         )
@@ -377,13 +384,18 @@ class CustomDataset(Dataset):
             ]
         )
         
-        transform_list = [transform_test, transform_crop]
-        print(transform_list)
+        transform_list = [transform_test] if not self.args.jitter else [transform_test, transform_color]
+        
+        if dig_k == "dryness": 
+            self.logger.debug(transform_list)
 
-        def save_dict(transform):
+        def save_dict(idx, transform):
             pil = Image.fromarray(pil_img.astype(np.uint8))
             patch_img = transform(pil)
-            area_list[dig][grade].append([patch_img, int(grade), desc_area, dig, meta_v])
+            if idx > 0: 
+                [area_list[dig][grade].append([patch_img[j], int(grade), desc_area, dig, meta_v]) for j in range(len(patch_img))]
+            else:
+                area_list[dig][grade].append([patch_img, int(grade), desc_area, dig, meta_v])
 
         for dig, grade, class_dict in tqdm(data_list.datasets, desc=f"{mode}_class"):
             if dig == dig_k:
@@ -404,8 +416,8 @@ class CustomDataset(Dataset):
                         (int(p_img.shape[1] * r_value), int(p_img.shape[0] * r_value)),
                     )
                     pil_img[: r_img.shape[0], : r_img.shape[1]] = r_img
-                    if i_path.split("_")[-1] in ["04", "06"]:
-                        pil_img = cv2.flip(pil_img, 1)
+                    # if i_path.split("_")[-1] in ["04", "06"]:
+                    #     pil_img = cv2.flip(pil_img, 1)
 
                     s_list = i_path.split("/")[-1].split("_")
                     desc_area = (
@@ -420,15 +432,12 @@ class CustomDataset(Dataset):
                     )
 
                     if mode == "train":                       
-                        for transform in transform_list:
-                            if s_list[3] in ["01", "02", "07", "08"]:
-                                save_dict(transform)
-                                pil_img = cv2.flip(pil_img, 1)
-                                save_dict(transform)
-                            else:
-                                save_dict(transform)
+                        for idx, transform in enumerate(transform_list):
+                            save_dict(idx, transform)
+                            pil_img = cv2.flip(pil_img, flipCode=1)
+                            save_dict(idx, transform)
                     else:
-                        save_dict(transform_test)
+                        save_dict(0, transform_test)
 
         sub_path = [item for items in area_list[dig_k].values() for item in items]
 

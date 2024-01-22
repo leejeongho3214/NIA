@@ -294,7 +294,7 @@ class ResNet(nn.Module):
         if self.args.meta:
             x = torch.concat([x, meta.cuda()], dim = -1)
             x = self.fcc(x)
-            x = self.dropout(x)
+            x = self.relu(x)
 
         x = self.fc(x)
 

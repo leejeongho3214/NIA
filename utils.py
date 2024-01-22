@@ -198,8 +198,9 @@ def save_image(self, img):
     path = os.path.join(self.args.save_img, self.m_dig)
     mkdir(path)
     img_mat = cv2.UMat(s_img)
+    j = self.args.batch_size // 4
     for i, name in enumerate(self.img_names):
-        x, y = (i % 8 * (256 + 2) + 2, i // 8 * (256 + 2) + 20)  # 위치 조절
+        x, y = (i % j * (256 + 2) + 2, i // j * (256 + 2) + 20)  # 위치 조절
         cv2.putText(img_mat, name, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.41, (255, 255, 255), 1, cv2.LINE_AA)
     cv2.imwrite(os.path.join(path, f"epoch_{self.epoch}_iter_{self.iter}_{self.m_dig}.jpg"), img_mat.get())
 
@@ -212,3 +213,6 @@ def fix_seed(random_seed):
     torch.backends.cudnn.benchmark = False
     np.random.seed(random_seed)
     random.seed(random_seed)
+    # torch.use_deterministic_algorithms(True)
+    # os.environ["PYTHONHASHSEED"] = str(random_seed)
+    

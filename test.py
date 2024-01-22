@@ -105,6 +105,7 @@ def parse_args():
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--cross", action="store_true")
     parser.add_argument("--meta", action="store_true")
+    parser.add_argument("--jitter", action="store_true")
 
     args = parser.parse_args()
 

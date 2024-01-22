@@ -66,7 +66,6 @@ class Model(object):
         )
 
         self.train_loss, self.val_loss = AverageMeter(), AverageMeter()
-        self.class_acc = AverageMeter()
         self.keep_acc = {
             "sagging": AverageMeter(),
             "wrinkle_forehead": AverageMeter(),
@@ -94,8 +93,12 @@ class Model(object):
             "8": {"moisture": 1, "elasticity": 1},
         }
         self.epoch = 0
-        self.criterion = FocalLoss(gamma=self.args.gamma) if self.args.mode == "class" else nn.L1Loss()
-        
+        self.criterion = (
+            FocalLoss(gamma=self.args.gamma)
+            if self.args.mode == "class"
+            else nn.L1Loss()
+        )
+
         (
             self.phase,
             self.update_c,
@@ -124,11 +127,10 @@ class Model(object):
             f"\rEpoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}",
             end="",
         )
-
         if final_flag:
             self.writer.add_scalar(
                 f"{self.phase}/{self.m_dig}",
-                self.train_loss.avg if self.args.mode == "class" else self.val_loss.avg,
+                self.train_loss.avg if self.phase == "Train" else self.val_loss.avg,
                 self.epoch,
             )
 
@@ -164,7 +166,7 @@ class Model(object):
                     f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.val_loss.avg:.04f}"
                 )
                 self.logger.info(
-                    f"[{self.m_dig}][Lr: {self.optimizer.param_groups[0]['lr']:4f}] [Early Stop: {self.update_c}/{self.args.stop_early}] Macro Precision: {macro_precision:.4f}, Macro Recall: {macro_recall:.4f}, Macro F1: {macro_f1:.4f}, Acc: {acc * 100:.2f}% "
+                    f"[{self.m_dig}][Lr: {self.optimizer.param_groups[0]['lr']:4f}] [Early Stop: {self.update_c}/{self.args.stop_early}] Macro Precision: {macro_precision:.4f}, Macro Recall: {macro_recall:.4f}, Macro F1: {macro_f1:.4f}, Acc: {acc * 100:.2f}%"
                 )
             else:
                 self.logger.info(
@@ -190,7 +192,7 @@ class Model(object):
             self.pred.append([self.m_dig, pred_v])
             self.gt.append([self.m_dig, gt_v])
             self.val_loss.update(loss.item(), batch_size=pred.shape[0])
-
+            
         return loss
 
     def regression(self, pred, label, dig):
@@ -272,10 +274,11 @@ class Model(object):
         self.phase = "Train"
         random_num = random.randrange(0, len(self.train_loader))
 
-        for self.iter, (img, label, self.img_names, _, meta_v) in enumerate(self.train_loader):
+        for self.iter, (img, label, self.img_names, _, meta_v) in enumerate(
+            self.train_loader
+        ):
             img, label = img.to(device), label.to(device)
             pred = self.model(img, meta_v)
-
 
             if self.args.mode == "class":
                 loss = self.class_loss(pred, label)
@@ -293,6 +296,7 @@ class Model(object):
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+            
         self.print_loss(len(self.train_loader), final_flag=True)
 
     def valid(self):
@@ -341,10 +345,10 @@ class Model_test(Model):
                     self.get_test_loss(pred, label)
 
     def save_value(self):
-        path = os.path.join(self.args.save_path, "prediction")
-        mkdir(path)
-        with open(os.path.join(path, f"pred.txt"), "w") as p:
-            with open(os.path.join(path, f"gt.txt"), "w") as g:
+        pred_path = os.path.join(self.agrs.check_path, "prediction")
+        mkdir(pred_path)
+        with open(os.path.join(pred_path, f"pred.txt"), "w") as p:
+            with open(os.path.join(pred_path, f"gt.txt"), "w") as g:
                 for key in list(self.pred.keys()):
                     for p_v, g_v in zip(self.pred[key], self.gt[key]):
                         p.write(f"{key}, {p_v} \n")
@@ -358,7 +362,9 @@ class Model_test(Model):
             macro_recall,
             macro_f1,
             _,
-        ) = precision_recall_fscore_support(self.pred[self.m_dig], self.gt[self.m_dig], average="macro", zero_division=1)
+        ) = precision_recall_fscore_support(
+            self.pred[self.m_dig], self.gt[self.m_dig], average="macro", zero_division=1
+        )
         acc = accuracy_score(self.gt[self.m_dig], self.pred[self.m_dig])
         self.logger.info(
             f"[{self.m_dig}] Macro Precision: {macro_precision:.4f}, Macro Recall: {macro_recall:.4f}, Macro F1: {macro_f1:.4f}, Acc: {acc * 100:.2f}% "

@@ -108,6 +108,7 @@ def parse_args():
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--img", action="store_true")
     parser.add_argument("--meta", action="store_true")
+    parser.add_argument("--jitter", action="store_true")
 
     args = parser.parse_args()
 
@@ -116,10 +117,8 @@ def parse_args():
 
 def main(args):
     check_path = os.path.join(args.output_dir, args.mode, args.name)
-    mkdir(os.path.join(check_path, "save_model"))
     log_path = os.path.join("tensorboard", git_name, args.mode, args.name)
-    mkdir(log_path)
-    writer = SummaryWriter(log_path)
+
     model_num_class = (
         {
             "dryness": 5,
@@ -145,21 +144,24 @@ def main(args):
     args.best_loss.update({item: np.inf for item in model_num_class})
     model_list.update(
         {
-            key: models.resnet50(weights=None, num_classes=value, args = args)
+            key: models.resnet50(weights=None, num_classes=value, args=args)
             for key, value in model_num_class.items()
         }
     )
 
     ## Adjust the number of output in model for each region image
     args.save_img = os.path.join(check_path, "save_img")
+    args.pred_path = os.path.join(check_path, "prediction")
+    model_path = os.path.join(check_path, "save_model")
 
     if args.reset:
         print(f"\033[90mReseting......{check_path}\033[0m")
         if os.path.isdir(check_path):
             shutil.rmtree(check_path)
+        if os.path.isdir(log_path):
+            shutil.rmtree(log_path)
 
     else:
-        model_path = os.path.join(check_path, "save_model")
         if os.path.isdir(model_path):
             for path in os.listdir(model_path):
                 dig_path = os.path.join(model_path, path)
@@ -168,15 +170,20 @@ def main(args):
                     model_list[path] = resume_checkpoint(
                         args,
                         model_list[path],
-                        os.path.join(model_path,f"{path}", "state_dict.bin"),
+                        os.path.join(model_path, f"{path}", "state_dict.bin"),
                     )
-                    
+
+    mkdir(model_path)
+    mkdir(log_path)
+    writer = SummaryWriter(log_path)
+
     logger = setup_logger(args.name + args.mode, check_path)
     logger.info(args)
     logger.info("Command Line: " + " ".join(sys.argv))
     logger.debug(inspect.getsource(FocalLoss))
+    logger.debug(inspect.getsource(models.resnet.ResNet._forward_impl))
 
-    dataset = CustomDataset(args)
+    dataset = CustomDataset(args, logger)
 
     for key in model_list:
         model = model_list[key].cuda()
@@ -211,6 +218,7 @@ def main(args):
 
         for epoch in range(args.load_epoch, args.epoch):
             resnet_model.update_e(epoch + 1) if args.load_epoch else None
+            
             resnet_model.train()
             resnet_model.valid()
 

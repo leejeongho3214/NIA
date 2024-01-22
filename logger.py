@@ -92,7 +92,7 @@ def setup_logger(name, path, filename="Evaluation.txt"):
     logger.propagate = False
     logger.addHandler(ch)
             
-    if not os.path.isfile(path):
+    if not os.path.isdir(path):
         mkdir(path)
         
     elif os.path.isfile(os.path.join(path, filename)):
