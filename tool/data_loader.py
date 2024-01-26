@@ -14,7 +14,6 @@ from torch.utils.data import random_split, ConcatDataset, Dataset
 
 from utils import noramlize_v
 
-
 def mkdir(path):
     # if it is the current folder, skip.
     # otherwise the original code will raise FileNotFoundError
@@ -25,7 +24,6 @@ def mkdir(path):
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise
-
 
 folder_name = {
     "F": "01",
@@ -65,7 +63,6 @@ img_num = {
     "02": 3,
     "03": 3,
 }
-
 
 class CustomDataset_class(Dataset):
     def __init__(self, args, logger):
@@ -225,6 +222,9 @@ class CustomDataset_class(Dataset):
                             )
                             and args.mode == "regression"
                         ):
+                            continue
+                        
+                        if json_meta["images"]["bbox"] == None: 
                             continue
 
                         age = torch.tensor(
