@@ -216,12 +216,12 @@ def fix_seed(random_seed):
     torch.backends.cudnn.benchmark = False
     np.random.seed(random_seed)
     random.seed(random_seed)
-    # torch.use_deterministic_algorithms(True)
-    # os.environ["PYTHONHASHSEED"] = str(random_seed)
+
     
     
 
 def noramlize_v(key, self):
+       
     if key == "dryness":
         a = (
             transforms.Normalize(

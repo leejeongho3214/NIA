@@ -7,7 +7,7 @@ import numpy as np
 from scipy.stats import pearsonr
 
 from tqdm import tqdm
-from dataset.data_loader import class_num_list, mkdir
+from data_loader import class_num_list, mkdir
 import torch.optim as optim
 from utils import (
     AverageMeter,
@@ -38,7 +38,6 @@ class Model(object):
         writer,
         dig_k,
     ):
-        super().__init__()
         (
             self.args,
             self.model,
@@ -136,60 +135,60 @@ class Model(object):
                     self.update_c = 0
                 else:
                     self.update_c += 1
-
+                    
                 f_pred = list()
                 f_gt = list()
-                for (key, value), (_, value2) in zip(self.pred, self.gt):
-                    if key != self.m_dig:
-                        continue
+                for value, value2 in zip(self.pred, self.gt):
                     for v, v1 in zip(value, value2):
                         f_pred.append(v)
                         f_gt.append(v1)
-
-                (
-                    macro_precision,
-                    macro_recall,
-                    macro_f1,
-                    _,
-                ) = precision_recall_fscore_support(
-                    f_gt, f_pred, average="macro", zero_division=1
-                )
                 
-                (
-                    micro_precision,
-                    micro_recall,
-                    micro_f1,
-                    _,
-                ) = precision_recall_fscore_support(
-                    f_gt, f_pred, average="micro", zero_division=1
-                )
-
-                (
-                    weighted_precision,
-                    weighted_recall,
-                    weighted_f1,
-                    _,
-                ) = precision_recall_fscore_support(
-                    f_gt, f_pred, average="weighted", zero_division=1
-                )
-
                 correlation, _ = pearsonr(f_gt, f_pred)
+                self.logger.info(
+                        f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
+                    )
                 
-                self.logger.info(
-                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.val_loss.avg:.04f}"
-                )
-                self.logger.info(
-                    f"[{self.m_dig}][Lr: {self.optimizer.param_groups[0]['lr']:4f}] [Early Stop: {self.update_c}/{self.args.stop_early}] Macro Precision: {macro_precision:.4f}, Macro Recall: {macro_recall:.4f}, Macro F1: {macro_f1:.4f}, Correlation: {correlation:.2f}"
-                )
-                self.logger.info(
-                    f"Mirco Precision: {micro_precision:.4f}, Mirco Recall: {micro_recall:.4f}, Mirco F1: {micro_f1:.4f}"
-                )
-                self.logger.info(
-                    f"Weighted Precision: {weighted_precision:.4f}, Weighted Recall: {weighted_recall:.4f}, Weighted F1: {weighted_f1:.4f}"
-                )
+                if self.args.mode == "class":
+                    (
+                        macro_precision,
+                        macro_recall,
+                        macro_f1,
+                        _,
+                    ) = precision_recall_fscore_support(
+                        f_gt, f_pred, average="macro", zero_division=1
+                    )
+                    
+                    (
+                        micro_precision,
+                        micro_recall,
+                        micro_f1,
+                        _,
+                    ) = precision_recall_fscore_support(
+                        f_gt, f_pred, average="micro", zero_division=1
+                    )
+
+                    (
+                        weighted_precision,
+                        weighted_recall,
+                        weighted_f1,
+                        _,
+                    ) = precision_recall_fscore_support(
+                        f_gt, f_pred, average="weighted", zero_division=1
+                    )
+
+
+                    self.logger.info(
+                        f"[{self.m_dig}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}] Macro Precision: {macro_precision:.4f}, Macro Recall: {macro_recall:.4f}, Macro F1: {macro_f1:.4f}"
+                    )
+                    self.logger.info(
+                        f"Mirco Precision: {micro_precision:.4f}, Mirco Recall: {micro_recall:.4f}, Mirco F1: {micro_f1:.4f}"
+                    )
+                    self.logger.info(
+                        f"Weighted Precision: {weighted_precision:.4f}, Weighted Recall: {weighted_recall:.4f}, Weighted F1: {weighted_f1:.4f}"
+                    )
             else:
                 self.logger.info(
-                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg:.04f}"
+                    f"Epoch: {self.epoch} [Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg:.04f}"
                 )
 
     def stop_early(self):
@@ -213,28 +212,33 @@ class Model(object):
         gt_v = [item.item() for item in gt]
 
         if self.phase == "Train":
-            self.pred_t.append([self.m_dig, pred_v])
-            self.gt_t.append([self.m_dig, gt_v])
+            self.pred_t.append(pred_v)
+            self.gt_t.append(gt_v)
             self.train_loss.update(loss.item(), batch_size=pred.shape[0])
 
         elif self.phase == "Valid":
-            self.pred.append([self.m_dig, pred_v])
-            self.gt.append([self.m_dig, gt_v])
+            self.pred.append(pred_v)
+            self.gt.append(gt_v)
             self.val_loss.update(loss.item(), batch_size=pred.shape[0])
 
         return loss
 
-    def regression(self, pred, label, dig):
-        loss = self.criterion(pred[0], label.to(device))
+    def regression(self, pred, gt):
+        pred = pred.flatten()
+        loss = self.criterion(pred, gt)
+        
+        pred_v = [item.item() for item in pred]
+        gt_v = [item.item() for item in gt]
+        
+        if self.phase == "Train":
+            self.pred_t.append(pred_v)
+            self.gt_t.append(gt_v)
+            self.train_loss.update(loss.item(), batch_size=pred.shape[0])
 
-        self.pred.append([dig, pred[0].item()])
-        self.gt.append([dig, label.item()])
-
-        self.train_loss[self.m_dig].update(
-            loss.item(), batch_size=pred.shape[0]
-        ) if self.phase == "Train" else self.val_loss[self.m_dig].update(
-            loss.item(), batch_size=pred.shape[0]
-        )
+        elif self.phase == "Valid":
+            self.pred.append(pred_v)
+            self.gt.append(gt_v)
+            self.val_loss.update(loss.item(), batch_size=pred.shape[0])
 
         return loss
 
@@ -261,33 +265,6 @@ class Model(object):
             )
 
         return result
-
-    def save_value(self):
-        pred_path = os.path.join(self.check_path, "prediction")
-        mkdir(pred_path)
-        with open(
-            os.path.join(pred_path, f"epoch_{self.epoch}_pred_train.txt"), "w"
-        ) as p:
-            with open(
-                os.path.join(pred_path, f"epoch_{self.epoch}_gt_train.txt"), "w"
-            ) as g:
-                for idx in range(len(self.pred_t)):
-                    p.write(f"{self.pred_t[idx][0]}, {self.pred_t[idx][1]} \n")
-                    g.write(f"{self.gt_t[idx][0]}, {self.gt_t[idx][1]} \n")
-        g.close()
-        p.close()
-
-        with open(
-            os.path.join(pred_path, f"epoch_{self.epoch}_pred_val.txt"), "w"
-        ) as p:
-            with open(
-                os.path.join(pred_path, f"epoch_{self.epoch}_gt_val.txt"), "w"
-            ) as g:
-                for idx in range(len(self.pred)):
-                    p.write(f"{self.pred[idx][0]}, {self.pred[idx][1]} \n")
-                    g.write(f"{self.gt[idx][0]}, {self.gt[idx][1]} \n")
-        g.close()
-        p.close()
 
     def reset_log(self):
         self.train_loss = AverageMeter()

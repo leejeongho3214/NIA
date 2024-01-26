@@ -67,8 +67,6 @@ img_num = {
 }
 
 
-
-
 class CustomDataset_class(Dataset):
     def __init__(self, args, logger):
         self.args = args
@@ -221,7 +219,11 @@ class CustomDataset_class(Dataset):
                             )
                             and args.mode == "class"
                         ) or (
-                            json_meta["equipment"] == None and args.mode == "regression"
+                            (
+                                json_meta["equipment"] == None
+                                or json_meta["images"]["bbox"] == None
+                            )
+                            and args.mode == "regression"
                         ):
                             continue
 
@@ -324,7 +326,7 @@ class CustomDataset_class(Dataset):
         else:
             norm_v = self.norm_reg(self.value)
             label_data = norm_v
-            
+
         if patch_img.dim() == 4:
             [
                 self.area_list.append(
@@ -337,6 +339,8 @@ class CustomDataset_class(Dataset):
                 [patch_img, label_data, desc_area, self.dig, self.meta_v]
             )
 
+        return pil_img
+
     def load_dataset(self, mode, dig_k):
         data_list = (
             self.train_list
@@ -347,11 +351,9 @@ class CustomDataset_class(Dataset):
         )
         self.area_list = list()
 
-        # transform_test = transforms.Compose(
-        #     [transforms.ToTensor(), noramlize_v(dig_k, self)]
-        # )
-
-        transform_test = transforms.Compose([transforms.ToTensor()])
+        transform_test = transforms.Compose(
+            [transforms.ToTensor(), noramlize_v(dig_k, self)]
+        )
 
         transform_crop = transforms.Compose(
             [
@@ -387,15 +389,13 @@ class CustomDataset_class(Dataset):
         self.logger.debug(transform_list)
 
         def func_v():
-            # if mode == "train":
-            #     for transform in transform_list:
-            #         self.save_dict(transform)
-            #         pil_img = cv2.flip(pil_img, flipCode=1)
-            #         self.save_dict(transform)
-            # else:
-            #     self.save_dict(transform_test)
-
-            self.save_dict(transform_test)
+            if mode == "train":
+                for transform in transform_list:
+                    pil_img = self.save_dict(transform)
+                    pil_img = cv2.flip(pil_img, flipCode=1)
+                    self.save_dict(transform)
+            else:
+                self.save_dict(transform_test)
 
         if self.args.mode == "class":
             for self.dig, self.grade, class_dict in tqdm(
@@ -420,11 +420,11 @@ class CustomDataset_class(Dataset):
                         func_v()
 
         return self.area_list
-    
+
     def norm_reg(self, value):
         dig_v = self.dig.split("_")[-1]
 
-        if dig_v in ["pigmentation", "R2"]:
+        if dig_v == "R2":
             return value
 
         elif dig_v == "moisture":
@@ -433,7 +433,7 @@ class CustomDataset_class(Dataset):
         elif dig_v == "Ra":
             return value / 50
 
-        elif dig_v == "count":
+        elif dig_v in ["pigmentation", "count"]:
             return value / 350
 
         elif dig_v == "pore":
@@ -441,6 +441,7 @@ class CustomDataset_class(Dataset):
 
         else:
             assert 0, "dig_v is not here"
+
 
 class CustomDataset_regress(CustomDataset_class):
     def __init__(self, args, logger):
@@ -464,5 +465,3 @@ class CustomDataset_regress(CustomDataset_class):
             ConcatDataset(val_list),
             ConcatDataset(test_list),
         )
-
-

@@ -223,15 +223,6 @@ def main(args):
     dataset = CustomDataset_class(args, logger) if args.mode == 'class' else CustomDataset_regress(args, logger)
     
     for key in model_list:
-        trainset = dataset.load_dataset("train", key)
-        t_set = [j[0] for j in trainset]
-        mean = torch.stack(t_set).mean(axis = 0).mean(axis = 1).mean(axis=1)
-        std = torch.stack(t_set).std(axis = 0).std(axis = 1).std(axis=1)
-        print(f"{len(trainset)}")
-        print(f"{key} => mean: {mean}, std: {std}")
-        assert 0, "finish"
-
-    for key in model_list:
         if key in pass_list:
             continue
         model = model_list[key].cuda()
