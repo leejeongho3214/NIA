@@ -10,7 +10,6 @@ from torch.utils import data
 import shutil
 
 import numpy as np
-import torch
 from torchvision import models
 from tensorboardX import SummaryWriter
 from utils import FocalLoss, mkdir, resume_checkpoint, fix_seed

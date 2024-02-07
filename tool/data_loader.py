@@ -1,4 +1,5 @@
 import errno
+import random
 from PIL import Image
 import natsort
 import torch
@@ -121,16 +122,8 @@ class CustomDataset_class(Dataset):
             if not item.startswith(".")
         ]
 
-        self.json_dict = (
-            defaultdict(lambda: defaultdict(list))
-            if args.mode == "class"
-            else defaultdict(list)
-        )
-        self.json_dict_train = (
-            defaultdict(lambda: defaultdict(list))
-            if args.mode == "class"
-            else defaultdict(list)
-        )
+        self.json_dict = defaultdict(lambda: defaultdict(list))
+        self.json_dict_train = defaultdict(lambda: defaultdict(list))
 
         for equ_name in sub_path_list:
             if equ_name.startswith(".") or int(equ_name) not in self.args.equ:
@@ -191,7 +184,7 @@ class CustomDataset_class(Dataset):
                             (
                                 j_name.split("_")[2] == "F"
                                 and j_name.split("_")[3].split(".")[0]
-                                not in ["01", "02", "05", "06", "07", "08"]
+                                not in ["00", "01", "02", "05", "06", "07", "08"]
                             )
                             or (
                                 j_name.split("_")[2] == "L"
@@ -277,7 +270,7 @@ class CustomDataset_class(Dataset):
                                     dig = matching_dig[0]
 
                                     if equ_name == "01":
-                                        self.json_dict[dig].append(
+                                        self.json_dict[dig][sub_fold].append(
                                             [
                                                 os.path.join(
                                                     pre_name, j_name.split(".")[0]
@@ -287,7 +280,7 @@ class CustomDataset_class(Dataset):
                                             ]
                                         )
                                     else:
-                                        self.json_dict_train[dig].append(
+                                        self.json_dict_train[dig][sub_fold].append(
                                             [
                                                 os.path.join(
                                                     pre_name, j_name.split(".")[0]
@@ -449,16 +442,29 @@ class CustomDataset_regress(CustomDataset_class):
         self.logger = logger
         self.load_list(args)
         train_list, val_list, test_list = list(), list(), list()
+        self.json_dict_train = dict(self.json_dict_train)
 
         for dig, v_list in self.json_dict.items():
-            t, v, tt = random_split(v_list, [0.8, 0.1, 0.1])
-            train_list.append([dig, t])
-            val_list.append([dig, v])
-            test_list.append([dig, tt])
-
-        if len(self.json_dict_train) > 0:
-            for dig, v_list in self.json_dict.items():
-                train_list.append([dig, v_list])
+            random_list = list(self.json_dict[dig].keys())
+            random.shuffle(random_list)
+            
+            t_len, v_len = int(len(v_list) * 0.8), int(len(v_list) * 0.1)
+            t_idx = random_list[: t_len]
+            v_idx = random_list[t_len: t_len + v_len]
+            test_idx = random_list[t_len + v_len:]
+            
+            v_list = dict(v_list)
+            
+            t_list = [sub_list for idx in t_idx for sub_list in v_list[idx]]
+            train_list.append([dig, t_list])
+            v_list2 = [sub_list for idx in v_idx for sub_list in v_list[idx]]
+            val_list.append([dig, v_list2])
+            t_list2 = [sub_list for idx in test_idx for sub_list in v_list[idx]]
+            test_list.append([dig, t_list2])
+            
+            if len(self.json_dict_train[dig]) > 0:
+                tt_list = [sub_list for idx in t_idx for sub_list in self.json_dict_train[dig][idx]]
+                train_list.append([dig, tt_list])
 
         self.train_list, self.val_list, self.test_list = (
             ConcatDataset(train_list),
