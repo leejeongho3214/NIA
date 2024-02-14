@@ -17,7 +17,7 @@ from utils import (
 )
 import os
 from torch.utils import data
-from sklearn.metrics import precision_recall_fscore_support, accuracy_score
+from sklearn.metrics import precision_recall_fscore_support, mean_absolute_error
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -135,19 +135,19 @@ class Model(object):
                     self.update_c = 0
                 else:
                     self.update_c += 1
-                    
+
                 f_pred = list()
                 f_gt = list()
                 for value, value2 in zip(self.pred, self.gt):
                     for v, v1 in zip(value, value2):
                         f_pred.append(v)
                         f_gt.append(v1)
-                
+
                 correlation, _ = pearsonr(f_gt, f_pred)
                 self.logger.info(
-                        f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
-                    )
-                
+                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
+                )
+
                 if self.args.mode == "class":
                     (
                         macro_precision,
@@ -157,35 +157,34 @@ class Model(object):
                     ) = precision_recall_fscore_support(
                         f_gt, f_pred, average="macro", zero_division=1
                     )
-                    
-                    (
-                        micro_precision,
-                        micro_recall,
-                        micro_f1,
-                        _,
-                    ) = precision_recall_fscore_support(
-                        f_gt, f_pred, average="micro", zero_division=1
-                    )
 
-                    (
-                        weighted_precision,
-                        weighted_recall,
-                        weighted_f1,
-                        _,
-                    ) = precision_recall_fscore_support(
-                        f_gt, f_pred, average="weighted", zero_division=1
-                    )
+                    # (
+                    #     micro_precision,
+                    #     micro_recall,
+                    #     micro_f1,
+                    #     _,
+                    # ) = precision_recall_fscore_support(
+                    #     f_gt, f_pred, average="micro", zero_division=1
+                    # )
 
+                    # (
+                    #     weighted_precision,
+                    #     weighted_recall,
+                    #     weighted_f1,
+                    #     _,
+                    # ) = precision_recall_fscore_support(
+                    #     f_gt, f_pred, average="weighted", zero_division=1
+                    # )
 
                     self.logger.info(
                         f"[{self.m_dig}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}] Macro Precision: {macro_precision:.4f}, Macro Recall: {macro_recall:.4f}, Macro F1: {macro_f1:.4f}"
                     )
-                    self.logger.info(
-                        f"Mirco Precision: {micro_precision:.4f}, Mirco Recall: {micro_recall:.4f}, Mirco F1: {micro_f1:.4f}"
-                    )
-                    self.logger.info(
-                        f"Weighted Precision: {weighted_precision:.4f}, Weighted Recall: {weighted_recall:.4f}, Weighted F1: {weighted_f1:.4f}"
-                    )
+                    # self.logger.info(
+                    #     f"Mirco Precision: {micro_precision:.4f}, Mirco Recall: {micro_recall:.4f}, Mirco F1: {micro_f1:.4f}"
+                    # )
+                    # self.logger.info(
+                    #     f"Weighted Precision: {weighted_precision:.4f}, Weighted Recall: {weighted_recall:.4f}, Weighted F1: {weighted_f1:.4f}"
+                    # )
             else:
                 self.logger.info(
                     f"Epoch: {self.epoch} [Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg:.04f}"
@@ -226,10 +225,10 @@ class Model(object):
     def regression(self, pred, gt):
         pred = pred.flatten()
         loss = self.criterion(pred, gt)
-        
+
         pred_v = [item.item() for item in pred]
         gt_v = [item.item() for item in gt]
-        
+
         if self.phase == "Train":
             self.pred_t.append(pred_v)
             self.gt_t.append(gt_v)
@@ -249,9 +248,7 @@ class Model(object):
             result = (
                 f"{color}+{value}{c_color}%"
                 if value > 0
-                else "No change"
-                if value == 0
-                else f"{color}{value}{c_color}%"
+                else "No change" if value == 0 else f"{color}{value}{c_color}%"
             )
         else:
             sub = (self.test_value[name].avg) - self.keep_mae[name]
@@ -259,9 +256,7 @@ class Model(object):
             result = (
                 f"{color}+{value}{c_color}"
                 if value > 0
-                else "No change"
-                if value == 0
-                else f"{color}{value}{c_color}"
+                else "No change" if value == 0 else f"{color}{value}{c_color}"
             )
 
         return result
@@ -381,56 +376,67 @@ class Model_test(Model):
         p.close()
 
     def print_test(self):
-        (
-            micro_precision,
-            micro_recall,
-            micro_f1,
-            _,
-        ) = precision_recall_fscore_support(
-            self.gt[self.m_dig], self.pred[self.m_dig], average="micro", zero_division=1
-        )
+        if self.args.mode == "class":
+            (
+                micro_precision,
+                micro_recall,
+                micro_f1,
+                _,
+            ) = precision_recall_fscore_support(
+                self.gt[self.m_dig],
+                self.pred[self.m_dig],
+                average="micro",
+                zero_division=1,
+            )
 
-        (
-            macro_precision,
-            macro_recall,
-            macro_f1,
-            _,
-        ) = precision_recall_fscore_support(
-            self.gt[self.m_dig], self.pred[self.m_dig], average="macro", zero_division=1
-        )
+            (
+                macro_precision,
+                macro_recall,
+                macro_f1,
+                _,
+            ) = precision_recall_fscore_support(
+                self.gt[self.m_dig],
+                self.pred[self.m_dig],
+                average="macro",
+                zero_division=1,
+            )
 
-        (
-            weighted_precision,
-            weighted_recall,
-            weighted_f1,
-            _,
-        ) = precision_recall_fscore_support(
-            self.gt[self.m_dig],
-            self.pred[self.m_dig],
-            average="weighted",
-            zero_division=1,
-        )
+            (
+                weighted_precision,
+                weighted_recall,
+                weighted_f1,
+                _,
+            ) = precision_recall_fscore_support(
+                self.gt[self.m_dig],
+                self.pred[self.m_dig],
+                average="weighted",
+                zero_division=1,
+            )
+            correlation, p_value = pearsonr(self.gt[self.m_dig], self.pred[self.m_dig])
+            
+            top_3 = [ False if abs(g - p) > 1 else True for g, p in zip(self.gt[self.m_dig], self.pred[self.m_dig])]
+            top_3_acc = sum(top_3)/len(top_3)
 
-        correlation, p_value = pearsonr(self.gt[self.m_dig], self.pred[self.m_dig])
+            self.logger.info(
+                f"[{self.m_dig}]Micro Precision(=Acc): {micro_precision:.4f}, Micro Recall: {micro_recall:.4f}, Micro F1: {micro_f1:.4f}"
+            )
 
-        self.logger.info(
-            f"[{self.m_dig}]Micro Precision(=Acc): {micro_precision:.4f}, Micro Recall: {micro_recall:.4f}, Micro F1: {micro_f1:.4f}, Correlation: {correlation:.2f}, P-value: {p_value}"
-        )
-
-        self.logger.info(
-            f"Macro Precision: {macro_precision:.4f}, Macro Recall: {macro_recall:.4f}, Macro F1: {macro_f1:.4f}"
-        )
-        self.logger.info(
-            f"Weighted Precision: {weighted_precision:.4f}, Weighted Recall: {weighted_recall:.4f}, Weighted F1: {weighted_f1:.4f}\n"
-        )
+            self.logger.info(
+                f"Macro Precision: {macro_precision:.4f}, Macro Recall: {macro_recall:.4f}, Macro F1: {macro_f1:.4f}"
+            )
+            self.logger.info(
+                f"Weighted Precision: {weighted_precision:.4f}, Weighted Recall: {weighted_recall:.4f}, Weighted F1: {weighted_f1:.4f}"
+            )
+            self.logger.info(f"Correlation: {correlation:.2f}, P-value: {p_value}, Top-3 Acc: {top_3_acc}\n")
+            
+        else:
+            correlation, p_value = pearsonr(self.gt[self.m_dig], self.pred[self.m_dig])
+            mae = mean_absolute_error(self.gt[self.m_dig], self.pred[self.m_dig])
+            self.logger.info(f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value}, MAE: {mae:.4f}\n")
 
     def get_test_loss(self, pred, gt):
-        self.test_regresion_mae[self.m_dig].update(
-            self.criterion(pred[0], gt).item(), batch_size=pred.shape[0]
-        )
-
-        self.pred.append([self.m_dig, pred.item()])
-        self.gt.append([self.m_dig, gt.item()])
+        [self.pred[self.m_dig].append(item.item()) for item in pred]
+        [self.gt[self.m_dig].append(item.item()) for item in gt]
 
     def get_test_acc(self, pred, gt):
         [self.pred[self.m_dig].append(item.argmax().item()) for item in pred]

@@ -266,7 +266,7 @@ def noramlize_v(key, self):
     elif key in [
         "pigmentation_cheek",
         "cheek_moisture",
-        "cheek_elasticity_R2, cheek_pore",
+        "cheek_elasticity_R2", "cheek_pore",
         "pore",
     ]:
         a = (

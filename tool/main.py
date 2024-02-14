@@ -3,6 +3,7 @@ import os
 import sys
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -69,6 +70,15 @@ def parse_args():
             "wrinkle_forehead",
             "wrinkle_glabellus",
             "wrinkle_perocular",
+            "pigmentation",
+            "forehead_moisture",
+            "forehead_elasticity_R2",
+            "perocular_wrinkle_Ra",
+            "cheek_moisture",
+            "cheek_elasticity_R2",
+            "cheek_pore",
+            "chin_moisture",
+            "chin_elasticity_R2",
         ],
         type=str,
     )
@@ -207,20 +217,25 @@ def main(args):
                     if os.path.isdir(os.path.join(dig_path, "done")):
                         print(f"\043[92mPassing......{dig_path}\043[0m")
                         pass_list.append(path)
+
     pass_list = pass_list + args.pass_list
 
     mkdir(model_path)
     mkdir(log_path)
     writer = SummaryWriter(log_path)
 
-    logger = setup_logger(args.name + args.mode, check_path)
+    logger = setup_logger(args.name + args.mode, os.path.join(check_path, "log", "train"))
     logger.info(args)
     logger.info("Command Line: " + " ".join(sys.argv))
     logger.debug(inspect.getsource(FocalLoss))
     logger.debug(inspect.getsource(models.resnet.ResNet._forward_impl))
 
-    dataset = CustomDataset_class(args, logger) if args.mode == 'class' else CustomDataset_regress(args, logger)
-    
+    dataset = (
+        CustomDataset_class(args, logger)
+        if args.mode == "class"
+        else CustomDataset_regress(args, logger)
+    )
+
     for key in model_list:
         if key in pass_list:
             continue

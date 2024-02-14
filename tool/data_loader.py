@@ -1,3 +1,4 @@
+import copy
 import errno
 import random
 from PIL import Image
@@ -15,6 +16,7 @@ from torch.utils.data import random_split, ConcatDataset, Dataset
 
 from utils import noramlize_v
 
+
 def mkdir(path):
     # if it is the current folder, skip.
     # otherwise the original code will raise FileNotFoundError
@@ -25,6 +27,7 @@ def mkdir(path):
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise
+
 
 folder_name = {
     "F": "01",
@@ -65,6 +68,7 @@ img_num = {
     "03": 3,
 }
 
+
 class CustomDataset_class(Dataset):
     def __init__(self, args, logger):
         self.args = args
@@ -73,20 +77,30 @@ class CustomDataset_class(Dataset):
         train_list, val_list, test_list = list(), list(), list()
 
         for dig, class_dict in self.json_dict.items():
-            for grade, name_list in class_dict.items():
-                if len(name_list) < 10:
-                    name_list = name_list * (10 // len(name_list) + 1)
-                t, v, tt = random_split(name_list, [0.8, 0.1, 0.1])
-                train_list.append([dig, grade, t])
-                val_list.append([dig, grade, v])
-                test_list.append([dig, grade, tt])
+            for grade, grade_dict in class_dict.items():
+                random_list = list(grade_dict.keys())
+                random.shuffle(random_list)
 
-        if len(self.json_dict_train) > 0:
-            for dig, class_dict in self.json_dict_train.items():
-                for grade, name_list in class_dict.items():
-                    if len(name_list) < 10:
-                        name_list = name_list * (10 // len(name_list) + 1)
-                    train_list.append([dig, grade, name_list])
+                t_len, v_len = int(len(grade_dict) * 0.8), int(len(grade_dict) * 0.1)
+                t_idx = random_list[:t_len]
+                v_idx = random_list[t_len : t_len + v_len]
+                test_idx = random_list[t_len + v_len :]
+
+                grade_dict = dict(grade_dict)
+                t_list = [sub_list for idx in t_idx for sub_list in grade_dict[idx]]
+                train_list.append([dig, grade, t_list])
+                v_list2 = [sub_list for idx in v_idx for sub_list in grade_dict[idx]]
+                val_list.append([dig, grade, v_list2])
+                t_list2 = [sub_list for idx in test_idx for sub_list in grade_dict[idx]]
+                test_list.append([dig, grade, t_list2])
+
+                if len(self.json_dict_train[dig][grade]) > 0:
+                    tt_list = [
+                        sub_list
+                        for idx in t_idx
+                        for sub_list in self.json_dict_train[dig][grade][idx]
+                    ]
+                    train_list.append([dig, grade, tt_list])
 
         self.train_list, self.val_list, self.test_list = (
             ConcatDataset(train_list),
@@ -122,8 +136,12 @@ class CustomDataset_class(Dataset):
             if not item.startswith(".")
         ]
 
-        self.json_dict = defaultdict(lambda: defaultdict(list))
-        self.json_dict_train = defaultdict(lambda: defaultdict(list))
+        self.json_dict = (
+            defaultdict(lambda: defaultdict(list))
+            if self.args.mode == "regression"
+            else defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+        )
+        self.json_dict_train = copy.deepcopy(self.json_dict)
 
         for equ_name in sub_path_list:
             if equ_name.startswith(".") or int(equ_name) not in self.args.equ:
@@ -140,203 +158,158 @@ class CustomDataset_class(Dataset):
                     os.path.join(self.json_path, pre_name)
                 ):
                     continue
-                
-                
+
+                ## Classifying meaningful images for training from various angles of images
                 for j_name in os.listdir(folder_path):
-                    if j_name.split("_")[3].split(".")[0] != "00": continue
+                    if equ_name == "01":
+                        if (
+                            (
+                                j_name.split("_")[2] == "Ft"
+                                and j_name.split("_")[3].split(".")[0]
+                                in ["01", "02", "03", "04", "05", "06"]
+                            )
+                            or (
+                                j_name.split("_")[2] == "Fb"
+                                and j_name.split("_")[3].split(".")[0]
+                                in ["01", "02", "03", "04", "05", "06", "07", "08"]
+                            )
+                            or (
+                                j_name.split("_")[2] == "F"
+                                and j_name.split("_")[3].split(".")[0] in ["03", "04"]
+                            )
+                        ):
+                            continue
+
+                        elif (
+                            j_name.split("_")[2].startswith("R")
+                            and j_name.split("_")[3].split(".")[0] in ["04", "06"]
+                        ) or (
+                            j_name.split("_")[2].startswith("L")
+                            and j_name.split("_")[3].split(".")[0] in ["03", "05"]
+                        ):
+                            continue
+
+                        elif j_name.split("_")[2] in [
+                            "R30",
+                            "L30",
+                        ] and j_name.split(
+                            "_"
+                        )[3].split(".")[0] in ["01", "02"]:
+                            continue
+
+                    elif equ_name == "02":
+                        if (
+                            (
+                                j_name.split("_")[2] == "F"
+                                and j_name.split("_")[3].split(".")[0]
+                                in ["03", "04"]
+                            )
+                            or (
+                                j_name.split("_")[2] == "L"
+                                and j_name.split("_")[3].split(".")[0]
+                                in ["00", "01", "03", "05", "07", "08"]
+                            )
+                            or (
+                                j_name.split("_")[2] == "R"
+                                and j_name.split("_")[3].split(".")[0]
+                                in ["00", "01", "04", "06", "07", "08"]
+                            )
+                        ):
+                            continue
+
+                    # Load the json file for image
                     with open(os.path.join(folder_path, j_name), "r") as f:
                         json_meta = json.load(f)
 
-                        img = cv2.imread(
-                            f"dataset/img/{equ_name}/{json_meta['info']['id']}/{json_meta['info']['filename']}"
+                        if (
+                            (
+                                list(json_meta["annotations"].keys())[0] == "acne"
+                                or json_meta["images"]["bbox"] == None
+                            )
+                            and args.mode == "class"
+                        ) or (
+                            (
+                                json_meta["equipment"] == None
+                                or json_meta["images"]["bbox"] == None
+                            )
+                            and args.mode == "regression"
+                        ):
+                            continue
+
+                        if json_meta["images"]["bbox"] == None:
+                            continue
+
+                        age = torch.tensor(
+                            [round((json_meta["info"]["age"] - 13.0) / 69.0, 5)]
                         )
-                        # bbox = json_meta["images"]["bbox"]
-                        # if bbox == None:
-                        #     continue
-                        
-                        # max_l = max(bbox[3] - bbox[1], bbox[2] - bbox[0]) // 2
-                        # center_p = ((bbox[1] + bbox[3]) // 2, (bbox[0] + bbox[2]) // 2)
-                        # p_img = img[
-                        #     max(0, center_p[0] - max_l) : min(
-                        #         img.shape[0] - 1, center_p[0] + max_l
-                        #     ),
-                        #     max(0, center_p[1] - max_l) : min(
-                        #         img.shape[1] - 1, center_p[1] + max_l
-                        #     ),
-                        # ]
-                        # r_value = 256 / max(p_img.shape)
+                        gender = 0 if json_meta["info"]["gender"] == "F" else 1
+                        gender_l = F.one_hot(torch.tensor(gender), 2)
 
-                        # pil_img = np.zeros([256, 256, 3])
-                        # r_img = cv2.resize(
-                        #     p_img,
-                        #     (
-                        #         int(p_img.shape[1] * r_value),
-                        #         int(p_img.shape[0] * r_value),
-                        #     ),
-                        # )
+                        meta_v = torch.concat([age, gender_l])
 
-                        # pil_img[: r_img.shape[0], : r_img.shape[1]] = r_img
-                        
-                        pil_img = cv2.resize(img, (256, 256))
-                        
-                        
-                        mkdir(f"dataset/cropped_img/{equ_name}/{json_meta['info']['id']}")
-                        cv2.imwrite(
-                            f"dataset/cropped_img/{equ_name}/{json_meta['info']['id']}/{json_meta['info']['filename'].split('.')[0]}_{json_meta['images']['facepart']:02}.jpg",
-                            pil_img,
-                        )
-                        
-                        continue
-         
-        assert 0, "finish"           
-                # ## Classifying meaningful images for training from various angles of images
-                # for j_name in os.listdir(folder_path):
-                #     if equ_name == "01":
-                #         if (
-                #             (
-                #                 j_name.split("_")[2] == "Ft"
-                #                 and j_name.split("_")[3].split(".")[0]
-                #                 in ["01", "02", "03", "04"]
-                #             )
-                #             or (
-                #                 j_name.split("_")[2] == "Fb"
-                #                 and j_name.split("_")[3].split(".")[0]
-                #                 in ["01", "02", "03", "04", "05", "06", "07", "08"]
-                #             )
-                #             or (
-                #                 j_name.split("_")[2] == "F"
-                #                 and j_name.split("_")[3].split(".")[0] in ["03", "04"]
-                #             )
-                #         ):
-                #             continue
+                        if args.mode == "class":
+                            for dig_n, grade in json_meta["annotations"].items():
+                                dig, area = (
+                                    dig_n.split("_")[-1],
+                                    dig_n.split("_")[-2],
+                                )
 
-                #         elif (
-                #             j_name.split("_")[2].startswith("R")
-                #             and j_name.split("_")[3].split(".")[0] in ["04", "06"]
-                #         ) or (
-                #             j_name.split("_")[2].startswith("L")
-                #             and j_name.split("_")[3].split(".")[0] in ["03", "05"]
-                #         ):
-                #             continue
+                                if dig in [
+                                    "wrinkle",
+                                    "pigmentation",
+                                ]:
+                                    dig = f"{dig}_{area}"
 
-                #         elif j_name.split("_")[2] in [
-                #             "R30",
-                #             "L30",
-                #         ] and j_name.split(
-                #             "_"
-                #         )[3].split(".")[0] in ["01", "02"]:
-                #             continue
+                                if equ_name == "01":
+                                    self.json_dict[dig][str(grade)][sub_fold].append(
+                                        [
+                                            os.path.join(
+                                                pre_name, j_name.split(".")[0]
+                                            ),
+                                            meta_v,
+                                        ]
+                                    )
+                                else:
+                                    self.json_dict_train[dig][str(grade)][
+                                        sub_fold
+                                    ].append(
+                                        [
+                                            os.path.join(
+                                                pre_name, j_name.split(".")[0]
+                                            ),
+                                            meta_v,
+                                        ]
+                                    )
+                        else:
+                            for dig_n, value in json_meta["equipment"].items():
+                                matching_dig = [
+                                    target_dig
+                                    for target_dig in target_list
+                                    if target_dig in dig_n
+                                ]
+                                if len(matching_dig) != 0:
+                                    dig = matching_dig[0]
 
-                #     elif equ_name == "02":
-                #         if (
-                #             (
-                #                 j_name.split("_")[2] == "F"
-                #                 and j_name.split("_")[3].split(".")[0]
-                #                 not in ["00", "01", "02", "05", "06", "07", "08"]
-                #             )
-                #             or (
-                #                 j_name.split("_")[2] == "L"
-                #                 and j_name.split("_")[3].split(".")[0]
-                #                 not in ["02", "04", "06"]
-                #             )
-                #             or (
-                #                 j_name.split("_")[2] == "R"
-                #                 and j_name.split("_")[3].split(".")[0]
-                #                 not in ["02", "03", "05"]
-                #             )
-                #         ):
-                #             continue
-
-                #     with open(os.path.join(folder_path, j_name), "r") as f:
-                #         json_meta = json.load(f)
-
-                #         if (
-                #             (
-                #                 list(json_meta["annotations"].keys())[0] == "acne"
-                #                 or json_meta["images"]["bbox"] == None
-                #             )
-                #             and args.mode == "class"
-                #         ) or (
-                #             (
-                #                 json_meta["equipment"] == None
-                #                 or json_meta["images"]["bbox"] == None
-                #             )
-                #             and args.mode == "regression"
-                #         ):
-                #             continue
-                        
-                #         if json_meta["images"]["bbox"] == None: 
-                #             continue
-
-                #         age = torch.tensor(
-                #             [round((json_meta["info"]["age"] - 13.0) / 69.0, 5)]
-                #         )
-                #         gender = 0 if json_meta["info"]["gender"] == "F" else 1
-                #         gender_l = F.one_hot(torch.tensor(gender), 2)
-
-                #         meta_v = torch.concat([age, gender_l])
-
-                #         if args.mode == "class":
-                #             for dig_n, grade in json_meta["annotations"].items():
-                #                 dig, area = (
-                #                     dig_n.split("_")[-1],
-                #                     dig_n.split("_")[-2],
-                #                 )
-
-                #                 if dig in [
-                #                     "wrinkle",
-                #                     "pigmentation",
-                #                 ]:
-                #                     dig = f"{dig}_{area}"
-
-                #                 if equ_name == "01":
-                #                     self.json_dict[dig][str(grade)].append(
-                #                         [
-                #                             os.path.join(
-                #                                 pre_name, j_name.split(".")[0]
-                #                             ),
-                #                             meta_v,
-                #                         ]
-                #                     )
-                #                 else:
-                #                     self.json_dict_train[dig][str(grade)].append(
-                #                         [
-                #                             os.path.join(
-                #                                 pre_name, j_name.split(".")[0]
-                #                             ),
-                #                             meta_v,
-                #                         ]
-                #                     )
-                #         else:
-                #             for dig_n, value in json_meta["equipment"].items():
-                #                 matching_dig = [
-                #                     target_dig
-                #                     for target_dig in target_list
-                #                     if target_dig in dig_n
-                #                 ]
-                #                 if len(matching_dig) != 0:
-                #                     dig = matching_dig[0]
-
-                #                     if equ_name == "01":
-                #                         self.json_dict[dig][sub_fold].append(
-                #                             [
-                #                                 os.path.join(
-                #                                     pre_name, j_name.split(".")[0]
-                #                                 ),
-                #                                 value,
-                #                                 meta_v,
-                #                             ]
-                #                         )
-                #                     else:
-                #                         self.json_dict_train[dig][sub_fold].append(
-                #                             [
-                #                                 os.path.join(
-                #                                     pre_name, j_name.split(".")[0]
-                #                                 ),
-                #                                 value,
-                #                                 meta_v,
-                #                             ]
-                #                         )
+                                    if equ_name == "01":
+                                        self.json_dict[dig][sub_fold].append(
+                                            [
+                                                os.path.join(
+                                                    pre_name, j_name.split(".")[0]
+                                                ),
+                                                value,
+                                                meta_v,
+                                            ]
+                                        )
+                                    else:
+                                        self.json_dict_train[dig][sub_fold].append(
+                                            [
+                                                os.path.join(
+                                                    pre_name, j_name.split(".")[0]
+                                                ),
+                                                value,
+                                                meta_v,
+                                            ]
+                                        )
 
     def save_dict(self, transform):
         p_img = cv2.imread(os.path.join("dataset/cropped_img", self.i_path + ".jpg"))
@@ -386,9 +359,7 @@ class CustomDataset_class(Dataset):
         data_list = (
             self.train_list
             if mode == "train"
-            else self.val_list
-            if mode == "val"
-            else self.test_list
+            else self.val_list if mode == "val" else self.test_list
         )
         self.area_list = list()
 
@@ -427,7 +398,7 @@ class CustomDataset_class(Dataset):
                 aug_naming[t_name] for t_name in self.args.aug
             ]
 
-        self.logger.debug(transform_list)
+        if mode == "train": self.logger.debug(transform_list) 
 
         def func_v():
             if mode == "train":
@@ -490,28 +461,31 @@ class CustomDataset_regress(CustomDataset_class):
         self.logger = logger
         self.load_list(args)
         train_list, val_list, test_list = list(), list(), list()
-        self.json_dict_train = dict(self.json_dict_train)
 
         for dig, v_list in self.json_dict.items():
             random_list = list(self.json_dict[dig].keys())
             random.shuffle(random_list)
-            
+
             t_len, v_len = int(len(v_list) * 0.8), int(len(v_list) * 0.1)
-            t_idx = random_list[: t_len]
-            v_idx = random_list[t_len: t_len + v_len]
-            test_idx = random_list[t_len + v_len:]
-            
+            t_idx = random_list[:t_len]
+            v_idx = random_list[t_len : t_len + v_len]
+            test_idx = random_list[t_len + v_len :]
+
             v_list = dict(v_list)
-            
+
             t_list = [sub_list for idx in t_idx for sub_list in v_list[idx]]
             train_list.append([dig, t_list])
             v_list2 = [sub_list for idx in v_idx for sub_list in v_list[idx]]
             val_list.append([dig, v_list2])
             t_list2 = [sub_list for idx in test_idx for sub_list in v_list[idx]]
             test_list.append([dig, t_list2])
-            
+
             if len(self.json_dict_train[dig]) > 0:
-                tt_list = [sub_list for idx in t_idx for sub_list in self.json_dict_train[dig][idx]]
+                tt_list = [
+                    sub_list
+                    for idx in t_idx
+                    for sub_list in self.json_dict_train[dig][idx]
+                ]
                 train_list.append([dig, tt_list])
 
         self.train_list, self.val_list, self.test_list = (

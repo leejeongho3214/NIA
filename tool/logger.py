@@ -4,6 +4,7 @@ import os
 import sys
 from logging import StreamHandler, Handler, getLevelName
 from utils import mkdir
+from datetime import datetime
 
 
 # this class is a copy of logging.FileHandler except we end self.close()
@@ -84,6 +85,12 @@ def setup_logger(name, path, filename="Evaluation.txt"):
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
 
+    today = datetime.today()
+
+    year = today.year
+    month = today.month
+    day = today.day
+    
     ch = logging.StreamHandler(stream=sys.stdout)
     ch.setLevel(logging.INFO)
     formatter1 = logging.Formatter('\r\033[95m'+"%(asctime)s\033[0m  %(message)s") 
@@ -91,12 +98,10 @@ def setup_logger(name, path, filename="Evaluation.txt"):
     ch.setFormatter(formatter1)
     logger.propagate = False
     logger.addHandler(ch)
-            
+    filename = f"{year}-{month}-{day}.txt"
+    
     if not os.path.isdir(path):
         mkdir(path)
-        
-    elif os.path.isfile(os.path.join(path, filename)):
-        os.remove(os.path.join(path, filename))
         
     fh = FileHandler(os.path.join(path, filename), encoding='utf-8', mode = "at")
     fh.setLevel(logging.DEBUG)
