@@ -166,43 +166,41 @@ class CustomDataset_class(Dataset):
                             (
                                 j_name.split("_")[2] == "Ft"
                                 and j_name.split("_")[3].split(".")[0]
-                                in ["01", "02", "03", "04", "05", "06"]
+                                in ["00", "01", "02", "03", "04", "05", "06", "07"]
                             )
                             or (
                                 j_name.split("_")[2] == "Fb"
                                 and j_name.split("_")[3].split(".")[0]
-                                in ["01", "02", "03", "04", "05", "06", "07", "08"]
+                                in ["00", "02", "03", "04", "05", "06", "07", "08"]
                             )
                             or (
                                 j_name.split("_")[2] == "F"
-                                and j_name.split("_")[3].split(".")[0] in ["03", "04"]
+                                and j_name.split("_")[3].split(".")[0] in ["03", "04", "05", "06"]
                             )
-                        ):
-                            continue
-
-                        elif (
-                            j_name.split("_")[2].startswith("R")
-                            and j_name.split("_")[3].split(".")[0] in ["04", "06"]
-                        ) or (
-                            j_name.split("_")[2].startswith("L")
-                            and j_name.split("_")[3].split(".")[0] in ["03", "05"]
                         ):
                             continue
 
                         elif j_name.split("_")[2] in [
-                            "R30",
-                            "L30",
-                        ] and j_name.split(
+                            "R15",
+                            "L15",
+                        ]:
+                            continue
+
+                        elif j_name.split("_")[2] == "R30" and j_name.split(
                             "_"
-                        )[3].split(".")[0] in ["01", "02"]:
+                        )[3].split(".")[0] in ["00", "01", "02", "04", "06", "07", "08"]:
+                            continue
+                        
+                        elif j_name.split("_")[2] == "L30" and j_name.split(
+                            "_"
+                        )[3].split(".")[0] in ["00", "01", "02", "03", "05", "07", "08"]:
                             continue
 
                     elif equ_name == "02":
                         if (
                             (
                                 j_name.split("_")[2] == "F"
-                                and j_name.split("_")[3].split(".")[0]
-                                in ["03", "04"]
+                                and j_name.split("_")[3].split(".")[0] in ["03", "04"]
                             )
                             or (
                                 j_name.split("_")[2] == "L"
@@ -216,10 +214,56 @@ class CustomDataset_class(Dataset):
                             )
                         ):
                             continue
-
+                        
+                for j_name in os.listdir(folder_path):
                     # Load the json file for image
                     with open(os.path.join(folder_path, j_name), "r") as f:
-                        json_meta = json.load(f)
+                        json_meta = json.load(f)                        
+                       
+                        img = cv2.imread(
+                            f"dataset/img/{equ_name}/{json_meta['info']['id']}/{json_meta['info']['filename']}"
+                        )
+                        pil_img = cv2.resize(img, (256, 256))
+                        
+                        
+                        bbox = json_meta["images"]["bbox"]
+                        if bbox == None:
+                            continue
+                        
+                        max_l = max(bbox[3] - bbox[1], bbox[2] - bbox[0]) // 2
+                        center_p = ((bbox[1] + bbox[3]) // 2, (bbox[0] + bbox[2]) // 2)
+                        p_img = img[
+                            max(0, center_p[0] - max_l) : min(
+                                img.shape[0] - 1, center_p[0] + max_l
+                            ),
+                            max(0, center_p[1] - max_l) : min(
+                                img.shape[1] - 1, center_p[1] + max_l
+                            ),
+                        ]
+                        r_value = 256 / max(p_img.shape)
+
+                        pil_img = np.zeros([256, 256, 3])
+                        r_img = cv2.resize(
+                            p_img,
+                            (
+                                int(p_img.shape[1] * r_value),
+                                int(p_img.shape[0] * r_value),
+                            ),
+                        )
+
+                        if "00.json" not in j_name.split("_"):
+                            pil_img[: r_img.shape[0], : r_img.shape[1]] = r_img
+                        else:
+                            pil_img = cv2.resize(img, (256, 256))
+
+                        mkdir(f"dataset/cropped_img/{equ_name}/{json_meta['info']['id']}")
+                        cv2.imwrite(
+                            f"dataset/cropped_img/{equ_name}/{json_meta['info']['id']}/{json_meta['info']['filename'].split('.')[0]}_{json_meta['images']['facepart']:02}.jpg",
+                            pil_img,
+                        )
+                            
+                        continue
+         
 
                         if (
                             (
@@ -310,6 +354,7 @@ class CustomDataset_class(Dataset):
                                                 meta_v,
                                             ]
                                         )
+                                        
 
     def save_dict(self, transform):
         p_img = cv2.imread(os.path.join("dataset/cropped_img", self.i_path + ".jpg"))
@@ -398,7 +443,8 @@ class CustomDataset_class(Dataset):
                 aug_naming[t_name] for t_name in self.args.aug
             ]
 
-        if mode == "train": self.logger.debug(transform_list) 
+        if mode == "train":
+            self.logger.debug(transform_list)
 
         def func_v():
             if mode == "train":
