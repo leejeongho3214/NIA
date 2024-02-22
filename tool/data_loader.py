@@ -87,11 +87,18 @@ class CustomDataset_class(Dataset):
                 test_idx = random_list[t_len + v_len :]
 
                 grade_dict = dict(grade_dict)
-                t_list = [sub_list for idx in t_idx for sub_list in grade_dict[idx]]
+                # t_list = [sub_list for idx in t_idx for sub_list in grade_dict[idx]]
+                # train_list.append([dig, grade, t_list])
+                # v_list2 = [sub_list for idx in v_idx for sub_list in grade_dict[idx]]
+                # val_list.append([dig, grade, v_list2])
+                # t_list2 = [sub_list for idx in test_idx for sub_list in grade_dict[idx]]
+                # test_list.append([dig, grade, t_list2])
+                
+                t_list = [grade_dict[idx] for idx in t_idx]
                 train_list.append([dig, grade, t_list])
-                v_list2 = [sub_list for idx in v_idx for sub_list in grade_dict[idx]]
+                v_list2 = [grade_dict[idx] for idx in v_idx]
                 val_list.append([dig, grade, v_list2])
-                t_list2 = [sub_list for idx in test_idx for sub_list in grade_dict[idx]]
+                t_list2 = [grade_dict[idx] for idx in test_idx]
                 test_list.append([dig, grade, t_list2])
 
                 if len(self.json_dict_train[dig][grade]) > 0:
@@ -162,39 +169,51 @@ class CustomDataset_class(Dataset):
                 ## Classifying meaningful images for training from various angles of images
                 for j_name in os.listdir(folder_path):
                     if equ_name == "01":
-                        if (
-                            (
-                                j_name.split("_")[2] == "Ft"
-                                and j_name.split("_")[3].split(".")[0]
-                                in ["00", "01", "02", "03", "04", "05", "06", "07"]
-                            )
-                            or (
-                                j_name.split("_")[2] == "Fb"
-                                and j_name.split("_")[3].split(".")[0]
-                                in ["00", "02", "03", "04", "05", "06", "07", "08"]
-                            )
-                            or (
-                                j_name.split("_")[2] == "F"
-                                and j_name.split("_")[3].split(".")[0] in ["03", "04", "05", "06"]
-                            )
-                        ):
-                            continue
-
-                        elif j_name.split("_")[2] in [
-                            "R15",
-                            "L15",
-                        ]:
-                            continue
-
-                        elif j_name.split("_")[2] == "R30" and j_name.split(
-                            "_"
-                        )[3].split(".")[0] in ["00", "01", "02", "04", "06", "07", "08"]:
-                            continue
                         
-                        elif j_name.split("_")[2] == "L30" and j_name.split(
-                            "_"
-                        )[3].split(".")[0] in ["00", "01", "02", "03", "05", "07", "08"]:
-                            continue
+                        pass
+                        # if j_name.split("_")[2] == "R30" and j_name.split(
+                        #     "_"
+                        # )[3].split(".")[0] in ["04", "06"]:
+                        #     continue
+                        
+                        # elif j_name.split("_")[2] == "L30" and j_name.split(
+                        #     "_"
+                        # )[3].split(".")[0] in ["03", "05"]:
+                        #     continue
+                        
+                        # if (
+                        #     (
+                        #         j_name.split("_")[2] == "Ft"
+                        #         and j_name.split("_")[3].split(".")[0]
+                        #         in ["00", "01", "02", "03", "04", "05", "06", "07"]
+                        #     )
+                        #     or (
+                        #         j_name.split("_")[2] == "Fb"
+                        #         and j_name.split("_")[3].split(".")[0]
+                        #         in ["00", "02", "03", "04", "05", "06", "07", "08"]
+                        #     )
+                        #     or (
+                        #         j_name.split("_")[2] == "F"
+                        #         and j_name.split("_")[3].split(".")[0] in ["03", "04", "05", "06"]
+                        #     )
+                        # ):
+                        #     continue
+
+                        # elif j_name.split("_")[2] in [
+                        #     "R15",
+                        #     "L15",
+                        # ]:
+                        #     continue
+
+                        # elif j_name.split("_")[2] == "R30" and j_name.split(
+                        #     "_"
+                        # )[3].split(".")[0] in ["00", "01", "02", "04", "06", "07", "08"]:
+                        #     continue
+                        
+                        # elif j_name.split("_")[2] == "L30" and j_name.split(
+                        #     "_"
+                        # )[3].split(".")[0] in ["00", "01", "02", "03", "05", "07", "08"]:
+                        #     continue
 
                     elif equ_name == "02":
                         if (

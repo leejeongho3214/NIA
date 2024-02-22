@@ -31,6 +31,12 @@ def parse_args():
         default="dataset/img",
         type=str,
     )
+    
+    parser.add_argument(
+        "--load_name",
+        default = None,
+        type=str,
+    )
 
     parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
 
@@ -166,7 +172,10 @@ def main(args):
 
     ## Adjust the number of output in model for each region image
 
-    model_path = os.path.join(args.check_path, "save_model")
+    if args.load_name == None:
+        args.load_name = args.name
+    
+    model_path = os.path.join(os.path.join(args.output_dir, args.mode, args.load_name), "save_model")
     if os.path.isdir(model_path):
         for path in os.listdir(model_path):
             dig_path = os.path.join(model_path, path)
