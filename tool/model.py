@@ -150,44 +150,20 @@ class Model(object):
 
                 if self.args.mode == "class":
                     (
-                        macro_precision,
-                        macro_recall,
-                        macro_f1,
+                        micro_precision,
+                        micro_recall,
+                        micro_f1,
                         _,
                     ) = precision_recall_fscore_support(
-                        f_gt, f_pred, average="macro", zero_division=1
+                        f_gt, f_pred, average="micro", zero_division=1
                     )
-
-                    # (
-                    #     micro_precision,
-                    #     micro_recall,
-                    #     micro_f1,
-                    #     _,
-                    # ) = precision_recall_fscore_support(
-                    #     f_gt, f_pred, average="micro", zero_division=1
-                    # )
-
-                    # (
-                    #     weighted_precision,
-                    #     weighted_recall,
-                    #     weighted_f1,
-                    #     _,
-                    # ) = precision_recall_fscore_support(
-                    #     f_gt, f_pred, average="weighted", zero_division=1
-                    # )
 
                     self.logger.info(
-                        f"[{self.m_dig}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}] Macro Precision: {macro_precision:.4f}, Macro Recall: {macro_recall:.4f}, Macro F1: {macro_f1:.4f}"
+                        f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}] micro Precision: {(micro_precision * 100):.2f}%, micro Recall: {micro_recall:.4f}, micro F1: {micro_f1:.4f}"
                     )
-                    # self.logger.info(
-                    #     f"Mirco Precision: {micro_precision:.4f}, Mirco Recall: {micro_recall:.4f}, Mirco F1: {micro_f1:.4f}"
-                    # )
-                    # self.logger.info(
-                    #     f"Weighted Precision: {weighted_precision:.4f}, Weighted Recall: {weighted_recall:.4f}, Weighted F1: {weighted_f1:.4f}"
-                    # )
             else:
                 self.logger.info(
-                    f"Epoch: {self.epoch} [Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg:.04f}"
+                    f"Epoch: {self.epoch} [{self.phase}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg:.04f}"
                 )
 
     def stop_early(self):
@@ -352,7 +328,7 @@ class Model_test(Model):
         self.m_dig = key
         with torch.no_grad():
             self.model.eval()
-            for self.iter, (img, label, _, _, meta_v) in enumerate(
+            for self.iter, (img, label, self.img_names, self.digs, meta_v) in enumerate(
                 tqdm(self.testset_loader, desc=self.m_dig)
             ):
                 img, label = img.to(device), label.to(device)
@@ -370,12 +346,14 @@ class Model_test(Model):
             with open(os.path.join(pred_path, f"gt.txt"), "w") as g:
                 for key in list(self.pred.keys()):
                     for p_v, g_v in zip(self.pred[key], self.gt[key]):
-                        p.write(f"{key}, {p_v} \n")
-                        g.write(f"{key}, {g_v} \n")
+                        p.write(f"{key}, {p_v[0]}, {p_v[1]} \n")
+                        g.write(f"{key}, {g_v[0]}, {g_v[1]} \n")
         g.close()
         p.close()
 
     def print_test(self):
+        gt_value = [value[0] for value in self.gt[self.m_dig]]
+        pred_value = [value[0] for value in self.pred[self.m_dig]]
         if self.args.mode == "class":
             (
                 micro_precision,
@@ -383,8 +361,8 @@ class Model_test(Model):
                 micro_f1,
                 _,
             ) = precision_recall_fscore_support(
-                self.gt[self.m_dig],
-                self.pred[self.m_dig],
+                gt_value,
+                pred_value,
                 average="micro",
                 zero_division=1,
             )
@@ -395,8 +373,8 @@ class Model_test(Model):
                 macro_f1,
                 _,
             ) = precision_recall_fscore_support(
-                self.gt[self.m_dig],
-                self.pred[self.m_dig],
+                gt_value,
+                pred_value,
                 average="macro",
                 zero_division=1,
             )
@@ -407,15 +385,17 @@ class Model_test(Model):
                 weighted_f1,
                 _,
             ) = precision_recall_fscore_support(
-                self.gt[self.m_dig],
-                self.pred[self.m_dig],
+                gt_value,
+                pred_value,
                 average="weighted",
                 zero_division=1,
             )
-            correlation, p_value = pearsonr(self.gt[self.m_dig], self.pred[self.m_dig])
-            
-            top_3 = [ False if abs(g - p) > 1 else True for g, p in zip(self.gt[self.m_dig], self.pred[self.m_dig])]
-            top_3_acc = sum(top_3)/len(top_3)
+            correlation, p_value = pearsonr(gt_value, pred_value)
+
+            top_3 = [
+                False if abs(g - p) > 1 else True for g, p in zip(gt_value, pred_value)
+            ]
+            top_3_acc = sum(top_3) / len(top_3)
 
             self.logger.info(
                 f"[{self.m_dig}]Micro Precision(=Acc): {micro_precision:.4f}, Micro Recall: {micro_recall:.4f}, Micro F1: {micro_f1:.4f}"
@@ -427,17 +407,31 @@ class Model_test(Model):
             self.logger.info(
                 f"Weighted Precision: {weighted_precision:.4f}, Weighted Recall: {weighted_recall:.4f}, Weighted F1: {weighted_f1:.4f}"
             )
-            self.logger.info(f"Correlation: {correlation:.2f}, P-value: {p_value}, Top-3 Acc: {top_3_acc}\n")
-            
+            self.logger.info(
+                f"Correlation: {correlation:.2f}, P-value: {p_value:.4f}, Top-3 Acc: {top_3_acc:.4f}\n"
+            )
+
         else:
             correlation, p_value = pearsonr(self.gt[self.m_dig], self.pred[self.m_dig])
             mae = mean_absolute_error(self.gt[self.m_dig], self.pred[self.m_dig])
-            self.logger.info(f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value}, MAE: {mae:.4f}\n")
+            self.logger.info(
+                f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae:.4f}\n"
+            )
 
     def get_test_loss(self, pred, gt):
         [self.pred[self.m_dig].append(item.item()) for item in pred]
         [self.gt[self.m_dig].append(item.item()) for item in gt]
 
     def get_test_acc(self, pred, gt):
-        [self.pred[self.m_dig].append(item.argmax().item()) for item in pred]
-        [self.gt[self.m_dig].append(item.item()) for item in gt]
+        [
+            self.pred[self.m_dig].append(
+                [item.argmax().item(), self.img_names[idx], self.digs[idx]]
+            )
+            for idx, item in enumerate(pred)
+        ]
+        [
+            self.gt[self.m_dig].append(
+                [item.item(), self.img_names[idx], self.digs[idx]]
+            )
+            for idx, item in enumerate(gt)
+        ]

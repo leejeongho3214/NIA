@@ -16,7 +16,6 @@ from tool.utils import resume_checkpoint, fix_seed
 fix_seed(523)
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
-
 def parse_args():
     parser = argparse.ArgumentParser()
 
@@ -169,8 +168,6 @@ def main(args):
             for key, value in model_num_class.items()
         }
     )
-
-    ## Adjust the number of output in model for each region image
 
     if args.load_name == None:
         args.load_name = args.name

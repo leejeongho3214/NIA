@@ -191,7 +191,6 @@ def main(args):
         }
     )
 
-    ## Adjust the number of output in model for each region image
     args.save_img = os.path.join(check_path, "save_img")
     args.pred_path = os.path.join(check_path, "prediction")
     model_path = os.path.join(check_path, "save_model")
@@ -288,12 +287,3 @@ if __name__ == "__main__":
     args = parse_args()
     main(args)
 
-"""
-    a = list()
-    for img, _, _, _ in trainset_loader:
-        a.append(img[0])
-    b = np.stack(a, axis = 0)
-    print(f"{key} => {b.mean(axis = -1).mean(axis = -1).mean(axis = 0)}")
-    print(f"{key} => {b.std(axis = -1).std(axis = -1).std(axis = 0)}")
-            
-"""
