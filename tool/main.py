@@ -167,6 +167,7 @@ def main(args):
             "wrinkle_glabellus": 7,
             "wrinkle_perocular": 7,
         }
+
         if args.mode == "class"
         else {
             "pigmentation": 1,

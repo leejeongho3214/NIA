@@ -183,7 +183,8 @@ class Model(object):
     def class_loss(self, pred, gt):
         loss = self.criterion(pred, gt)
 
-        pred_v = [item.argmax().item() for item in pred]
+        # pred_v = [item.argmax().item() for item in pred]
+        pred_v = [round(item.argmax().item()) for item in pred]
         gt_v = [item.item() for item in gt]
 
         if self.phase == "Train":
@@ -412,26 +413,40 @@ class Model_test(Model):
             )
 
         else:
-            correlation, p_value = pearsonr(self.gt[self.m_dig], self.pred[self.m_dig])
-            mae = mean_absolute_error(self.gt[self.m_dig], self.pred[self.m_dig])
+            correlation, p_value = pearsonr(gt_value, pred_value)
+            mae = mean_absolute_error(gt_value, pred_value)
             self.logger.info(
                 f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae:.4f}\n"
             )
 
     def get_test_loss(self, pred, gt):
-        [self.pred[self.m_dig].append(item.item()) for item in pred]
-        [self.gt[self.m_dig].append(item.item()) for item in gt]
+        dig_v = self.m_dig.split("_")[-1]
+        
+        if dig_v == "R2":
+            value = 1
+
+        elif dig_v == "moisture":
+            value = 100
+
+        elif dig_v == "Ra":
+            value = 50
+
+        elif dig_v in ["pigmentation", "count"]:
+            value = 350
+
+        elif dig_v == "pore":
+            value = 2600
+        
+        else:
+            assert 0, "error"
+
+        for idx, (pred_item, gt_item) in enumerate(zip(pred, gt)):
+            self.pred[self.m_dig].append([round(pred_item.item() * value, 3), self.img_names[idx]])
+            self.gt[self.m_dig].append([round(gt_item.item() * value, 3), self.img_names[idx]])
 
     def get_test_acc(self, pred, gt):
-        [
+        for idx, (pred_item, gt_item) in enumerate(zip(pred, gt)):
             self.pred[self.m_dig].append(
-                [item.argmax().item(), self.img_names[idx], self.digs[idx]]
+                [pred_item.argmax().item(), self.img_names[idx]]
             )
-            for idx, item in enumerate(pred)
-        ]
-        [
-            self.gt[self.m_dig].append(
-                [item.item(), self.img_names[idx], self.digs[idx]]
-            )
-            for idx, item in enumerate(gt)
-        ]
+            self.gt[self.m_dig].append([gt_item.item(), self.img_names[idx]])
