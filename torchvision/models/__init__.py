@@ -1,5 +1,6 @@
 from .alexnet import *
 from .convnext import *
+from .coatnet import *
 from .densenet import *
 from .efficientnet import *
 from .googlenet import *

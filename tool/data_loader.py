@@ -12,7 +12,7 @@ import cv2
 import json
 from collections import defaultdict
 from tqdm import tqdm
-from torch.utils.data import random_split, ConcatDataset, Dataset
+from torch.utils.data import ConcatDataset, Dataset
 
 
 def mkdir(path):
@@ -238,10 +238,11 @@ class CustomDataset_class(Dataset):
                 func()
         else:
             func()
-
+                        
     def should_skip_image(self, j_name, equ_name):
         if equ_name == "01":
-            return (j_name.split("_")[2] in ["R30", "L30"] and j_name.split("_")[3].split(".")[0] in ["03", "04", "05", "06", "07", "08"]) or \
+            return (j_name.split("_")[2] == "Ft" and j_name.split("_")[3].split(".")[0] in ["00", "01", "02", "03", "04", "05", "06", "07"]) or \
+                   (j_name.split("_")[2] == "Fb" and j_name.split("_")[3].split(".")[0] in ["00", "02", "03", "04", "05", "06", "07", "08"]) or \
                    (j_name.split("_")[2] == "F" and j_name.split("_")[3].split(".")[0] in ["03", "04", "05", "06"]) or \
                    (j_name.split("_")[2] in ["R15", "L15"]) or \
                    (j_name.split("_")[2] == "R30" and j_name.split("_")[3].split(".")[0] in ["00", "01", "02", "04", "06", "07", "08"]) or \
@@ -262,6 +263,7 @@ class CustomDataset_class(Dataset):
 
         transform_test = transforms.Compose(
             [transforms.ToTensor(), 
+             transforms.Resize(256, antialias=True),
              ]
         )
 

@@ -119,6 +119,7 @@ def parse_args():
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--cross", action="store_true")
     parser.add_argument("--meta", action="store_true")
+    parser.add_argument("--bias", action="store_true")
 
     args = parser.parse_args()
 
@@ -127,7 +128,10 @@ def parse_args():
 
 def main(args):
     args.check_path = os.path.join(args.output_dir, args.mode, args.name)
-    ## Make the directories for save
+    
+    args.model = "coatnet"
+    if args.model == "coatnet": args.lr = 0.0005
+    if args.model not in args.name: assert 0, "이름 확인해봐"
 
     logger = setup_logger(
         args.name,
@@ -163,12 +167,21 @@ def main(args):
     )
 
     model_list = dict()
-    model_list.update(
-        {
-            key: models.resnet50(weights=None, num_classes=value, args=args)
-            for key, value in model_num_class.items()
-        }
-    )
+    
+    if args.model != "coatnet":
+        model_list.update(
+            {
+                key: models.resnet50(weights=None, num_classes=value, args=args)
+                for key, value in model_num_class.items()
+            }
+        )
+    else:
+        model_list.update(
+            {
+                key: models.coatnet.coatnet_4(num_classes=value, bias_v = args.bias)
+                for key, value in model_num_class.items()
+            }
+        )
 
     if args.load_name == None:
         args.load_name = args.name

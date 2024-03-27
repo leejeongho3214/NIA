@@ -7,6 +7,8 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import torch
+import gc
 from torch.utils import data
 import shutil
 
@@ -146,6 +148,7 @@ def parse_args():
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--img", action="store_true")
     parser.add_argument("--meta", action="store_true")
+    parser.add_argument("--bias", action="store_true")
 
     args = parser.parse_args()
 
@@ -155,7 +158,13 @@ def parse_args():
 def main(args):
     check_path = os.path.join(args.output_dir, args.mode, args.name)
     log_path = os.path.join("tensorboard", git_name, args.mode, args.name)
-
+    
+    args.model = "coatnet"
+    if args.model == "coatnet": args.lr = 0.0005
+    if args.model not in args.name: assert 0, "이름 확인해봐"
+    if args.bias:
+        if "bias" not in args.name: assert 0, "이름 확인해봐"
+    
     model_num_class = (
         {
             "dryness": 5,
@@ -167,7 +176,6 @@ def main(args):
             "wrinkle_glabellus": 7,
             "wrinkle_perocular": 7,
         }
-
         if args.mode == "class"
         else {
             "pigmentation": 1,
@@ -185,12 +193,21 @@ def main(args):
 
     args.best_loss, model_list = dict(), dict()
     args.best_loss.update({item: np.inf for item in model_num_class})
-    model_list.update(
-        {
-            key: models.resnet50(weights=None, num_classes=value, args=args)
-            for key, value in model_num_class.items()
-        }
-    )
+    
+    if args.model != "coatnet":
+        model_list.update(
+            {
+                key: models.resnet50(weights=None, num_classes=value, args=args)
+                for key, value in model_num_class.items()
+            }
+        )
+    else:
+        model_list.update(
+            {
+                key: models.coatnet.coatnet_4(num_classes=value, bias_v= True)
+                for key, value in model_num_class.items()
+            }
+        )
 
     args.save_img = os.path.join(check_path, "save_img")
     args.pred_path = os.path.join(check_path, "prediction")
@@ -224,7 +241,9 @@ def main(args):
     mkdir(log_path)
     writer = SummaryWriter(log_path)
 
-    logger = setup_logger(args.name + args.mode, os.path.join(check_path, "log", "train"))
+    logger = setup_logger(
+        args.name + args.mode, os.path.join(check_path, "log", "train")
+    )
     logger.info(args)
     logger.info("Command Line: " + " ".join(sys.argv))
     logger.debug(inspect.getsource(FocalLoss))
@@ -283,8 +302,10 @@ def main(args):
 
         del trainset_loader, valset_loader
 
+        torch.cuda.empty_cache()
+        gc.collect()
+
 
 if __name__ == "__main__":
     args = parse_args()
     main(args)
-

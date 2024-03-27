@@ -1,5 +1,4 @@
 from collections import defaultdict
-import inspect
 import random
 import torch
 import torch.nn as nn
@@ -7,7 +6,7 @@ import numpy as np
 from scipy.stats import pearsonr
 
 from tqdm import tqdm
-from data_loader import class_num_list, mkdir
+from data_loader import mkdir
 import torch.optim as optim
 from utils import (
     AverageMeter,
@@ -16,7 +15,7 @@ from utils import (
     save_image,
 )
 import os
-from torch.utils import data
+
 from sklearn.metrics import precision_recall_fscore_support, mean_absolute_error
 
 if torch.cuda.is_available():
@@ -183,8 +182,7 @@ class Model(object):
     def class_loss(self, pred, gt):
         loss = self.criterion(pred, gt)
 
-        # pred_v = [item.argmax().item() for item in pred]
-        pred_v = [round(item.argmax().item()) for item in pred]
+        pred_v = [item.argmax().item() for item in pred]
         gt_v = [item.item() for item in gt]
 
         if self.phase == "Train":
@@ -265,7 +263,9 @@ class Model(object):
             self.train_loader
         ):
             img, label = img.to(device), label.to(device)
-            pred = self.model(img, meta_v)
+
+            pred = self.model(img, meta_v) if self.args.model != 'coatnet' else self.model(img)
+
 
             if self.args.mode == "class":
                 loss = self.class_loss(pred, label)
@@ -303,8 +303,9 @@ class Model(object):
                 self.valid_loader
             ):
                 img, label = img.to(device), label.to(device)
-                pred = self.model(img, meta_v)
-
+                
+                pred = self.model(img, meta_v) if self.args.model != 'coatnet' else self.model(img)
+                
                 if self.args.mode == "class":
                     self.class_loss(pred, label)
                 else:
@@ -333,7 +334,8 @@ class Model_test(Model):
                 tqdm(self.testset_loader, desc=self.m_dig)
             ):
                 img, label = img.to(device), label.to(device)
-                pred = self.model.to(device)(img, meta_v)
+                
+                pred = self.model.to(device)(img, meta_v) if self.args.model != 'coatnet' else self.model.to(device)(img)
 
                 if self.args.mode == "class":
                     self.get_test_acc(pred, label)
