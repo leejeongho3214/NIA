@@ -1,6 +1,8 @@
 import sys
 import os
 
+import torch
+import gc
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -216,7 +218,11 @@ def main(args):
         )
         resnet_model.test(model, testset_loader, key)
         resnet_model.print_test()
+        torch.cuda.empty_cache()
+        gc.collect()
     resnet_model.save_value()
+    
+
 
 
 if __name__ == "__main__":
