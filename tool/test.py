@@ -3,6 +3,7 @@ import os
 
 import torch
 import gc
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -18,6 +19,7 @@ from tool.utils import resume_checkpoint, fix_seed
 fix_seed(523)
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
+
 def parse_args():
     parser = argparse.ArgumentParser()
 
@@ -32,10 +34,10 @@ def parse_args():
         default="dataset/img",
         type=str,
     )
-    
+
     parser.add_argument(
         "--load_name",
-        default = None,
+        default=None,
         type=str,
     )
 
@@ -130,10 +132,12 @@ def parse_args():
 
 def main(args):
     args.check_path = os.path.join(args.output_dir, args.mode, args.name)
-    
-    args.model = "coatnet"
-    if args.model == "coatnet": args.lr = 0.0005
-    if args.model not in args.name: assert 0, "이름 확인해봐"
+
+    args.model = "cnn"
+    if args.model == "coatnet":
+        args.lr = 0.0005
+    if args.model not in args.name:
+        assert 0, "이름 확인해봐"
 
     logger = setup_logger(
         args.name,
@@ -145,31 +149,23 @@ def main(args):
     model_num_class = (
         {
             "dryness": 5,
-            "pigmentation_forehead": 6,
-            "pigmentation_cheek": 6,
+            "pigmentation": 6,
             "pore": 6,
             "sagging": 7,
-            "wrinkle_forehead": 7,
-            "wrinkle_glabellus": 7,
-            "wrinkle_perocular": 7,
+            "wrinkle": 7,
         }  # dryness, pigmentation, pore, sagging, wrinkle
-
         if args.mode == "class"
         else {
             "pigmentation": 1,
-            "forehead_moisture": 1,
-            "forehead_elasticity_R2": 1,
-            "perocular_wrinkle_Ra": 1,
-            "cheek_moisture": 1,
-            "cheek_elasticity_R2": 1,
-            "cheek_pore": 1,
-            "chin_moisture": 1,
-            "chin_elasticity_R2": 1,
+            "moisture": 1,
+            "elasticity_R2": 1,
+            "wrinkle_Ra": 1,
+            "pore": 1,
         }
     )
 
     model_list = dict()
-    
+
     if args.model != "coatnet":
         model_list.update(
             {
@@ -180,15 +176,17 @@ def main(args):
     else:
         model_list.update(
             {
-                key: models.coatnet.coatnet_4(num_classes=value, bias_v = args.bias)
+                key: models.coatnet.coatnet_4(num_classes=value, bias_v=args.bias)
                 for key, value in model_num_class.items()
             }
         )
 
     if args.load_name == None:
         args.load_name = args.name
-    
-    model_path = os.path.join(os.path.join(args.output_dir, args.mode, args.load_name), "save_model")
+
+    model_path = os.path.join(
+        os.path.join(args.output_dir, args.mode, args.load_name), "save_model"
+    )
     if os.path.isdir(model_path):
         for path in os.listdir(model_path):
             dig_path = os.path.join(model_path, path)
@@ -201,28 +199,49 @@ def main(args):
                 )
 
     dataset = (
-        CustomDataset_class(args, logger)
+        CustomDataset_class(args, logger, "test")
         if args.mode == "class"
         else CustomDataset_regress(args, logger)
     )
     resnet_model = Model_test(args, logger)
 
+    model_area_dict = (
+        {
+            "dryness": ["dryness"],
+            "pigmentation": ["pigmentation_forehead", "pigmentation_cheek"],
+            "pore": ["pore"],
+            "sagging": ["sagging"],
+            "wrinkle": ["wrinkle_forehead", "wrinkle_glabellus", "wrinkle_perocular"],
+        }
+        if args.mode == "class"
+        else {
+            "pigmentation": ["pigmentation"],
+            "moisture": ["forehead_moisture", "cheek_moisture", "chin_moisture"],
+            "elasticity_R2": [
+                "forehead_elasticity_R2",
+                "cheek_elasticity_R2",
+                "chin_elasticity_R2",
+            ],
+            "wrinkle_Ra": ["perocular_wrinkle_Ra"],
+            "pore": ["cheek_pore"],
+        }
+    )
+
     for key in model_list:
         model = model_list[key].cuda()
-        testset = dataset.load_dataset("test", key)
-        testset_loader = data.DataLoader(
-            dataset=testset,
-            batch_size=args.batch_size,
-            num_workers=args.num_workers,
-            shuffle=False,
-        )
-        resnet_model.test(model, testset_loader, key)
-        resnet_model.print_test()
-        torch.cuda.empty_cache()
-        gc.collect()
+        for w_key in model_area_dict[key]:
+            testset = dataset.load_dataset("test", w_key)
+            testset_loader = data.DataLoader(
+                dataset=testset,
+                batch_size=args.batch_size,
+                num_workers=args.num_workers,
+                shuffle=False,
+            )
+            resnet_model.test(model, testset_loader, w_key)
+            resnet_model.print_test()
+            torch.cuda.empty_cache()
+            gc.collect()
     resnet_model.save_value()
-    
-
 
 
 if __name__ == "__main__":

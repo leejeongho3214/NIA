@@ -127,11 +127,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class FocalLoss(nn.Module):
-    def __init__(self, alpha=1, gamma=3, reduction='mean'):
+    def __init__(self, epoch = 0, alpha=1, gamma=3, reduction='mean'):
         super(FocalLoss, self).__init__()
         self.alpha = alpha
-        self.gamma = gamma
+        self.gamma = gamma 
         self.reduction = reduction
+        
+        if gamma != 3 and epoch == 0:
+            print("현재 감마 3 아니다~")
 
     def forward(self, inputs, targets):
         ce_loss = F.cross_entropy(inputs, targets, reduction='none')

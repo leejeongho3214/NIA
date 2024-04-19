@@ -68,10 +68,10 @@ img_num = {
 
 
 class CustomDataset_class(Dataset):
-    def __init__(self, args, logger):
+    def __init__(self, args, logger, mode):
         self.args = args
         self.logger = logger
-        self.load_list(args)
+        self.load_list(args, mode)
         self.generate_datasets()
 
     def __len__(self):
@@ -105,17 +105,14 @@ class CustomDataset_class(Dataset):
             ConcatDataset(test_list),
         )
 
-    def load_list(self, args):
+    def load_list(self, args, mode="train"):
+        self.mode = mode
         target_list = [
             "pigmentation",
-            "forehead_moisture",
-            "forehead_elasticity_R2",
-            "perocular_wrinkle_Ra",
-            "cheek_moisture",
-            "cheek_elasticity_R2",
-            "cheek_pore",
-            "chin_moisture",
-            "chin_elasticity_R2",
+            "moisture",
+            "elasticity_R2",
+            "wrinkle_Ra",
+            "pore"
         ]
         self.img_path = args.img_path
         self.json_path = args.json_path
@@ -158,6 +155,7 @@ class CustomDataset_class(Dataset):
                     with open(os.path.join(folder_path, j_name), "r") as f:
                         json_meta = json.load(f)
                         self.process_json_meta(json_meta, j_name, pre_name, equ_name, target_list, sub_fold)
+            
 
     def process_json_meta(self, json_meta, j_name, pre_name, equ_name, target_list, sub_fold):
         if ((list(json_meta["annotations"].keys())[0] == "acne" or json_meta["images"]["bbox"] is None)
@@ -174,8 +172,10 @@ class CustomDataset_class(Dataset):
         if self.args.mode == "class":
             for dig_n, grade in json_meta["annotations"].items():
                 dig, area = dig_n.split("_")[-1], dig_n.split("_")[-2]
-                if dig in ["wrinkle", "pigmentation"]:
+                
+                if dig in ["wrinkle", "pigmentation"] and self.mode == 'test':
                     dig = f"{dig}_{area}"
+                    
                 if equ_name == "01":
                     self.json_dict[dig][str(grade)][sub_fold].append([
                         os.path.join(pre_name, j_name.split(".")[0]), meta_v])
@@ -184,7 +184,8 @@ class CustomDataset_class(Dataset):
                         os.path.join(pre_name, j_name.split(".")[0]), meta_v])
         else:
             for dig_n, value in json_meta["equipment"].items():
-                matching_dig = [target_dig for target_dig in target_list if target_dig in dig_n]
+                # matching_dig = [target_dig for target_dig in target_list if target_dig in dig_n]
+                matching_dig = [dig_n for target_dig in target_list if target_dig in dig_n]
                 if matching_dig:
                     dig = matching_dig[0]
                     if equ_name == "01":
@@ -311,6 +312,7 @@ class CustomDataset_class(Dataset):
             for self.dig, self.grade, class_dict in tqdm(
                 data_list.datasets, desc=f"{mode}_class"
             ):
+                    
                 if self.dig == dig_k:
                     for self.idx, sub_folder in enumerate(
                         tqdm(sorted(class_dict), desc=f"{self.dig}_{self.grade}")
@@ -325,7 +327,8 @@ class CustomDataset_class(Dataset):
 
         else:
             for self.dig, v_list in tqdm(data_list.datasets, desc=f"{mode}_regression"):
-                if self.dig == dig_k:
+                # if self.dig in dig_k:
+                if dig_k in self.dig:
                     for vv_list in tqdm(v_list, desc=f"{self.dig}"):
                         for idx, (self.i_path, self.value, self.meta_v) in enumerate(
                             sorted(vv_list)

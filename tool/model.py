@@ -182,18 +182,19 @@ class Model(object):
     def class_loss(self, pred, gt):
         loss = self.criterion(pred, gt)
 
-        pred_v = [item.argmax().item() for item in pred]
-        gt_v = [item.item() for item in gt]
+        with torch.no_grad():        
+            pred_v = [item.argmax().item() for item in pred]
+            gt_v = [item.item() for item in gt]
 
-        if self.phase == "Train":
-            self.pred_t.append(pred_v)
-            self.gt_t.append(gt_v)
-            self.train_loss.update(loss.item(), batch_size=pred.shape[0])
+            if self.phase == "Train":
+                self.pred_t.append(pred_v)
+                self.gt_t.append(gt_v)
+                self.train_loss.update(loss.item(), batch_size=pred.shape[0])
 
-        elif self.phase == "Valid":
-            self.pred.append(pred_v)
-            self.gt.append(gt_v)
-            self.val_loss.update(loss.item(), batch_size=pred.shape[0])
+            elif self.phase == "Valid":
+                self.pred.append(pred_v)
+                self.gt.append(gt_v)
+                self.val_loss.update(loss.item(), batch_size=pred.shape[0])
 
         return loss
 
@@ -201,18 +202,19 @@ class Model(object):
         pred = pred.flatten()
         loss = self.criterion(pred, gt)
 
-        pred_v = [item.item() for item in pred]
-        gt_v = [item.item() for item in gt]
+        with torch.no_grad():  
+            pred_v = [item.item() for item in pred]
+            gt_v = [item.item() for item in gt]
 
-        if self.phase == "Train":
-            self.pred_t.append(pred_v)
-            self.gt_t.append(gt_v)
-            self.train_loss.update(loss.item(), batch_size=pred.shape[0])
+            if self.phase == "Train":
+                self.pred_t.append(pred_v)
+                self.gt_t.append(gt_v)
+                self.train_loss.update(loss.item(), batch_size=pred.shape[0])
 
-        elif self.phase == "Valid":
-            self.pred.append(pred_v)
-            self.gt.append(gt_v)
-            self.val_loss.update(loss.item(), batch_size=pred.shape[0])
+            elif self.phase == "Valid":
+                self.pred.append(pred_v)
+                self.gt.append(gt_v)
+                self.val_loss.update(loss.item(), batch_size=pred.shape[0])
 
         return loss
 
@@ -250,7 +252,8 @@ class Model(object):
         self.phase = "Train"
         self.criterion = (
             (
-                FocalLoss(gamma=self.args.gamma)
+                FocalLoss(epoch = self.epoch, gamma=self.args.gamma if self.m_dig not in ["pore", "dryness"] else 4)
+                # FocalLoss(gamma=self.args.gamma)
                 if self.phase == "Train"
                 else nn.CrossEntropyLoss()
             )
@@ -265,7 +268,6 @@ class Model(object):
             img, label = img.to(device), label.to(device)
 
             pred = self.model(img, meta_v) if self.args.model != 'coatnet' else self.model(img)
-
 
             if self.args.mode == "class":
                 loss = self.class_loss(pred, label)
@@ -422,21 +424,19 @@ class Model_test(Model):
             )
 
     def get_test_loss(self, pred, gt):
-        dig_v = self.m_dig.split("_")[-1]
-        
-        if dig_v == "R2":
+        if "elasticity_R2" in self.m_dig:
             value = 1
 
-        elif dig_v == "moisture":
+        elif "moisture" in self.m_dig:
             value = 100
 
-        elif dig_v == "Ra":
+        elif "wrinkle_Ra" in self.m_dig:
             value = 50
 
-        elif dig_v in ["pigmentation", "count"]:
+        elif self.m_dig == "pigmentation":
             value = 350
 
-        elif dig_v == "pore":
+        elif "pore" in self.m_dig:
             value = 2600
         
         else:

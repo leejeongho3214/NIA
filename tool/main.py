@@ -42,7 +42,7 @@ def parse_args():
 
     parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
 
-    parser.add_argument("--stop_early", type=int, default=50)
+    parser.add_argument("--stop_early", type=int, default=30)
 
     parser.add_argument(
         "--mode",
@@ -129,13 +129,13 @@ def parse_args():
 
     parser.add_argument(
         "--lr",
-        default=0.05,
+        default=0.005,
         type=float,
     )
 
     parser.add_argument(
         "--batch_size",
-        default=128,
+        default=32,
         type=int,
     )
 
@@ -158,42 +158,33 @@ def parse_args():
 def main(args):
     check_path = os.path.join(args.output_dir, args.mode, args.name)
     log_path = os.path.join("tensorboard", git_name, args.mode, args.name)
+
+    args.model = "cnn"
     
-    args.model = "coatnet"
-    if args.model == "coatnet": args.lr = 0.0005
-    if args.model not in args.name: assert 0, "이름 확인해봐"
+    if args.model == "coatnet":
+        args.lr = 0.0005
+    if args.model not in args.name:
+        assert 0, "이름 확인해봐"
     if args.bias:
-        if "bias" not in args.name: assert 0, "이름 확인해봐"
-    
+        if "bias" not in args.name:
+            assert 0, "이름 확인해봐"
+
     model_num_class = (
-        {
-            "dryness": 5,
-            "pigmentation_forehead": 6,
-            "pigmentation_cheek": 6,
-            "pore": 6,
-            "sagging": 7,
-            "wrinkle_forehead": 7,
-            "wrinkle_glabellus": 7,
-            "wrinkle_perocular": 7,
-        }
+        {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
         if args.mode == "class"
         else {
             "pigmentation": 1,
-            "forehead_moisture": 1,
-            "forehead_elasticity_R2": 1,
-            "perocular_wrinkle_Ra": 1,
-            "cheek_moisture": 1,
-            "cheek_elasticity_R2": 1,
-            "cheek_pore": 1,
-            "chin_moisture": 1,
-            "chin_elasticity_R2": 1,
+            "moisture": 1,
+            "elasticity_R2": 1,
+            "wrinkle_Ra": 1,
+            "pore": 1,
         }
     )
     pass_list = list()
 
     args.best_loss, model_list = dict(), dict()
     args.best_loss.update({item: np.inf for item in model_num_class})
-    
+
     if args.model != "coatnet":
         model_list.update(
             {
@@ -204,7 +195,7 @@ def main(args):
     else:
         model_list.update(
             {
-                key: models.coatnet.coatnet_4(num_classes=value, bias_v= True)
+                key: models.coatnet.coatnet_4(num_classes=value, bias_v=True)
                 for key, value in model_num_class.items()
             }
         )
@@ -250,7 +241,7 @@ def main(args):
     logger.debug(inspect.getsource(models.resnet.ResNet._forward_impl))
 
     dataset = (
-        CustomDataset_class(args, logger)
+        CustomDataset_class(args, logger, "train")
         if args.mode == "class"
         else CustomDataset_regress(args, logger)
     )
@@ -258,6 +249,7 @@ def main(args):
     for key in model_list:
         if key in pass_list:
             continue
+
         model = model_list[key].cuda()
 
         trainset = dataset.load_dataset("train", key)
