@@ -133,7 +133,7 @@ def parse_args():
 def main(args):
     args.check_path = os.path.join(args.output_dir, args.mode, args.name)
 
-    args.model = "cnn"
+    args.model = "coatnet"
     if args.model == "coatnet":
         args.lr = 0.0005
     if args.model not in args.name:

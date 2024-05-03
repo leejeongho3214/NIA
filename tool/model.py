@@ -252,8 +252,8 @@ class Model(object):
         self.phase = "Train"
         self.criterion = (
             (
-                FocalLoss(epoch = self.epoch, gamma=self.args.gamma if self.m_dig not in ["pore", "dryness"] else 4)
                 # FocalLoss(gamma=self.args.gamma)
+                nn.CrossEntropyLoss()
                 if self.phase == "Train"
                 else nn.CrossEntropyLoss()
             )

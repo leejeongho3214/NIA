@@ -159,7 +159,7 @@ def main(args):
     check_path = os.path.join(args.output_dir, args.mode, args.name)
     log_path = os.path.join("tensorboard", git_name, args.mode, args.name)
 
-    args.model = "cnn"
+    args.model = "coatnet"
     
     if args.model == "coatnet":
         args.lr = 0.0005
@@ -195,7 +195,7 @@ def main(args):
     else:
         model_list.update(
             {
-                key: models.coatnet.coatnet_4(num_classes=value, bias_v=True)
+                key: models.coatnet.coatnet_4(num_classes=value, bias_v=args.bias)
                 for key, value in model_num_class.items()
             }
         )

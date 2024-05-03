@@ -132,9 +132,7 @@ class FocalLoss(nn.Module):
         self.alpha = alpha
         self.gamma = gamma 
         self.reduction = reduction
-        
-        if gamma != 3 and epoch == 0:
-            print("현재 감마 3 아니다~")
+
 
     def forward(self, inputs, targets):
         ce_loss = F.cross_entropy(inputs, targets, reduction='none')

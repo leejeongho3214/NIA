@@ -88,7 +88,7 @@ class CustomDataset_class(Dataset):
                 random_list = list(grade_dict.keys())
                 random.shuffle(random_list)
 
-                t_len, v_len = int(len(grade_dict) * 0.8), int(len(grade_dict) * 0.1)
+                t_len, v_len = int(len(grade_dict) * 0.6), int(len(grade_dict) * 0.2)
                 t_idx, v_idx, test_idx = random_list[:t_len], random_list[t_len: t_len + v_len], random_list[t_len + v_len:]
                 grade_dict = dict(grade_dict)
                 
@@ -377,7 +377,7 @@ class CustomDataset_regress(CustomDataset_class):
             random_list = list(self.json_dict[dig].keys())
             random.shuffle(random_list)
 
-            t_len, v_len = int(len(v_list) * 0.8), int(len(v_list) * 0.1)
+            t_len, v_len = int(len(v_list) * 0.6), int(len(v_list) * 0.2)
             t_idx, v_idx, test_idx = random_list[:t_len], random_list[t_len: t_len + v_len], random_list[t_len + v_len:]
             v_list = dict(v_list)
             
