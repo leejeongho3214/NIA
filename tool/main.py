@@ -239,7 +239,8 @@ def main(args):
     logger.info("Command Line: " + " ".join(sys.argv))
     logger.debug(inspect.getsource(FocalLoss))
     logger.debug(inspect.getsource(models.resnet.ResNet._forward_impl))
-
+    logger.debug(inspect.getsource(Model.train))
+    
     dataset = (
         CustomDataset_class(args, logger, "train")
         if args.mode == "class"

@@ -252,8 +252,7 @@ class Model(object):
         self.phase = "Train"
         self.criterion = (
             (
-                # FocalLoss(gamma=self.args.gamma)
-                nn.CrossEntropyLoss()
+                FocalLoss(gamma=self.args.gamma)
                 if self.phase == "Train"
                 else nn.CrossEntropyLoss()
             )
