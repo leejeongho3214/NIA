@@ -337,7 +337,7 @@ class CustomDataset_class(Dataset):
         transform_test = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.Resize(256, antialias=True),
+                transforms.Resize(self.args.res, antialias=True),
             ]
         )
 
@@ -348,7 +348,7 @@ class CustomDataset_class(Dataset):
                 transforms.Lambda(
                     lambda crops: torch.stack([(crop) for crop in crops])
                 ),
-                transforms.Resize(256, antialias=True),
+                transforms.Resize(self.args.res, antialias=True),
             ]
         )
 
@@ -358,7 +358,7 @@ class CustomDataset_class(Dataset):
                     brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1
                 ),
                 transforms.ToTensor(),
-                transforms.Resize(256, antialias=True),
+                transforms.Resize(self.args.res, antialias=True),
             ]
         )
         # aug_naming = {"crop": transform_crop, "jitter": transform_color}

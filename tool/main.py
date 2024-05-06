@@ -105,7 +105,7 @@ def parse_args():
 
     parser.add_argument(
         "--res",
-        default=128,
+        default=512,
         type=int,
     )
 
@@ -159,7 +159,7 @@ def main(args):
     check_path = os.path.join(args.output_dir, args.mode, args.name)
     log_path = os.path.join("tensorboard", git_name, args.mode, args.name)
 
-    args.model = "coatnet"
+    args.model = "cnn"
     
     if args.model == "coatnet":
         args.lr = 0.0005
