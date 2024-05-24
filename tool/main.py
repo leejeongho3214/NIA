@@ -148,7 +148,6 @@ def parse_args():
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--img", action="store_true")
     parser.add_argument("--meta", action="store_true")
-    parser.add_argument("--bias", action="store_true")
 
     args = parser.parse_args()
 
@@ -165,10 +164,7 @@ def main(args):
         args.lr = 0.0005
     if args.model not in args.name:
         assert 0, "이름 확인해봐"
-    if args.bias:
-        if "bias" not in args.name:
-            assert 0, "이름 확인해봐"
-
+        
     model_num_class = (
         {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
         if args.mode == "class"

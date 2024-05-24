@@ -352,26 +352,6 @@ class CustomDataset_class(Dataset):
             ]
         )
 
-        transform_color = transforms.Compose(
-            [
-                transforms.ColorJitter(
-                    brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1
-                ),
-                transforms.ToTensor(),
-                transforms.Resize(self.args.res, antialias=True),
-            ]
-        )
-        # aug_naming = {"crop": transform_crop, "jitter": transform_color}
-
-        # if self.args.aug == None:
-        #     transform_list = [transform_test]
-        # else:
-        #     transform_list = [transform_test] + [
-        #         aug_naming[t_name] for t_name in self.args.aug
-        # ]
-
-        # if mode == "train":
-        #     self.logger.debug(transform_list)
 
         def func_v(aug_list):
             flip = False
@@ -388,43 +368,26 @@ class CustomDataset_class(Dataset):
 
             if mode == "train":
                 for transform in transform_list:
-                    # self.save_dict(transform, True)
                     self.save_dict(transform, flip, num)
             else:
                 self.save_dict(transform_test)
 
+
         if self.args.mode == "class":
-            for gr, gr_list in sorted(data_list[dig_k].items()):
-                data_list[dig_k][gr] = [j for i in gr_list for j in i]
-                
-            max_class = max([len(j) for j in data_list[dig_k].values()])
-            for self.grade, grade_list in sorted(data_list[dig_k].items()):
-                if max_class / len(grade_list) < 1.9:
-                    aug = []
-                elif max_class / len(grade_list) < 2.9:
-                    aug = ["flip"]
-                elif max_class / len(grade_list) < 3.9:
-                    aug = ["crop_2"]
-                elif max_class / len(grade_list) < 4.9:
-                    aug = ["crop_1", "flip"]
-                elif max_class / len(grade_list) < 5.9:
-                    aug = ["crop_4"]
-                elif max_class / len(grade_list) < 6.9:
-                    aug = ["flip", "crop_2"]
-                elif max_class / len(grade_list) < 8.9:
-                    aug = ["flip", "crop_3"]
-                elif max_class / len(grade_list) < 10.9:
-                    aug = ["flip", "crop_4"]
-                else:
-                    aug = ["flip", "crop_5"]
-                    
-                for self.idx, (self.i_path, self.meta_v) in enumerate(
-                    tqdm(sorted(grade_list), desc = f"{dig_k}_{self.grade}")
-                ):
-                    if self.idx == self.args.data_num:
-                        break
-                    func_v(aug)
-                    
+            for self.dig, self.grade, class_dict in tqdm(
+                data_list.datasets, desc=f"{mode}_class"
+            ):
+                if self.dig == dig_k:
+                    for self.idx, sub_folder in enumerate(
+                        tqdm(sorted(class_dict), desc=f"{self.dig}_{self.grade}")
+                    ):
+                        if self.idx == self.args.data_num:
+                                break
+                            
+                        self.sub_list = list()
+                        for (self.i_path, self.meta_v) in sub_folder:
+                            func_v()
+                        self.area_list.append(self.sub_list)
 
         else:
             for self.dig, v_list in tqdm(data_list.datasets, desc=f"{mode}_regression"):
