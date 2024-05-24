@@ -279,33 +279,35 @@ class CustomDataset_class(Dataset):
 
     def should_skip_image(self, j_name, equ_name):
         if equ_name == "01":
-            return (
-                (
-                    j_name.split("_")[2] == "Ft"
-                    and j_name.split("_")[3].split(".")[0]
-                    in ["00", "01", "02", "03", "04", "05", "06", "07"]
-                )
-                or (
-                    j_name.split("_")[2] == "Fb"
-                    and j_name.split("_")[3].split(".")[0]
-                    in ["00", "02", "03", "04", "05", "06", "07", "08"]
-                )
-                or (
-                    j_name.split("_")[2] == "F"
-                    and j_name.split("_")[3].split(".")[0] in ["03", "04", "05", "06"]
-                )
-                or (j_name.split("_")[2] in ["R15", "L15"])
-                or (
-                    j_name.split("_")[2] == "R30"
-                    and j_name.split("_")[3].split(".")[0]
-                    in ["00", "01", "02", "04", "06", "07", "08"]
-                )
-                or (
-                    j_name.split("_")[2] == "L30"
-                    and j_name.split("_")[3].split(".")[0]
-                    in ["00", "01", "02", "03", "05", "07", "08"]
-                )
-            )
+            return j_name.split("_")[2] != "F"
+        
+            # return (
+            #     (
+            #         j_name.split("_")[2] == "Ft"
+            #         and j_name.split("_")[3].split(".")[0]
+            #         in ["00", "01", "02", "03", "04", "05", "06", "07"]
+            #     )
+            #     or (
+            #         j_name.split("_")[2] == "Fb"
+            #         and j_name.split("_")[3].split(".")[0]
+            #         in ["00", "02", "03", "04", "05", "06", "07", "08"]
+            #     )
+            #     or (
+            #         j_name.split("_")[2] == "F"
+            #         and j_name.split("_")[3].split(".")[0] in ["03", "04", "05", "06"]
+            #     )
+            #     or (j_name.split("_")[2] in ["R15", "L15"])
+            #     or (
+            #         j_name.split("_")[2] == "R30"
+            #         and j_name.split("_")[3].split(".")[0]
+            #         in ["00", "01", "02", "04", "06", "07", "08"]
+            #     )
+            #     or (
+            #         j_name.split("_")[2] == "L30"
+            #         and j_name.split("_")[3].split(".")[0]
+            #         in ["00", "01", "02", "03", "05", "07", "08"]
+            #     )
+            # )
         elif equ_name == "02":
             return (
                 (
@@ -341,53 +343,40 @@ class CustomDataset_class(Dataset):
             ]
         )
 
-        transform_crop = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.FiveCrop(230),
-                transforms.Lambda(
-                    lambda crops: torch.stack([(crop) for crop in crops])
-                ),
-                transforms.Resize(self.args.res, antialias=True),
-            ]
-        )
 
-
-        def func_v(aug_list):
-            flip = False
+        def func_v():
+            # flip = False
             transform_list = [transform_test]
-            num = -1
+            # num = -1
             
-            if len(aug_list):
-                for i in aug_list:
-                    if "crop" in i: 
-                        transform_list = [transform_test, transform_crop]
-                        num = int(i.split('_')[-1])
-                    if "flip" in i:
-                        flip = True
+            # if len(aug_list):
+            #     for i in aug_list:
+            #         if "crop" in i: 
+            #             transform_list = [transform_test, transform_crop]
+            #             num = int(i.split('_')[-1])
+            #         if "flip" in i:
+            #             flip = True
 
             if mode == "train":
                 for transform in transform_list:
-                    self.save_dict(transform, flip, num)
+                    self.save_dict(transform, True)
             else:
                 self.save_dict(transform_test)
 
-
+        data_list = dict(data_list)
         if self.args.mode == "class":
-            for self.dig, self.grade, class_dict in tqdm(
-                data_list.datasets, desc=f"{mode}_class"
+            for self.grade, class_dict in tqdm(
+                data_list[dig_k].items(), desc=f"{mode}_class"
             ):
-                if self.dig == dig_k:
                     for self.idx, sub_folder in enumerate(
                         tqdm(sorted(class_dict), desc=f"{self.dig}_{self.grade}")
                     ):
                         if self.idx == self.args.data_num:
                                 break
                             
-                        self.sub_list = list()
                         for (self.i_path, self.meta_v) in sub_folder:
                             func_v()
-                        self.area_list.append(self.sub_list)
+                    
 
         else:
             for self.dig, v_list in tqdm(data_list.datasets, desc=f"{mode}_regression"):
