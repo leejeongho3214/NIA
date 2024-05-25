@@ -17,7 +17,11 @@ from tool.model import Model_test
 from tool.utils import resume_checkpoint, fix_seed
 
 fix_seed(523)
-git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
+
+if len(os.popen("git branch --show-current").readlines()):
+    git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
+else:
+    git_name = os.popen("git describe --tags").readlines()[0].rstrip()
 
 
 def parse_args():
@@ -133,7 +137,7 @@ def parse_args():
 def main(args):
     args.check_path = os.path.join(args.output_dir, args.mode, args.name)
 
-    args.model = "coatnet"
+    args.model = "cnn"
     if args.model == "coatnet":
         args.lr = 0.0005
     if args.model not in args.name:

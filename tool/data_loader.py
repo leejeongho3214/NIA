@@ -66,7 +66,44 @@ img_num = {
     "03": 3,
 }
 
+transform_test = transforms.Compose(
+    [
+        transforms.ToTensor(),
+        transforms.Resize(self.args.res, antialias=True),
+    ]
+)
 
+class IEC_dataset(Dataset):
+    def __init__(self, args, logger):
+        self.args = args
+        self.logger = logger
+        self.load_img()
+        self.img_list = []
+        
+    def __len__(self):
+        return len(self.img_list)
+    
+    def __getitem__(self, idx):
+        return self.img_list[idx]
+    
+    def load_img(self):
+        img_path_list = list()
+        for root, _, files in os.walk(
+            "IEC_korea_data"
+        ):
+            for file in files:
+                if ".jpg" in file or ".JPG" in file:
+                    img_path_list.append(os.path.join(root, file))
+                    
+        for img_path in img_path_list:
+            pil_img = cv2.imread(img_path)
+            pil = Image.fromarray(pil_img.astype(np.uint8))
+            patch_img = transform_test(pil)
+            self.img_list.append(patch_img, img_path)
+    
+    def load_dataset(self, dig):
+        pass
+    
 class CustomDataset_class(Dataset):
     def __init__(self, args, logger, mode):
         self.args = args
