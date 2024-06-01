@@ -347,7 +347,7 @@ class CustomDataset_class(Dataset):
 
             if mode == "train":
                 for transform in transform_list:
-                    self.save_dict(transform, True)
+                    self.save_dict(transform, False)
             else:
                 self.save_dict(transform_test)
 
@@ -371,9 +371,7 @@ class CustomDataset_class(Dataset):
                 # if self.dig in dig_k:
                 if dig_k in self.dig:
                     for vv_list in tqdm(v_list, desc=f"{self.dig}"):
-                        for idx, (self.i_path, self.value, self.meta_v) in enumerate(
-                            sorted(vv_list)
-                        ):
+                        for self.i_path, self.value, self.meta_v in sorted(vv_list):
                             func_v()
 
         return self.area_list
