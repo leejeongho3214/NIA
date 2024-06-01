@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from torchvision import models
-from tool.data_loader import CustomDataset_class, CustomDataset_regress
+from tool.data_loader import IEC_dataset
 import argparse
 from tool.logger import setup_logger
 from torch.utils import data
@@ -47,8 +47,6 @@ def parse_args():
 
     parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
 
-    parser.add_argument("--stop_early", type=int, default=30)
-
     parser.add_argument(
         "--mode",
         default="class",
@@ -77,44 +75,14 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--epoch",
-        default=300,
-        type=int,
-    )
-
-    parser.add_argument(
-        "--smooth",
-        default=0.1,
-        type=float,
-    )
-
-    parser.add_argument(
         "--res",
-        default=128,
+        default=256,
         type=int,
-    )
-
-    parser.add_argument(
-        "--data_num",
-        default=-1,
-        type=int,
-    )
-
-    parser.add_argument(
-        "--load_epoch",
-        default=0,
-        type=int,
-    )
-
-    parser.add_argument(
-        "--lr",
-        default=1e-3,
-        type=float,
     )
 
     parser.add_argument(
         "--batch_size",
-        default=128,
+        default=32,
         type=int,
     )
 
@@ -125,9 +93,7 @@ def parse_args():
     )
 
     parser.add_argument("--reset", action="store_true")
-    parser.add_argument("--cross", action="store_true")
     parser.add_argument("--meta", action="store_true")
-    parser.add_argument("--bias", action="store_true")
 
     args = parser.parse_args()
 
@@ -136,12 +102,7 @@ def parse_args():
 
 def main(args):
     args.check_path = os.path.join(args.output_dir, args.mode, args.name)
-
-    args.model = "cnn"
-    if args.model == "coatnet":
-        args.lr = 0.0005
-    if args.model not in args.name:
-        assert 0, "이름 확인해봐"
+    args.save_img = os.path.join(args.check_path, "save_img")
 
     logger = setup_logger(
         args.name,
@@ -155,7 +116,6 @@ def main(args):
             "dryness": 5,
             "pigmentation": 6,
             "pore": 6,
-            "sagging": 7,
             "wrinkle": 7,
         }  # dryness, pigmentation, pore, sagging, wrinkle
         if args.mode == "class"
@@ -168,22 +128,10 @@ def main(args):
         }
     )
 
-    model_list = dict()
-
-    if args.model != "coatnet":
-        model_list.update(
-            {
-                key: models.resnet50(weights=None, num_classes=value, args=args)
-                for key, value in model_num_class.items()
-            }
-        )
-    else:
-        model_list.update(
-            {
-                key: models.coatnet.coatnet_4(num_classes=value, bias_v=args.bias)
-                for key, value in model_num_class.items()
-            }
-        )
+    model_list = {
+        key: models.resnet50(weights=None, num_classes=value, args=args)
+        for key, value in model_num_class.items()
+    }
 
     if args.load_name == None:
         args.load_name = args.name
@@ -202,49 +150,40 @@ def main(args):
                     os.path.join(dig_path, "state_dict.bin"),
                 )
 
-    dataset = (
-        CustomDataset_class(args, logger, "test")
-        if args.mode == "class"
-        else CustomDataset_regress(args, logger)
-    )
+    dataset = IEC_dataset(args, logger)
     resnet_model = Model_test(args, logger)
 
     model_area_dict = (
         {
-            "dryness": ["dryness"],
-            "pigmentation": ["pigmentation_forehead", "pigmentation_cheek"],
-            "pore": ["pore"],
-            "sagging": ["sagging"],
-            "wrinkle": ["wrinkle_forehead", "wrinkle_glabellus", "wrinkle_perocular"],
+            "dryness": ["lip"],
+            "pigmentation": ["forehead", "l_cheek", "r_cheek"],
+            "pore": ["l_cheek", "r_cheek"],
+            "wrinkle": ["forehead", "glabellus", "l_peroucular", "r_peroucular"],
         }
         if args.mode == "class"
         else {
-            "pigmentation": ["pigmentation"],
-            "moisture": ["forehead_moisture", "cheek_moisture", "chin_moisture"],
-            "elasticity_R2": [
-                "forehead_elasticity_R2",
-                "cheek_elasticity_R2",
-                "chin_elasticity_R2",
-            ],
-            "wrinkle_Ra": ["perocular_wrinkle_Ra"],
-            "pore": ["cheek_pore"],
+            "pigmentation": ["face"],
+            "moisture": ["forehead", "l_cheek", "r_cheek"],
+            "elasticity_R2": ["forehead", "l_cheek", "r_cheek"],
+            "wrinkle_Ra": ["l_peroucular", "r_peroucular"],
+            "pore": ["l_cheek", "r_cheek"],
         }
     )
 
     for key in model_list:
         model = model_list[key].cuda()
         for w_key in model_area_dict[key]:
-            testset = dataset.load_dataset("test", w_key)
+            testset = dataset.load_dataset(w_key)
             testset_loader = data.DataLoader(
                 dataset=testset,
                 batch_size=args.batch_size,
                 num_workers=args.num_workers,
                 shuffle=False,
             )
-            resnet_model.test(model, testset_loader, w_key)
-            resnet_model.print_test()
+            resnet_model.test(model, testset_loader, f"{key}_{w_key}")
             torch.cuda.empty_cache()
             gc.collect()
+
     resnet_model.save_value()
 
 

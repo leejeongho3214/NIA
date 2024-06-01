@@ -17,11 +17,11 @@ from torchvision import models
 from tensorboardX import SummaryWriter
 from utils import FocalLoss, mkdir, resume_checkpoint, fix_seed
 from logger import setup_logger
-from tool.data_loader import CustomDataset_class, CustomDataset_regress
 from model import Model
+from data_loader import CustomDataset_class, CustomDataset_regress
 import argparse
 
-fix_seed(523)   
+fix_seed(523)
 if len(os.popen("git branch --show-current").readlines()):
     git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 else:
@@ -108,7 +108,7 @@ def parse_args():
 
     parser.add_argument(
         "--res",
-        default=512,
+        default=256,
         type=int,
     )
 
@@ -162,14 +162,9 @@ def main(args):
     log_path = os.path.join("tensorboard", git_name, args.mode, args.name)
 
     args.model = "cnn"
-    
-    if args.model == "coatnet":
-        args.lr = 0.0005
-    if args.model not in args.name:
-        assert 0, "이름 확인해봐"
-        
+
     model_num_class = (
-        {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
+        {"dryness": 5, "pigmentation": 6, "pore": 6, "wrinkle": 7}
         if args.mode == "class"
         else {
             "pigmentation": 1,
@@ -181,23 +176,10 @@ def main(args):
     )
     pass_list = list()
 
-    args.best_loss, model_list = dict(), dict()
-    args.best_loss.update({item: np.inf for item in model_num_class})
-
-    if args.model != "coatnet":
-        model_list.update(
-            {
-                key: models.resnet50(weights=None, num_classes=value, args=args)
-                for key, value in model_num_class.items()
-            }
-        )
-    else:
-        model_list.update(
-            {
-                key: models.coatnet.coatnet_4(num_classes=value, bias_v=args.bias)
-                for key, value in model_num_class.items()
-            }
-        )
+    args.best_loss, model_list = {item: np.inf for item in model_num_class}, {
+        key: models.resnet50(weights=None, num_classes=value, args=args)
+        for key, value in model_num_class.items()
+    }
 
     args.save_img = os.path.join(check_path, "save_img")
     args.pred_path = os.path.join(check_path, "prediction")
@@ -239,7 +221,7 @@ def main(args):
     logger.debug(inspect.getsource(FocalLoss))
     logger.debug(inspect.getsource(models.resnet.ResNet._forward_impl))
     logger.debug(inspect.getsource(Model.train))
-    
+
     dataset = (
         CustomDataset_class(args, logger, "train")
         if args.mode == "class"
@@ -259,6 +241,9 @@ def main(args):
             num_workers=args.num_workers,
             shuffle=True,
         )
+
+        if key == 'dryness':
+            
 
         valset = dataset.load_dataset("valid", key)
         valset_loader = data.DataLoader(

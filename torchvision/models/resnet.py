@@ -296,6 +296,7 @@ class ResNet(nn.Module):
             x = self.fcc(x)
             x = self.relu(x)
 
+        
         x = self.fc(x)
 
         return x 

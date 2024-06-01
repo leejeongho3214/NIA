@@ -1,6 +1,7 @@
 import copy
 import errno
 import random
+import unicodedata
 from PIL import Image
 import natsort
 import torch
@@ -69,41 +70,79 @@ img_num = {
 transform_test = transforms.Compose(
     [
         transforms.ToTensor(),
-        transforms.Resize(self.args.res, antialias=True),
+        transforms.Resize((256, 256), antialias=True),
     ]
 )
+
+
+# 유니코드 정규화 함수
+def normalize_unicode(s):
+    return unicodedata.normalize("NFC", s)
+
 
 class IEC_dataset(Dataset):
     def __init__(self, args, logger):
         self.args = args
         self.logger = logger
+        self.area_img_list = defaultdict(list)
         self.load_img()
-        self.img_list = []
-        
+        self.area_img_list = dict(self.area_img_list)
+        self.dig_list = None
+
     def __len__(self):
-        return len(self.img_list)
-    
+        return len(self.dig_list)
+
     def __getitem__(self, idx):
-        return self.img_list[idx]
-    
+        return self.dig_list[idx]
+
+    def load_dataset(self, dig):
+        self.dig_list = self.area_img_list[dig]
+        return self.dig_list
+
     def load_img(self):
+        # with open("IEC_korea_data/test.json", "r", encoding="utf-8") as f:
+        #     bbox_anno = json.load(f)
+        
+        with open("IEC_korea_data/test4.json", "r", encoding="utf-8") as f:
+            bbox_anno = json.load(f)
+
         img_path_list = list()
-        for root, _, files in os.walk(
-            "IEC_korea_data"
-        ):
+        # for root, _, files in os.walk("IEC_korea_data"):
+        #     for file in files:
+        #         if ".jpg" in file or ".JPG" in file:
+        #             img_path_list.append(os.path.join(root, file))
+        
+        for root, _, files in os.walk("IEC_korea_data/test"):
             for file in files:
                 if ".jpg" in file or ".JPG" in file:
                     img_path_list.append(os.path.join(root, file))
-                    
-        for img_path in img_path_list:
+
+        # img_path랑 anno key 값에 한글이 있어서 정규화 시켜줘서 에러 방지
+        normalized_bbox_anno = {normalize_unicode(k): v for k, v in bbox_anno.items()}
+
+        for img_path in tqdm(img_path_list):
             pil_img = cv2.imread(img_path)
-            pil = Image.fromarray(pil_img.astype(np.uint8))
-            patch_img = transform_test(pil)
-            self.img_list.append(patch_img, img_path)
-    
-    def load_dataset(self, dig):
-        pass
-    
+            query = "/".join(img_path.split("/")[1:])
+            normalized_query = normalize_unicode(query)
+            if normalized_query in normalized_bbox_anno:
+                for area, bbox in normalized_bbox_anno[normalized_query].items():
+                    # 이미지 크기가 400 x 800에서 bbox 좌표를 받은거라 튜닝해줌
+                    # 현재 이미지는 3000 x 5000 이미지
+                    bbox[0], bbox[2] = bbox[0] * 8.64, bbox[2] * 8.64
+                    bbox[1], bbox[3] = bbox[1] * 6.48, bbox[3] * 6.48
+                    bbox = list(map(int, bbox))
+                    bbox = [0 if a < 0 else a for a in bbox]
+                    crop_img = pil_img[bbox[1] : bbox[3], bbox[0] : bbox[2]]
+
+                    pil = Image.fromarray(crop_img.astype(np.uint8))
+                    patch_img = transform_test(pil)
+                    self.area_img_list[area].append([patch_img, img_path])
+
+                pil = Image.fromarray(pil_img.astype(np.uint8))
+                patch_img = transform_test(pil)
+                self.area_img_list["face"].append([patch_img, img_path])
+
+
 class CustomDataset_class(Dataset):
     def __init__(self, args, logger, mode):
         self.args = args
@@ -142,12 +181,12 @@ class CustomDataset_class(Dataset):
                     [t_idx, v_idx, test_idx], [train_list, val_list, test_list]
                 ):
                     t_list = [grade_dict[idx] for idx in idx_list]
-                    # out_list.append([dig, grade, t_list])
                     out_list[dig][grade] = t_list
-                    # if len(self.json_dict_train[dig][grade]) > 0:
-                    #     tt_list = [sub_list for idx in idx_list for sub_list in self.json_dict_train[dig][grade][idx]]
-                    #     out_list.append([dig, grade, tt_list])
-                    
+
+
+
+                
+
         self.train_list, self.val_list, self.test_list = train_list, val_list, test_list
         # self.train_list, self.val_list, self.test_list = (
         #     ConcatDataset(train_list),
@@ -245,7 +284,6 @@ class CustomDataset_class(Dataset):
                     )
         else:
             for dig_n, value in json_meta["equipment"].items():
-                # matching_dig = [target_dig for target_dig in target_list if target_dig in dig_n]
                 matching_dig = [
                     dig_n for target_dig in target_list if target_dig in dig_n
                 ]
@@ -268,7 +306,7 @@ class CustomDataset_class(Dataset):
                             ]
                         )
 
-    def save_dict(self, transform, flip=False, num = -1):
+    def save_dict(self, transform, flip=False, num=-1):
         pil_img = cv2.imread(os.path.join("dataset/cropped_img", self.i_path + ".jpg"))
 
         s_list = self.i_path.split("/")[-1].split("_")
@@ -304,7 +342,6 @@ class CustomDataset_class(Dataset):
                 self.area_list.append(
                     [patch_img, label_data, desc_area, self.dig, self.meta_v]
                 )
-            
 
         if flip:
             for j in range(2):
@@ -317,34 +354,7 @@ class CustomDataset_class(Dataset):
     def should_skip_image(self, j_name, equ_name):
         if equ_name == "01":
             return j_name.split("_")[2] != "F"
-        
-            # return (
-            #     (
-            #         j_name.split("_")[2] == "Ft"
-            #         and j_name.split("_")[3].split(".")[0]
-            #         in ["00", "01", "02", "03", "04", "05", "06", "07"]
-            #     )
-            #     or (
-            #         j_name.split("_")[2] == "Fb"
-            #         and j_name.split("_")[3].split(".")[0]
-            #         in ["00", "02", "03", "04", "05", "06", "07", "08"]
-            #     )
-            #     or (
-            #         j_name.split("_")[2] == "F"
-            #         and j_name.split("_")[3].split(".")[0] in ["03", "04", "05", "06"]
-            #     )
-            #     or (j_name.split("_")[2] in ["R15", "L15"])
-            #     or (
-            #         j_name.split("_")[2] == "R30"
-            #         and j_name.split("_")[3].split(".")[0]
-            #         in ["00", "01", "02", "04", "06", "07", "08"]
-            #     )
-            #     or (
-            #         j_name.split("_")[2] == "L30"
-            #         and j_name.split("_")[3].split(".")[0]
-            #         in ["00", "01", "02", "03", "05", "07", "08"]
-            #     )
-            # )
+
         elif equ_name == "02":
             return (
                 (
@@ -363,7 +373,14 @@ class CustomDataset_class(Dataset):
                 )
             )
         return False
+    
+    # def add_dataset(self):
+    #     for a, b, c in os.walk("dataset/diff_img"):
+    #         for os.path.join()
+            
 
+                # if dig == "dryness" and grade in ["0", "4"]:
+                #     for a, b, c in os.walk(f"dataset/diff_img/{grade}"):
     def load_dataset(self, mode, dig_k):
         data_list = (
             self.train_list
@@ -380,19 +397,8 @@ class CustomDataset_class(Dataset):
             ]
         )
 
-
         def func_v():
-            # flip = False
             transform_list = [transform_test]
-            # num = -1
-            
-            # if len(aug_list):
-            #     for i in aug_list:
-            #         if "crop" in i: 
-            #             transform_list = [transform_test, transform_crop]
-            #             num = int(i.split('_')[-1])
-            #         if "flip" in i:
-            #             flip = True
 
             if mode == "train":
                 for transform in transform_list:
@@ -400,20 +406,20 @@ class CustomDataset_class(Dataset):
             else:
                 self.save_dict(transform_test)
 
-        data_list = dict(data_list)
+        
         if self.args.mode == "class":
+            data_list = dict(data_list)
             for self.grade, class_dict in tqdm(
                 data_list[dig_k].items(), desc=f"{mode}_class"
             ):
-                    for self.idx, sub_folder in enumerate(
-                        tqdm(sorted(class_dict), desc=f"{self.dig}_{self.grade}")
-                    ):
-                        if self.idx == self.args.data_num:
-                                break
-                            
-                        for (self.i_path, self.meta_v) in sub_folder:
-                            func_v()
-                    
+                for self.idx, sub_folder in enumerate(
+                    tqdm(sorted(class_dict), desc=f"{self.dig}_{self.grade}")
+                ):
+                    if self.idx == self.args.data_num:
+                        break
+
+                    for self.i_path, self.meta_v in sub_folder:
+                        func_v()
 
         else:
             for self.dig, v_list in tqdm(data_list.datasets, desc=f"{mode}_regression"):
@@ -423,11 +429,7 @@ class CustomDataset_class(Dataset):
                         for idx, (self.i_path, self.value, self.meta_v) in enumerate(
                             sorted(vv_list)
                         ):
-                            if idx == self.args.data_num:
-                                break
-                            self.sub_list = list()
                             func_v()
-                            self.area_list.append(self.sub_list)
 
         return self.area_list
 
@@ -493,7 +495,8 @@ class CustomDataset_regress(CustomDataset_class):
             ConcatDataset(test_list),
         )
 
-'''
+
+"""
 pigmentation_0 -> 406
 pigmentation_1 -> 1355
 pigmentation_2 -> 789
@@ -557,4 +560,4 @@ dryness_1 -> 423
 dryness_2 -> 520
 dryness_3 -> 474
 dryness_4 -> 228
-'''
+"""

@@ -322,6 +322,7 @@ class Model_test(Model):
     def __init__(self, args, logger):
         self.args = args
         self.pred = defaultdict(list)
+        self.norm_pred = defaultdict(list)
         self.gt = defaultdict(list)
         self.logger = logger
 
@@ -331,28 +332,32 @@ class Model_test(Model):
         self.m_dig = key
         with torch.no_grad():
             self.model.eval()
-            for self.iter, (img, label, self.img_names, self.digs, meta_v) in enumerate(
+            for self.iter, (img, self.img_names) in enumerate(
                 tqdm(self.testset_loader, desc=self.m_dig)
             ):
-                img, label = img.to(device), label.to(device)
-                
-                pred = self.model.to(device)(img, meta_v) if self.args.model != 'coatnet' else self.model.to(device)(img)
+                img = img.to(device)
+                pred = self.model.to(device)(img, None)
 
                 if self.args.mode == "class":
-                    self.get_test_acc(pred, label)
+                    self.get_test_acc(pred)
                 else:
-                    self.get_test_loss(pred, label)
+                    self.get_test_loss(pred)
+                    
+                if not self.iter:
+                    self.epoch = "test"
+                    save_image(self, img)
 
     def save_value(self):
         pred_path = os.path.join(self.args.check_path, "prediction")
         mkdir(pred_path)
         with open(os.path.join(pred_path, f"pred.txt"), "w") as p:
-            with open(os.path.join(pred_path, f"gt.txt"), "w") as g:
-                for key in list(self.pred.keys()):
-                    for p_v, g_v in zip(self.pred[key], self.gt[key]):
-                        p.write(f"{key}, {p_v[0]}, {p_v[1]} \n")
-                        g.write(f"{key}, {g_v[0]}, {g_v[1]} \n")
-        g.close()
+            for key in list(self.pred.keys()):
+                if len(self.norm_pred) != 0:
+                    for p_v, p_n in zip(self.pred[key], self.norm_pred[key]):
+                        p.write(f"{key}, {p_v[0]}, {p_n[0]}, {p_n[1]}\n")
+                else:
+                    for p_v in self.pred[key]:
+                        p.write(f"{key}, {p_v[0]}, {p_v[1]}\n")
         p.close()
 
     def print_test(self):
@@ -422,7 +427,7 @@ class Model_test(Model):
                 f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae:.4f}\n"
             )
 
-    def get_test_loss(self, pred, gt):
+    def get_test_loss(self, pred):
         if "elasticity_R2" in self.m_dig:
             value = 1
 
@@ -432,7 +437,7 @@ class Model_test(Model):
         elif "wrinkle_Ra" in self.m_dig:
             value = 50
 
-        elif self.m_dig == "pigmentation":
+        elif "pigmentation" in self.m_dig:
             value = 350
 
         elif "pore" in self.m_dig:
@@ -441,13 +446,12 @@ class Model_test(Model):
         else:
             assert 0, "error"
 
-        for idx, (pred_item, gt_item) in enumerate(zip(pred, gt)):
+        for idx, pred_item in enumerate(pred):
             self.pred[self.m_dig].append([round(pred_item.item() * value, 3), self.img_names[idx]])
-            self.gt[self.m_dig].append([round(gt_item.item() * value, 3), self.img_names[idx]])
+            self.norm_pred[self.m_dig].append([round(pred_item.item(), 3), self.img_names[idx]])
 
-    def get_test_acc(self, pred, gt):
-        for idx, (pred_item, gt_item) in enumerate(zip(pred, gt)):
+    def get_test_acc(self, pred):
+        for idx, pred_item in enumerate(pred):
             self.pred[self.m_dig].append(
                 [pred_item.argmax().item(), self.img_names[idx]]
             )
-            self.gt[self.m_dig].append([gt_item.item(), self.img_names[idx]])
