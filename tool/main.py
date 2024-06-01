@@ -242,8 +242,6 @@ def main(args):
             shuffle=True,
         )
 
-        if key == 'dryness':
-            
 
         valset = dataset.load_dataset("valid", key)
         valset_loader = data.DataLoader(
