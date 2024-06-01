@@ -233,6 +233,7 @@ class CustomDataset_class(Dataset):
 
     def save_dict(self, transform, flip=False, num = -1):
         pil_img = cv2.imread(os.path.join("dataset/cropped_img", self.i_path + ".jpg"))
+        pil_img = cv2.cvtColor(pil_img, cv2.COLOR_BGR2RGB)
 
         s_list = self.i_path.split("/")[-1].split("_")
         desc_area = (
@@ -324,7 +325,31 @@ class CustomDataset_class(Dataset):
                 )
             )
         return False
-
+    
+    def add_dataset(self, trainset):
+        transform_test = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Resize((self.args.res, self.args.res), antialias=True),
+            ]
+        )
+        
+        def processing():
+            pil = Image.fromarray(pil_img.astype(np.uint8))
+            patch_img = transform_test(pil)
+            trainset.append([patch_img, int(grade), os.path.join(root, img_name), "dryness", torch.tensor([0, 0, 0], dtype = torch.float32)])
+        
+        for a, b, c in os.walk("dataset/diff_img"):
+            for grade in b:
+                for root, _, img_names in os.walk(os.path.join(a, grade)):
+                    for img_name in img_names:
+                        pil_img = cv2.imread(os.path.join(root, img_name))
+                        processing()
+                        pil_img = cv2.flip(pil_img, flipCode=1)
+                        processing()
+        return trainset
+                
+                
     def load_dataset(self, mode, dig_k):
         data_list = (
             self.train_list
@@ -337,57 +362,33 @@ class CustomDataset_class(Dataset):
         transform_test = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.Resize(self.args.res, antialias=True),
+                transforms.Resize((self.args.res, self.args.res), antialias=True),
             ]
         )
 
-        transform_crop = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.FiveCrop(230),
-                transforms.Lambda(
-                    lambda crops: torch.stack([(crop) for crop in crops])
-                ),
-                transforms.Resize(self.args.res, antialias=True),
-            ]
-        )
-
-
-        def func_v(aug_list):
-            flip = False
+        def func_v():
             transform_list = [transform_test]
-            num = -1
-            
-            if len(aug_list):
-                for i in aug_list:
-                    if "crop" in i: 
-                        transform_list = [transform_test, transform_crop]
-                        num = int(i.split('_')[-1])
-                    if "flip" in i:
-                        flip = True
 
             if mode == "train":
                 for transform in transform_list:
-                    self.save_dict(transform, flip, num)
+                    self.save_dict(transform, True)
             else:
                 self.save_dict(transform_test)
 
-
+        
         if self.args.mode == "class":
-            for self.dig, self.grade, class_dict in tqdm(
-                data_list.datasets, desc=f"{mode}_class"
+            data_list = dict(data_list)
+            for self.grade, class_dict in tqdm(
+                data_list[dig_k].items(), desc=f"{mode}_class"
             ):
-                if self.dig == dig_k:
-                    for self.idx, sub_folder in enumerate(
-                        tqdm(sorted(class_dict), desc=f"{self.dig}_{self.grade}")
-                    ):
-                        if self.idx == self.args.data_num:
-                                break
-                            
-                        self.sub_list = list()
-                        for (self.i_path, self.meta_v) in sub_folder:
-                            func_v()
-                        self.area_list.append(self.sub_list)
+                for self.idx, sub_folder in enumerate(
+                    tqdm(sorted(class_dict), desc=f"{self.dig}_{self.grade}")
+                ):
+                    if self.idx == self.args.data_num:
+                        break
+
+                    for self.i_path, self.meta_v in sub_folder:
+                        func_v()
 
         else:
             for self.dig, v_list in tqdm(data_list.datasets, desc=f"{mode}_regression"):
@@ -397,11 +398,7 @@ class CustomDataset_class(Dataset):
                         for idx, (self.i_path, self.value, self.meta_v) in enumerate(
                             sorted(vv_list)
                         ):
-                            if idx == self.args.data_num:
-                                break
-                            self.sub_list = list()
                             func_v()
-                            self.area_list.append(self.sub_list)
 
         return self.area_list
 
