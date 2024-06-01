@@ -22,7 +22,11 @@ from model import Model
 import argparse
 
 fix_seed(523)
-git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
+if len(os.popen("git branch --show-current").readlines()):
+    git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
+else:
+    git_name = os.popen("git describe --tags").readlines()[0].rstrip()
+
 
 
 def parse_args():
@@ -105,7 +109,7 @@ def parse_args():
 
     parser.add_argument(
         "--res",
-        default=512,
+        default=256,
         type=int,
     )
 
