@@ -82,7 +82,6 @@ class CustomDataset_class(Dataset):
         return idx_list[idx], self.sub_path[idx_list[idx]], self.train_num
 
     def generate_datasets(self):
-        # train_list, val_list, test_list = list(), list(), list()
         train_list, val_list, test_list = (
             defaultdict(lambda: defaultdict()),
             defaultdict(lambda: defaultdict()),
@@ -105,18 +104,11 @@ class CustomDataset_class(Dataset):
                     [t_idx, v_idx, test_idx], [train_list, val_list, test_list]
                 ):
                     t_list = [grade_dict[idx] for idx in idx_list]
-                    # out_list.append([dig, grade, t_list])
                     out_list[dig][grade] = t_list
-                    # if len(self.json_dict_train[dig][grade]) > 0:
-                    #     tt_list = [sub_list for idx in idx_list for sub_list in self.json_dict_train[dig][grade][idx]]
-                    #     out_list.append([dig, grade, tt_list])
+
                     
         self.train_list, self.val_list, self.test_list = train_list, val_list, test_list
-        # self.train_list, self.val_list, self.test_list = (
-        #     ConcatDataset(train_list),
-        #     ConcatDataset(val_list),
-        #     ConcatDataset(test_list),
-        # )
+
 
     def load_list(self, args, mode="train"):
         self.mode = mode
@@ -208,7 +200,6 @@ class CustomDataset_class(Dataset):
                     )
         else:
             for dig_n, value in json_meta["equipment"].items():
-                # matching_dig = [target_dig for target_dig in target_list if target_dig in dig_n]
                 matching_dig = [
                     dig_n for target_dig in target_list if target_dig in dig_n
                 ]
