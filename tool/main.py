@@ -46,7 +46,7 @@ def parse_args():
 
     parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
 
-    parser.add_argument("--stop_early", type=int, default=30)
+    parser.add_argument("--stop_early", type=int, default=50)
 
     parser.add_argument(
         "--mode",
@@ -164,11 +164,6 @@ def main(args):
 
     args.model = "cnn"
     
-    if args.model == "coatnet":
-        args.lr = 0.0005
-    if args.model not in args.name:
-        assert 0, "이름 확인해봐"
-        
     model_num_class = (
         {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
         if args.mode == "class"

@@ -107,7 +107,7 @@ class Model(object):
             betas=(0.9, 0.999),
             weight_decay=0,
         )
-        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, "min")
+        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, "min", patience=30)
 
     def acc_avg(self, name):
         return round(self.test_value[name].avg * 100, 2)
