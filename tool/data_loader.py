@@ -361,8 +361,6 @@ class CustomDataset_class(Dataset):
                 for self.idx, sub_folder in enumerate(
                     tqdm(sorted(class_dict), desc=f"{self.dig}_{self.grade}")
                 ):
-                    if self.idx == 4:
-                        break
                     for self.i_path, self.meta_v in sub_folder:
                         func_v()
 
