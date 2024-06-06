@@ -250,7 +250,6 @@ def main(args):
             batch_size=args.batch_size,
             num_workers=args.num_workers,
             shuffle=True,
-            collate_fn=collate_fn
         )
 
         valset = dataset.load_dataset("valid", key)
@@ -259,7 +258,6 @@ def main(args):
             batch_size=args.batch_size,
             num_workers=args.num_workers,
             shuffle=False,
-            collate_fn=collate_fn
         )
 
         resnet_model = Model(
