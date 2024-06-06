@@ -28,6 +28,8 @@ save_img/
 pytorch_grad_cam/
 
 IEC_korea_data
+cam_output
+cam.py
 
 
 NIA.tar

@@ -107,7 +107,9 @@ class Model(object):
             betas=(0.9, 0.999),
             weight_decay=0,
         )
-        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, "min", patience=30)
+        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            self.optimizer, "min", patience=20
+        )
 
     def acc_avg(self, name):
         return round(self.test_value[name].avg * 100, 2)
@@ -182,7 +184,7 @@ class Model(object):
     def class_loss(self, pred, gt):
         loss = self.criterion(pred, gt)
 
-        with torch.no_grad():        
+        with torch.no_grad():
             pred_v = [item.argmax().item() for item in pred]
             gt_v = [item.item() for item in gt]
 
@@ -202,7 +204,7 @@ class Model(object):
         pred = pred.flatten()
         loss = self.criterion(pred, gt)
 
-        with torch.no_grad():  
+        with torch.no_grad():
             pred_v = [item.item() for item in pred]
             gt_v = [item.item() for item in gt]
 
@@ -251,11 +253,7 @@ class Model(object):
         self.model.train()
         self.phase = "Train"
         self.criterion = (
-            (
-                FocalLoss(gamma=self.args.gamma)
-                if self.phase == "Train"
-                else nn.CrossEntropyLoss()
-            )
+            FocalLoss(gamma=self.args.gamma)
             if self.args.mode == "class"
             else nn.L1Loss()
         )
@@ -266,18 +264,19 @@ class Model(object):
         ):
             img, label = img.to(device), label.to(device)
 
-            pred = self.model(img, meta_v) if self.args.model != 'coatnet' else self.model(img)
+            pred = (
+                self.model(img, meta_v)
+                if self.args.model != "coatnet"
+                else self.model(img)
+            )
 
             if self.args.mode == "class":
                 loss = self.class_loss(pred, label)
             else:
                 loss = self.regression(pred, label)
 
-            if self.args.img:
+            if self.iter == random_num:
                 save_image(self, img)
-            else:
-                if self.iter == random_num:
-                    save_image(self, img)
 
             self.print_loss(len(self.train_loader))
 
@@ -290,11 +289,7 @@ class Model(object):
     def valid(self):
         self.phase = "Valid"
         self.criterion = (
-            (
-                FocalLoss(gamma=self.args.gamma)
-                if self.phase == "Train"
-                else nn.CrossEntropyLoss()
-            )
+            nn.CrossEntropyLoss()
             if self.args.mode == "class"
             else nn.L1Loss()
         )
@@ -304,9 +299,13 @@ class Model(object):
                 self.valid_loader
             ):
                 img, label = img.to(device), label.to(device)
-                
-                pred = self.model(img, meta_v) if self.args.model != 'coatnet' else self.model(img)
-                
+
+                pred = (
+                    self.model(img, meta_v)
+                    if self.args.model != "coatnet"
+                    else self.model(img)
+                )
+
                 if self.args.mode == "class":
                     self.class_loss(pred, label)
                 else:
@@ -335,8 +334,12 @@ class Model_test(Model):
                 tqdm(self.testset_loader, desc=self.m_dig)
             ):
                 img, label = img.to(device), label.to(device)
-                
-                pred = self.model.to(device)(img, meta_v) if self.args.model != 'coatnet' else self.model.to(device)(img)
+
+                pred = (
+                    self.model.to(device)(img, meta_v)
+                    if self.args.model != "coatnet"
+                    else self.model.to(device)(img)
+                )
 
                 if self.args.mode == "class":
                     self.get_test_acc(pred, label)
@@ -437,13 +440,17 @@ class Model_test(Model):
 
         elif "pore" in self.m_dig:
             value = 2600
-        
+
         else:
             assert 0, "error"
 
         for idx, (pred_item, gt_item) in enumerate(zip(pred, gt)):
-            self.pred[self.m_dig].append([round(pred_item.item() * value, 3), self.img_names[idx]])
-            self.gt[self.m_dig].append([round(gt_item.item() * value, 3), self.img_names[idx]])
+            self.pred[self.m_dig].append(
+                [round(pred_item.item() * value, 3), self.img_names[idx]]
+            )
+            self.gt[self.m_dig].append(
+                [round(gt_item.item() * value, 3), self.img_names[idx]]
+            )
 
     def get_test_acc(self, pred, gt):
         for idx, (pred_item, gt_item) in enumerate(zip(pred, gt)):

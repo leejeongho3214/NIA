@@ -206,7 +206,7 @@ def save_image(self, img):
     for i, name in enumerate(self.img_names):
         x, y = (i % j * (256 + 2) + 2, i // j * (256 + 2) + 20)  # 위치 조절
         cv2.putText(img_mat, name, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.41, (255, 255, 255), 1, cv2.LINE_AA)
-    cv2.imwrite(os.path.join(path, f"epoch_{self.epoch}_iter_{self.iter}_{self.m_dig}.jpg"), img_mat.get())
+    cv2.imwrite(os.path.join(path, f"epoch_{self.epoch}_iter_{self.iter}_{self.m_dig}.jpg"), img_mat.get()[:, :, (2, 1, 0)])
 
 def fix_seed(random_seed):
 

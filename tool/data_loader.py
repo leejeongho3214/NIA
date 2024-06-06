@@ -16,8 +16,6 @@ from torch.utils.data import ConcatDataset, Dataset
 
 
 def mkdir(path):
-    # if it is the current folder, skip.
-    # otherwise the original code will raise FileNotFoundError
     if path == "":
         return
     try:
@@ -82,7 +80,6 @@ class CustomDataset_class(Dataset):
         return idx_list[idx], self.sub_path[idx_list[idx]], self.train_num
 
     def generate_datasets(self):
-        # train_list, val_list, test_list = list(), list(), list()
         train_list, val_list, test_list = (
             defaultdict(lambda: defaultdict()),
             defaultdict(lambda: defaultdict()),
@@ -150,12 +147,10 @@ class CustomDataset_class(Dataset):
                 ):
                     continue
 
-                ## Classifying meaningful images for training from various angles of images
                 for j_name in os.listdir(folder_path):
                     if self.should_skip_image(j_name, equ_name):
                         continue
 
-                    # Load the json file for image
                     with open(os.path.join(folder_path, j_name), "r") as f:
                         json_meta = json.load(f)
                         self.process_json_meta(
@@ -199,7 +194,6 @@ class CustomDataset_class(Dataset):
                     )
         else:
             for dig_n, value in json_meta["equipment"].items():
-                # matching_dig = [target_dig for target_dig in target_list if target_dig in dig_n]
                 matching_dig = [
                     dig_n for target_dig in target_list if target_dig in dig_n
                 ]
@@ -275,7 +269,7 @@ class CustomDataset_class(Dataset):
                 (
                     j_name.split("_")[2] == "Ft"
                     and j_name.split("_")[3].split(".")[0]
-                    in ["00", "01", "02", "03", "04", "05", "06", "07"]
+                    in ["00", "01", "02", "03", "04", "05", "06"]
                 )
                 or (
                     j_name.split("_")[2] == "Fb"
@@ -338,7 +332,7 @@ class CustomDataset_class(Dataset):
 
             if mode == "train":
                 for transform in transform_list:
-                    self.save_dict(transform, False)
+                    self.save_dict(transform, True)
             else:
                 self.save_dict(transform_test)
 
@@ -359,7 +353,6 @@ class CustomDataset_class(Dataset):
 
         else:
             for self.dig, v_list in tqdm(data_list.datasets, desc=f"{mode}_regression"):
-                # if self.dig in dig_k:
                 if dig_k in self.dig:
                     for vv_list in tqdm(v_list, desc=f"{self.dig}"):
                         for self.i_path, self.value, self.meta_v in sorted(vv_list):
@@ -428,69 +421,3 @@ class CustomDataset_regress(CustomDataset_class):
             ConcatDataset(val_list),
             ConcatDataset(test_list),
         )
-
-'''
-pigmentation_0 -> 406
-pigmentation_1 -> 1355
-pigmentation_2 -> 789
-pigmentation_3 -> 602
-pigmentation_4 -> 198
-pigmentation_5 -> 82
-wrinkle_0 -> 374
-wrinkle_1 -> 1566
-wrinkle_2 -> 777
-wrinkle_3 -> 644
-wrinkle_4 -> 327
-wrinkle_5 -> 321
-wrinkle_6 -> 273
-pore_0 -> 45
-pore_1 -> 297
-pore_2 -> 1035
-pore_3 -> 221
-pore_4 -> 92
-pore_5 -> 18
-sagging_0 -> 794
-sagging_1 -> 346
-sagging_2 -> 222
-sagging_3 -> 200
-sagging_4 -> 88
-sagging_5 -> 56
-sagging_6 -> 2
-dryness_0 -> 18
-dryness_1 -> 141
-dryness_2 -> 520
-dryness_3 -> 158
-dryness_4 -> 19
-ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ
-pigmentation_0 -> 1218
-pigmentation_1 -> 1355
-pigmentation_2 -> 789
-pigmentation_3 -> 1204
-pigmentation_4 -> 1188
-pigmentation_5 -> 984
-wrinkle_0 -> 1496
-wrinkle_1 -> 1566
-wrinkle_2 -> 1554
-wrinkle_3 -> 1288
-wrinkle_4 -> 1308
-wrinkle_5 -> 1284
-wrinkle_6 -> 1365
-pore_0 -> 540
-pore_1 -> 891
-pore_2 -> 1035
-pore_3 -> 884
-pore_4 -> 1104
-pore_5 -> 216
-sagging_0 -> 794
-sagging_1 -> 692
-sagging_2 -> 666
-sagging_3 -> 800
-sagging_4 -> 880
-sagging_5 -> 672
-sagging_6 -> 24
-dryness_0 -> 216
-dryness_1 -> 423
-dryness_2 -> 520
-dryness_3 -> 474
-dryness_4 -> 228
-'''
