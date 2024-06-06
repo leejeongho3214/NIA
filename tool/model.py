@@ -264,11 +264,7 @@ class Model(object):
         ):
             img, label = img.to(device), label.to(device)
 
-            pred = (
-                self.model(img, meta_v)
-                if self.args.model != "coatnet"
-                else self.model(img)
-            )
+            pred = self.model(img)
 
             if self.args.mode == "class":
                 loss = self.class_loss(pred, label)
@@ -300,11 +296,7 @@ class Model(object):
             ):
                 img, label = img.to(device), label.to(device)
 
-                pred = (
-                    self.model(img, meta_v)
-                    if self.args.model != "coatnet"
-                    else self.model(img)
-                )
+                pred = self.model(img)
 
                 if self.args.mode == "class":
                     self.class_loss(pred, label)
@@ -371,7 +363,6 @@ class Model_test(Model):
                 gt_value,
                 pred_value,
                 average="micro",
-                zero_division=1,
             )
 
             (
@@ -383,7 +374,6 @@ class Model_test(Model):
                 gt_value,
                 pred_value,
                 average="macro",
-                zero_division=1,
             )
 
             (
@@ -395,7 +385,6 @@ class Model_test(Model):
                 gt_value,
                 pred_value,
                 average="weighted",
-                zero_division=1,
             )
             correlation, p_value = pearsonr(gt_value, pred_value)
 
@@ -405,7 +394,7 @@ class Model_test(Model):
             top_3_acc = sum(top_3) / len(top_3)
 
             self.logger.info(
-                f"[{self.m_dig}]Micro Precision(=Acc): {micro_precision:.4f}, Micro Recall: {micro_recall:.4f}, Micro F1: {micro_f1:.4f}"
+                f"[{self.m_dig}]Precision(=Acc): {micro_precision:.4f}, Recall: {micro_recall:.4f}, F1: {micro_f1:.4f}"
             )
 
             self.logger.info(

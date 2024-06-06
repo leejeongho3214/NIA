@@ -28,7 +28,6 @@ else:
     git_name = os.popen("git describe --tags").readlines()[0].rstrip()
 
 
-
 def parse_args():
     parser = argparse.ArgumentParser()
 
@@ -162,8 +161,8 @@ def main(args):
     check_path = os.path.join(args.output_dir, args.mode, args.name)
     log_path = os.path.join("tensorboard", git_name, args.mode, args.name)
 
-    args.model = "cnn"
-    
+    args.model = "coatnet"
+
     model_num_class = (
         {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
         if args.mode == "class"
@@ -180,20 +179,12 @@ def main(args):
     args.best_loss, model_list = dict(), dict()
     args.best_loss.update({item: np.inf for item in model_num_class})
 
-    if args.model != "coatnet":
-        model_list.update(
-            {
-                key: models.resnet50(weights=None, num_classes=value, args=args)
-                for key, value in model_num_class.items()
-            }
-        )
-    else:
-        model_list.update(
-            {
-                key: models.coatnet.coatnet_4(num_classes=value, bias_v=args.bias)
-                for key, value in model_num_class.items()
-            }
-        )
+    model_list.update(
+        {
+            key: models.coatnet.coatnet_4(num_classes=value)
+            for key, value in model_num_class.items()
+        }
+    )
 
     args.save_img = os.path.join(check_path, "save_img")
     args.pred_path = os.path.join(check_path, "prediction")
@@ -235,7 +226,7 @@ def main(args):
     logger.debug(inspect.getsource(FocalLoss))
     logger.debug(inspect.getsource(models.resnet.ResNet._forward_impl))
     logger.debug(inspect.getsource(Model))
-    
+
     dataset = (
         CustomDataset_class(args, logger, "train")
         if args.mode == "class"
