@@ -15,6 +15,11 @@ if torch.cuda.is_available():
 else:
     device = torch.device("cpu")
 
+def collate_fn(data): # img, grade, img_name, dig, meta
+    # for img, grade, img_name, dig, meta in data:
+        
+    #     data.append()
+    pass
 
 def softmax(x):
     e_x = torch.exp(x - torch.max(x, dim=1, keepdim=True).values)

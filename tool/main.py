@@ -15,18 +15,14 @@ import shutil
 import numpy as np
 from torchvision import models
 from tensorboardX import SummaryWriter
-from utils import FocalLoss, mkdir, resume_checkpoint, fix_seed
+from utils import FocalLoss, mkdir, resume_checkpoint, fix_seed, collate_fn
 from logger import setup_logger
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
 from model import Model
 import argparse
 
 fix_seed(523)
-if len(os.popen("git branch --show-current").readlines()):
-    git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
-else:
-    git_name = os.popen("git describe --tags").readlines()[0].rstrip()
-
+git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
 
 def parse_args():
@@ -254,6 +250,7 @@ def main(args):
             batch_size=args.batch_size,
             num_workers=args.num_workers,
             shuffle=True,
+            collate_fn=collate_fn
         )
 
         valset = dataset.load_dataset("valid", key)
@@ -262,6 +259,7 @@ def main(args):
             batch_size=args.batch_size,
             num_workers=args.num_workers,
             shuffle=False,
+            collate_fn=collate_fn
         )
 
         resnet_model = Model(

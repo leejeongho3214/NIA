@@ -103,7 +103,7 @@ class CustomDataset_class(Dataset):
                 ):
                     t_list = [grade_dict[idx] for idx in idx_list]
                     out_list[dig][grade] = t_list
-                    
+
         self.train_list, self.val_list, self.test_list = train_list, val_list, test_list
 
     def load_list(self, args, mode="train"):
@@ -216,7 +216,7 @@ class CustomDataset_class(Dataset):
                             ]
                         )
 
-    def save_dict(self, transform, flip=False, num = -1):
+    def save_dict(self, transform, num=-1):
         pil_img = cv2.imread(os.path.join("dataset/cropped_img", self.i_path + ".jpg"))
         pil_img = cv2.cvtColor(pil_img, cv2.COLOR_BGR2RGB)
 
@@ -253,15 +253,8 @@ class CustomDataset_class(Dataset):
                 self.area_list.append(
                     [patch_img, label_data, desc_area, self.dig, self.meta_v]
                 )
-            
 
-        if flip:
-            for j in range(2):
-                if j:
-                    pil_img = cv2.flip(pil_img, flipCode=1)
-                func()
-        else:
-            func()
+        func()
 
     def should_skip_image(self, j_name, equ_name):
         if equ_name == "01":
@@ -320,23 +313,46 @@ class CustomDataset_class(Dataset):
         self.area_list = list()
         self.dig = dig_k
 
+        transform_aug1 = transforms.Compose(
+            [
+                transforms.Resize((self.args.res, self.args.res), antialias=True),
+                transforms.RandomRotation([-180, 180]),
+                transforms.ColorJitter(
+                    brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1
+                ),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            ]
+        )
+
+        transform_aug2 = transforms.Compose(
+            [
+                transforms.Resize((self.args.res, self.args.res), antialias=True),
+                transforms.RandomHorizontalFlip(p=1),
+                transforms.RandomRotation([-180, 180]),
+                transforms.ColorJitter(
+                    brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1
+                ),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            ]
+        )
+
         transform_test = transforms.Compose(
             [
-                transforms.ToTensor(),
                 transforms.Resize((self.args.res, self.args.res), antialias=True),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ]
         )
 
         def func_v():
-            transform_list = [transform_test]
-
+            self.save_dict(transform_test)
             if mode == "train":
-                for transform in transform_list:
-                    self.save_dict(transform, True)
-            else:
-                self.save_dict(transform_test)
+                for _ in range(5):
+                    for aug_mode in [transform_aug1, transform_aug2]:
+                        self.save_dict(aug_mode)
 
-        
         if self.args.mode == "class":
             data_list = dict(data_list)
             for self.grade, class_dict in tqdm(
@@ -345,9 +361,8 @@ class CustomDataset_class(Dataset):
                 for self.idx, sub_folder in enumerate(
                     tqdm(sorted(class_dict), desc=f"{self.dig}_{self.grade}")
                 ):
-                    if self.idx == self.args.data_num:
+                    if self.idx == 4:
                         break
-
                     for self.i_path, self.meta_v in sub_folder:
                         func_v()
 
