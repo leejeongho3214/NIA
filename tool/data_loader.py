@@ -324,6 +324,7 @@ class CustomDataset_class(Dataset):
             [
                 transforms.ToTensor(),
                 transforms.Resize((self.args.res, self.args.res), antialias=True),
+                # transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ]
         )
 
