@@ -23,7 +23,6 @@ else:
     git_name = os.popen("git describe --tags").readlines()[0].rstrip()
 
 
-
 def parse_args():
     parser = argparse.ArgumentParser()
 
@@ -137,11 +136,7 @@ def parse_args():
 def main(args):
     args.check_path = os.path.join(args.output_dir, args.mode, args.name)
 
-    args.model = "cnn"
-    if args.model == "coatnet":
-        args.lr = 0.0005
-    if args.model not in args.name:
-        assert 0, "이름 확인해봐"
+    args.model = "coatnet"
 
     logger = setup_logger(
         args.name,
@@ -168,23 +163,11 @@ def main(args):
         }
     )
 
-    model_list = dict()
-
-    if args.model != "coatnet":
-        model_list.update(
-            {
-                key: models.resnet50(weights=None, num_classes=value, args=args)
-                for key, value in model_num_class.items()
-            }
-        )
-    else:
-        model_list.update(
-            {
-                key: models.coatnet.coatnet_4(num_classes=value, bias_v=args.bias)
-                for key, value in model_num_class.items()
-            }
-        )
-
+    model_list = {
+        key: models.coatnet.coatnet_4(num_classes=value)
+        for key, value in model_num_class.items()
+    }
+    
     if args.load_name == None:
         args.load_name = args.name
 

@@ -363,6 +363,7 @@ class Model_test(Model):
                 gt_value,
                 pred_value,
                 average="micro",
+                zero_division=0
             )
 
             (
@@ -374,6 +375,7 @@ class Model_test(Model):
                 gt_value,
                 pred_value,
                 average="macro",
+                zero_division=0
             )
 
             (
@@ -385,6 +387,7 @@ class Model_test(Model):
                 gt_value,
                 pred_value,
                 average="weighted",
+                zero_division=0
             )
             correlation, p_value = pearsonr(gt_value, pred_value)
 
