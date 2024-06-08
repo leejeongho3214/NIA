@@ -146,13 +146,7 @@ def main(args):
     logger.info("Command Line: " + " ".join(sys.argv))
 
     model_num_class = (
-        {
-            "dryness": 5,
-            "pigmentation": 6,
-            "pore": 6,
-            "sagging": 7,
-            "wrinkle": 7,
-        }  # dryness, pigmentation, pore, sagging, wrinkle
+        {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
         if args.mode == "class"
         else {
             "pigmentation": 1,

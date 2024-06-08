@@ -15,17 +15,14 @@ import shutil
 import numpy as np
 from torchvision import models
 from tensorboardX import SummaryWriter
-from utils import FocalLoss, mkdir, resume_checkpoint, fix_seed
+from utils import FocalLoss, mkdir, resume_checkpoint, fix_seed, collate_fn
 from logger import setup_logger
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
 from model import Model
 import argparse
 
 fix_seed(523)
-if len(os.popen("git branch --show-current").readlines()):
-    git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
-else:
-    git_name = os.popen("git describe --tags").readlines()[0].rstrip()
+git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
 
 def parse_args():
@@ -132,13 +129,13 @@ def parse_args():
 
     parser.add_argument(
         "--lr",
-        default=0.005,
+        default=0.0005,
         type=float,
     )
 
     parser.add_argument(
         "--batch_size",
-        default=32,
+        default=8,
         type=int,
     )
 
@@ -226,6 +223,7 @@ def main(args):
     logger.debug(inspect.getsource(FocalLoss))
     logger.debug(inspect.getsource(models.resnet.ResNet._forward_impl))
     logger.debug(inspect.getsource(Model))
+    logger.debug(inspect.getsource(CustomDataset_class))
 
     dataset = (
         CustomDataset_class(args, logger, "train")
