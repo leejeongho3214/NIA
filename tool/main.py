@@ -231,6 +231,7 @@ def main(args):
     logger.debug(inspect.getsource(FocalLoss))
     logger.debug(inspect.getsource(models.resnet.ResNet._forward_impl))
     logger.debug(inspect.getsource(Model))
+    logger.debug(inspect.getsource(CustomDataset_class))
     
     dataset = (
         CustomDataset_class(args, logger, "train")
