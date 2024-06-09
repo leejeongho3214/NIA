@@ -1,8 +1,6 @@
 import inspect
 import os
 import sys
-import sys
-import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -15,7 +13,7 @@ import shutil
 import numpy as np
 from torchvision import models
 from tensorboardX import SummaryWriter
-from utils import FocalLoss, mkdir, resume_checkpoint, fix_seed, collate_fn
+from utils import FocalLoss, mkdir, resume_checkpoint, fix_seed
 from logger import setup_logger
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
 from model import Model
@@ -159,7 +157,7 @@ def main(args):
     log_path = os.path.join("tensorboard", git_name, args.mode, args.name)
 
     args.model = "cnn"
-    
+
     model_num_class = (
         {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
         if args.mode == "class"
@@ -173,23 +171,12 @@ def main(args):
     )
     pass_list = list()
 
-    args.best_loss, model_list = dict(), dict()
-    args.best_loss.update({item: np.inf for item in model_num_class})
+    args.best_loss = {item: np.inf for item in model_num_class}
 
-    if args.model != "coatnet":
-        model_list.update(
-            {
-                key: models.resnet50(weights=None, num_classes=value, args=args)
-                for key, value in model_num_class.items()
-            }
-        )
-    else:
-        model_list.update(
-            {
-                key: models.coatnet.coatnet_4(num_classes=value, bias_v=args.bias)
-                for key, value in model_num_class.items()
-            }
-        )
+    model_list = {
+        key: models.resnet50(weights=None, num_classes=value, args=args)
+        for key, value in model_num_class.items()
+    }
 
     args.save_img = os.path.join(check_path, "save_img")
     args.pred_path = os.path.join(check_path, "prediction")
@@ -232,7 +219,7 @@ def main(args):
     logger.debug(inspect.getsource(models.resnet.ResNet._forward_impl))
     logger.debug(inspect.getsource(Model))
     logger.debug(inspect.getsource(CustomDataset_class))
-    
+
     dataset = (
         CustomDataset_class(args, logger, "train")
         if args.mode == "class"
