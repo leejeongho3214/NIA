@@ -12,7 +12,7 @@ from tool.data_loader import CustomDataset_class, CustomDataset_regress
 import argparse
 from tool.logger import setup_logger
 from torch.utils import data
-
+import torch.nn as nn
 from tool.model import Model_test
 from tool.utils import resume_checkpoint, fix_seed
 
@@ -122,6 +122,12 @@ def parse_args():
         default=4,
         type=int,
     )
+    
+    parser.add_argument(
+        "--dropout",
+        default = 0.3,
+        type = float,
+    )
 
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--cross", action="store_true")
@@ -158,9 +164,13 @@ def main(args):
     )
 
     model_list = {
-        key: models.resnet50(weights=None, num_classes=value, args=args)
-        for key, value in model_num_class.items()
+        key: models.resnet50(weights=models.ResNet50_Weights.DEFAULT, args=args)
+        for key, _ in model_num_class.items()
     }
+
+    for key, model in model_list.items(): 
+        model.fc = nn.Linear(model.fc.in_features, model_num_class[key], bias = True)
+        model_list.update({key: model})
 
     if args.load_name == None:
         args.load_name = args.name

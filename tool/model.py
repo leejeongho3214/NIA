@@ -255,7 +255,6 @@ class Model(object):
         self.phase = "Train"
         self.criterion = (
             FocalLoss(gamma=self.args.gamma)
-            # nn.CrossEntropyLoss()
             if self.args.mode == "class"
             else nn.L1Loss()
         )
@@ -406,13 +405,6 @@ class Model_test(Model):
 
             self.logger.info(
                 f"[{self.m_dig}]Micro Precision(=Acc): {micro_precision:.4f}, Micro Recall: {micro_recall:.4f}, Micro F1: {micro_f1:.4f}"
-            )
-
-            self.logger.info(
-                f"Macro Precision: {macro_precision:.4f}, Macro Recall: {macro_recall:.4f}, Macro F1: {macro_f1:.4f}"
-            )
-            self.logger.info(
-                f"Weighted Precision: {weighted_precision:.4f}, Weighted Recall: {weighted_recall:.4f}, Weighted F1: {weighted_f1:.4f}"
             )
             self.logger.info(
                 f"Correlation: {correlation:.2f}, P-value: {p_value:.4f}, Top-3 Acc: {top_3_acc:.4f}\n"

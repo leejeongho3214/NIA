@@ -142,6 +142,12 @@ def parse_args():
         default=8,
         type=int,
     )
+    
+    parser.add_argument(
+        "--dropout",
+        default = 0.3,
+        type = float,
+    )
 
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--img", action="store_true")
