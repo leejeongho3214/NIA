@@ -9,7 +9,7 @@ import torch
 import gc
 from torch.utils import data
 import shutil
-
+import torch.nn as nn
 import numpy as np
 from torchvision import models
 from tensorboardX import SummaryWriter
@@ -174,9 +174,13 @@ def main(args):
     args.best_loss = {item: np.inf for item in model_num_class}
 
     model_list = {
-        key: models.resnet50(weights=None, num_classes=value, args=args)
-        for key, value in model_num_class.items()
+        key: models.resnet50(weights=models.ResNet50_Weights.DEFAULT, args=args)
+        for key, _ in model_num_class.items()
     }
+
+    for key, model in model_list.items(): 
+        model.fc = nn.Linear(model.fc.in_features, model_num_class[key], bias = True)
+        model_list.update({key: model})
 
     args.save_img = os.path.join(check_path, "save_img")
     args.pred_path = os.path.join(check_path, "prediction")

@@ -339,10 +339,8 @@ class CustomDataset_class(Dataset):
         def func_v(num):
             self.save_dict(transform_test)
             if mode == "train":
-                # for _ in range(num):
-                for _ in range(5):
-                    for aug_mode in [transform_aug1, transform_aug2]:
-                        self.save_dict(aug_mode)
+                for _ in range(num):
+                    self.save_dict(transform_aug1)
             else:
                 self.save_dict(transform_test)
 
