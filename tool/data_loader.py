@@ -238,23 +238,13 @@ class CustomDataset_class(Dataset):
             norm_v = self.norm_reg(self.value)
             label_data = norm_v
 
-        def func():
-            pil = Image.fromarray(pil_img.astype(np.uint8))
-            patch_img = transform(pil)
+        pil = Image.fromarray(pil_img.astype(np.uint8))
+        patch_img = transform(pil)
 
-            if patch_img.dim() == 4:
-                [
-                    self.area_list.append(
-                        [patch_img[j], label_data, desc_area, self.dig, self.meta_v]
-                    )
-                    for j in range(len(patch_img[:num]))
-                ]
-            else:
-                self.area_list.append(
-                    [patch_img, label_data, desc_area, self.dig, self.meta_v]
-                )
+        self.area_list.append(
+            [patch_img, label_data, desc_area, self.dig, self.meta_v]
+        )
 
-        func()
 
     def should_skip_image(self, j_name, equ_name):
         if equ_name == "01":
@@ -346,15 +336,25 @@ class CustomDataset_class(Dataset):
             ]
         )
 
-        def func_v():
+        def func_v(num):
             self.save_dict(transform_test)
             if mode == "train":
+                # for _ in range(num):
                 for _ in range(5):
                     for aug_mode in [transform_aug1, transform_aug2]:
                         self.save_dict(aug_mode)
+            else:
+                self.save_dict(transform_test)
 
         if self.args.mode == "class":
             data_list = dict(data_list)
+
+            grade_num = dict()
+            grade_num.update({key: len(value) for key, value in data_list[dig_k].items()})
+            
+            max_num = max(grade_num.values())
+            result = {k: (max_num // v) for k, v in grade_num.items()}
+            
             for self.grade, class_dict in tqdm(
                 data_list[dig_k].items(), desc=f"{mode}_class"
             ):
@@ -362,7 +362,7 @@ class CustomDataset_class(Dataset):
                     tqdm(sorted(class_dict), desc=f"{self.dig}_{self.grade}")
                 ):
                     for self.i_path, self.meta_v in sub_folder:
-                        func_v()
+                        func_v(result[self.grade])
 
         else:
             for self.dig, v_list in tqdm(data_list.datasets, desc=f"{mode}_regression"):

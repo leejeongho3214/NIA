@@ -160,11 +160,12 @@ class Model(object):
                     )
 
                     self.logger.info(
-                        f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}] micro Precision: {(micro_precision * 100):.2f}%, micro Recall: {micro_recall:.4f}, micro F1: {micro_f1:.4f}"
+                        f"Epoch: {self.epoch} [{self.phase}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] micro Precision: {(micro_precision * 100):.2f}%, micro Recall: {micro_recall:.4f}, micro F1: {micro_f1:.4f}"
                     )
+
             else:
                 self.logger.info(
-                    f"Epoch: {self.epoch} [{self.phase}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg:.04f}"
+                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}"
                 )
 
     def stop_early(self):
@@ -289,9 +290,7 @@ class Model(object):
     def valid(self):
         self.phase = "Valid"
         self.criterion = (
-            nn.CrossEntropyLoss()
-            if self.args.mode == "class"
-            else nn.L1Loss()
+            nn.CrossEntropyLoss() if self.args.mode == "class" else nn.L1Loss()
         )
         with torch.no_grad():
             self.model.eval()
