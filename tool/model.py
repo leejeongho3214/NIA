@@ -149,9 +149,6 @@ class Model(object):
                         f_gt.append(v1)
 
                 correlation, _ = pearsonr(f_gt, f_pred)
-                self.logger.info(
-                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
-                )
 
                 if self.args.mode == "class":
                     (
@@ -165,6 +162,13 @@ class Model(object):
 
                     self.logger.info(
                         f"Epoch: {self.epoch} [{self.phase}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] micro Precision: {(micro_precision * 100):.2f}%, micro Recall: {micro_recall:.4f}, micro F1: {micro_f1:.4f}"
+                    )
+                    self.logger.info(
+                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
+                    )
+                else:
+                    self.logger.info(
+                    f"Epoch: {self.epoch} [{self.phase}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] ---- >  loss: {self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
                     )
 
             else:
