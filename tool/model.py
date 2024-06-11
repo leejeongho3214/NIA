@@ -13,6 +13,7 @@ from utils import (
     FocalLoss,
     save_checkpoint,
     save_image,
+    CB_loss
 )
 import os
 
@@ -36,6 +37,7 @@ class Model(object):
         model_num_class,
         writer,
         dig_k,
+        grade_num,
     ):
         (
             self.args,
@@ -49,6 +51,7 @@ class Model(object):
             self.model_num_class,
             self.writer,
             self.m_dig,
+            self.grade_num
         ) = (
             args,
             model,
@@ -61,6 +64,7 @@ class Model(object):
             model_num_class,
             writer,
             dig_k,
+            grade_num,
         )
 
         self.train_loss, self.val_loss = AverageMeter(), AverageMeter()
@@ -254,7 +258,10 @@ class Model(object):
         self.model.train()
         self.phase = "Train"
         self.criterion = (
-            FocalLoss(gamma=self.args.gamma)
+            CB_loss(samples_per_cls=self.grade_num, no_of_classes=len(self.grade_num), gamma = self.args.gamma)
+            # FocalLoss(gamma=self.args.gamma)
+            # nn.CrossEntropyLoss()
+            
             if self.args.mode == "class"
             else nn.L1Loss()
         )

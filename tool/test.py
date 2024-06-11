@@ -221,7 +221,7 @@ def main(args):
     for key in model_list:
         model = model_list[key].cuda()
         for w_key in model_area_dict[key]:
-            testset = dataset.load_dataset("test", w_key)
+            testset, _ = dataset.load_dataset("test", w_key)
             testset_loader = data.DataLoader(
                 dataset=testset,
                 batch_size=args.batch_size,

@@ -13,7 +13,7 @@ import torch.nn as nn
 import numpy as np
 from torchvision import models
 from tensorboardX import SummaryWriter
-from utils import FocalLoss, mkdir, resume_checkpoint, fix_seed
+from utils import FocalLoss, mkdir, resume_checkpoint, fix_seed, CB_loss
 from logger import setup_logger
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
 from model import Model
@@ -109,7 +109,7 @@ def parse_args():
 
     parser.add_argument(
         "--gamma",
-        default=3,
+        default=2,
         type=int,
     )
 
@@ -142,12 +142,7 @@ def parse_args():
         default=8,
         type=int,
     )
-    
-    parser.add_argument(
-        "--dropout",
-        default = 0.3,
-        type = float,
-    )
+
 
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--img", action="store_true")
@@ -225,7 +220,7 @@ def main(args):
     )
     logger.info(args)
     logger.info("Command Line: " + " ".join(sys.argv))
-    logger.debug(inspect.getsource(FocalLoss))
+    logger.debug(inspect.getsource(CB_loss))
     logger.debug(inspect.getsource(models.resnet.ResNet._forward_impl))
     logger.debug(inspect.getsource(Model))
     logger.debug(inspect.getsource(CustomDataset_class))
@@ -242,7 +237,7 @@ def main(args):
 
         model = model_list[key].cuda()
 
-        trainset = dataset.load_dataset("train", key)
+        trainset, grade_num = dataset.load_dataset("train", key)
         trainset_loader = data.DataLoader(
             dataset=trainset,
             batch_size=args.batch_size,
@@ -250,7 +245,7 @@ def main(args):
             shuffle=True,
         )
 
-        valset = dataset.load_dataset("valid", key)
+        valset, _ = dataset.load_dataset("valid", key)
         valset_loader = data.DataLoader(
             dataset=valset,
             batch_size=args.batch_size,
@@ -268,6 +263,7 @@ def main(args):
             model_num_class,
             writer,
             key,
+            grade_num
         )
 
         for epoch in range(args.load_epoch, args.epoch):
