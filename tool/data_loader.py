@@ -194,22 +194,14 @@ class CustomDataset_class(Dataset):
                 ]
                 if matching_dig:
                     dig = matching_dig[0]
-                    if equ_name == "01":
-                        self.json_dict[dig][sub_fold].append(
-                            [
-                                os.path.join(pre_name, j_name.split(".")[0]),
-                                value,
-                                meta_v,
-                            ]
-                        )
-                    else:
-                        self.json_dict_train[dig][sub_fold].append(
-                            [
-                                os.path.join(pre_name, j_name.split(".")[0]),
-                                value,
-                                meta_v,
-                            ]
-                        )
+                    self.json_dict[dig][sub_fold].append(
+                        [
+                            os.path.join(pre_name, j_name.split(".")[0]),
+                            value,
+                            meta_v,
+                        ]
+                    )
+
 
     def save_dict(self, transform, num=-1):
         pil_img = cv2.imread(os.path.join("dataset/cropped_img", self.i_path + ".jpg"))
@@ -333,11 +325,11 @@ class CustomDataset_class(Dataset):
 
         def func_v(num):
             self.save_dict(transform_test)
-            if mode == "train":
-                for _ in range(2):
-                    self.save_dict(transform_aug1)
-            else:
-                self.save_dict(transform_test)
+            # if mode == "train":
+            #     for _ in range(1):
+            #         self.save_dict(transform_aug1)
+            # else:
+            #     self.save_dict(transform_test)
 
         if self.args.mode == "class":
             data_list = dict(data_list)

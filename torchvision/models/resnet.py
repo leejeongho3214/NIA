@@ -211,9 +211,7 @@ class ResNet(nn.Module):
         self.block_expansion = block.expansion
         
         self.fc = nn.Linear(512 * block.expansion, num_classes)
-        self.fcc = nn.Linear(512 * block.expansion + 3, 512 * block.expansion)
-
-        self.dropout = nn.Dropout(p = 0.5)
+        # self.dropout = nn.Dropout(p = args.dropout)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -295,7 +293,9 @@ class ResNet(nn.Module):
         #     x = torch.concat([x, meta.cuda()], dim = -1)
         #     x = self.fcc(x)
         #     x = self.relu(x)
-
+        
+        # x = self.dropout(x) # newly added
+        
         x = self.fc(x)
 
         return x 

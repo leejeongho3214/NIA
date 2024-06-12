@@ -29,12 +29,13 @@ def softmax(x):
 
 def resume_checkpoint(args, model, path):
     state_dict = torch.load(path, map_location=device)
-    args.best_loss = state_dict["best_loss"]
-    args.load_epoch = state_dict["epoch"]
-    if 'batch_size' in state_dict:
-        args.batch_size = state_dict["batch_size"]
-        if args.batch_size != state_dict['batch_size']:
-            print(f"batch_size update 128 ->> {args.batch_size}")
+    if not args.transfer:
+        args.best_loss = state_dict["best_loss"]
+        args.load_epoch = state_dict["epoch"]
+        if 'batch_size' in state_dict:
+            args.batch_size = state_dict["batch_size"]
+            if args.batch_size != state_dict['batch_size']:
+                print(f"batch_size update 128 ->> {args.batch_size}")
     model.load_state_dict(state_dict["model_state"], strict=False)
     del state_dict
 
@@ -237,8 +238,11 @@ class CB_loss(nn.Module):
 
         cb_loss = self.focal_loss(logits, labels_one_hot, weights)
         
+        # cb_loss = F.binary_cross_entropy_with_logits(input = logits,target = labels_one_hot, weights = weights)
+        
         # pred = logits.softmax(dim = 1)
         # cb_loss = F.binary_cross_entropy(input = pred, target = labels_one_hot, weight = weights)
+        
         return cb_loss
 
 def save_checkpoint(self):

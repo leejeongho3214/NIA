@@ -384,29 +384,6 @@ class Model_test(Model):
                 zero_division=1,
             )
 
-            (
-                macro_precision,
-                macro_recall,
-                macro_f1,
-                _,
-            ) = precision_recall_fscore_support(
-                gt_value,
-                pred_value,
-                average="macro",
-                zero_division=1,
-            )
-
-            (
-                weighted_precision,
-                weighted_recall,
-                weighted_f1,
-                _,
-            ) = precision_recall_fscore_support(
-                gt_value,
-                pred_value,
-                average="weighted",
-                zero_division=1,
-            )
             correlation, p_value = pearsonr(gt_value, pred_value)
 
             top_3 = [

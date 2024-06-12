@@ -136,6 +136,12 @@ def parse_args():
         default=32,
         type=int,
     )
+    
+    parser.add_argument(
+        "--transfer_path",
+        default=None,
+        type=str,
+    )
 
     parser.add_argument(
         "--num_workers",
@@ -147,6 +153,7 @@ def parse_args():
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--img", action="store_true")
     parser.add_argument("--meta", action="store_true")
+    parser.add_argument("--transfer", action="store_true")
 
     args = parser.parse_args()
 
@@ -179,13 +186,25 @@ def main(args):
         for key, _ in model_num_class.items()
     }
 
+    if args.transfer: 
+        model_path = os.path.join(args.output_dir, args.mode, args.transfer_path, "save_model")
+        print("transfer learning...")
+    else:
+        model_path = os.path.join(check_path, "save_model")
+        
     for key, model in model_list.items(): 
         model.fc = nn.Linear(model.fc.in_features, model_num_class[key], bias = True)
+        if args.transfer:
+            for i, (name, param) in enumerate(model.named_parameters()):
+                param.requires_grad = False
+                if len(list(model.named_parameters())) - i == 3:
+                    break
         model_list.update({key: model})
+        
 
     args.save_img = os.path.join(check_path, "save_img")
     args.pred_path = os.path.join(check_path, "prediction")
-    model_path = os.path.join(check_path, "save_model")
+    
 
     if args.reset:
         print(f"\033[90mReseting......{check_path}\033[0m")
@@ -194,20 +213,19 @@ def main(args):
         if os.path.isdir(log_path):
             shutil.rmtree(log_path)
 
-    else:
-        if os.path.isdir(model_path):
-            for path in os.listdir(model_path):
-                dig_path = os.path.join(model_path, path)
-                if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
-                    print(f"\033[92mResuming......{dig_path}\033[0m")
-                    model_list[path] = resume_checkpoint(
-                        args,
-                        model_list[path],
-                        os.path.join(model_path, f"{path}", "state_dict.bin"),
-                    )
-                    if os.path.isdir(os.path.join(dig_path, "done")):
-                        print(f"\043[92mPassing......{dig_path}\043[0m")
-                        pass_list.append(path)
+    if os.path.isdir(model_path):
+        for path in os.listdir(model_path):
+            dig_path = os.path.join(model_path, path)
+            if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
+                print(f"\033[92mResuming......{dig_path}\033[0m")
+                model_list[path] = resume_checkpoint(
+                    args,
+                    model_list[path],
+                    os.path.join(model_path, f"{path}", "state_dict.bin"),
+                )
+                if os.path.isdir(os.path.join(dig_path, "done")) and not args.transfer:
+                    print(f"\043[92mPassing......{dig_path}\043[0m")
+                    pass_list.append(path)
 
     pass_list = pass_list + args.pass_list
 

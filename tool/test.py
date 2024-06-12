@@ -1,3 +1,4 @@
+import shutil
 import sys
 import os
 
@@ -133,6 +134,7 @@ def parse_args():
     parser.add_argument("--cross", action="store_true")
     parser.add_argument("--meta", action="store_true")
     parser.add_argument("--bias", action="store_true")
+    parser.add_argument("--transfer", action="store_true")
 
     args = parser.parse_args()
 
@@ -144,6 +146,9 @@ def main(args):
 
     args.model = "cnn"
 
+    if os.path.isdir(os.path.join(args.check_path, "log", "eval")):
+        shutil.rmtree(os.path.join(args.check_path, "log", "eval"))
+        
     logger = setup_logger(
         args.name,
         os.path.join(args.check_path, "log", "eval"),
