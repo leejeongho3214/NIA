@@ -239,7 +239,7 @@ class CustomDataset_class(Dataset):
                 (
                     j_name.split("_")[2] == "Ft"
                     and j_name.split("_")[3].split(".")[0]
-                    in ["00", "01", "02", "03", "04", "05", "06"]
+                    in ["00", "01", "02", "03", "04", "05", "06", "07", "08"]
                 )
                 or (
                     j_name.split("_")[2] == "Fb"
@@ -266,7 +266,7 @@ class CustomDataset_class(Dataset):
             return (
                 (
                     j_name.split("_")[2] == "F"
-                    and j_name.split("_")[3].split(".")[0] in ["03", "04"]
+                    and j_name.split("_")[3].split(".")[0] in ["03", "04", "05", "06"]
                 )
                 or (
                     j_name.split("_")[2] == "L"
@@ -325,11 +325,12 @@ class CustomDataset_class(Dataset):
 
         def func_v(num):
             self.save_dict(transform_test)
-            # if mode == "train":
-            #     for _ in range(1):
-            #         self.save_dict(transform_aug1)
-            # else:
-            #     self.save_dict(transform_test)
+            if mode == "train":
+                for _ in range(5):
+                    self.save_dict(transform_aug1)
+                    self.save_dict(transform_aug2)
+            else:
+                self.save_dict(transform_test)
 
         if self.args.mode == "class":
             data_list = dict(data_list)
