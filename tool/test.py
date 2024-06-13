@@ -1,3 +1,4 @@
+import shutil
 import sys
 import os
 
@@ -12,7 +13,7 @@ from tool.data_loader import CustomDataset_class, CustomDataset_regress
 import argparse
 from tool.logger import setup_logger
 from torch.utils import data
-
+import torch.nn as nn
 from tool.model import Model_test
 from tool.utils import resume_checkpoint, fix_seed
 
@@ -122,11 +123,18 @@ def parse_args():
         default=4,
         type=int,
     )
+    
+    parser.add_argument(
+        "--dropout",
+        default = 0.3,
+        type = float,
+    )
 
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--cross", action="store_true")
     parser.add_argument("--meta", action="store_true")
     parser.add_argument("--bias", action="store_true")
+    parser.add_argument("--transfer", action="store_true")
 
     args = parser.parse_args()
 
@@ -138,6 +146,9 @@ def main(args):
 
     args.model = "coatnet"
 
+    if os.path.isdir(os.path.join(args.check_path, "log", "eval")):
+        shutil.rmtree(os.path.join(args.check_path, "log", "eval"))
+        
     logger = setup_logger(
         args.name,
         os.path.join(args.check_path, "log", "eval"),
@@ -211,7 +222,7 @@ def main(args):
     for key in model_list:
         model = model_list[key].cuda()
         for w_key in model_area_dict[key]:
-            testset = dataset.load_dataset("test", w_key)
+            testset, _ = dataset.load_dataset("test", w_key)
             testset_loader = data.DataLoader(
                 dataset=testset,
                 batch_size=args.batch_size,

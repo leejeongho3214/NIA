@@ -184,14 +184,9 @@ class CustomDataset_class(Dataset):
                 if dig in ["wrinkle", "pigmentation"] and self.mode == "test":
                     dig = f"{dig}_{area}"
 
-                if equ_name == "01":
-                    self.json_dict[dig][str(grade)][sub_fold].append(
-                        [os.path.join(pre_name, j_name.split(".")[0]), meta_v]
-                    )
-                else:
-                    self.json_dict_train[dig][str(grade)][sub_fold].append(
-                        [os.path.join(pre_name, j_name.split(".")[0]), meta_v]
-                    )
+                self.json_dict[dig][str(grade)][sub_fold].append(
+                    [os.path.join(pre_name, j_name.split(".")[0]), meta_v]
+                )
         else:
             for dig_n, value in json_meta["equipment"].items():
                 matching_dig = [
@@ -199,22 +194,14 @@ class CustomDataset_class(Dataset):
                 ]
                 if matching_dig:
                     dig = matching_dig[0]
-                    if equ_name == "01":
-                        self.json_dict[dig][sub_fold].append(
-                            [
-                                os.path.join(pre_name, j_name.split(".")[0]),
-                                value,
-                                meta_v,
-                            ]
-                        )
-                    else:
-                        self.json_dict_train[dig][sub_fold].append(
-                            [
-                                os.path.join(pre_name, j_name.split(".")[0]),
-                                value,
-                                meta_v,
-                            ]
-                        )
+                    self.json_dict[dig][sub_fold].append(
+                        [
+                            os.path.join(pre_name, j_name.split(".")[0]),
+                            value,
+                            meta_v,
+                        ]
+                    )
+
 
     def save_dict(self, transform, num=-1):
         pil_img = cv2.imread(os.path.join("dataset/cropped_img", self.i_path + ".jpg"))
@@ -238,23 +225,13 @@ class CustomDataset_class(Dataset):
             norm_v = self.norm_reg(self.value)
             label_data = norm_v
 
-        def func():
-            pil = Image.fromarray(pil_img.astype(np.uint8))
-            patch_img = transform(pil)
+        pil = Image.fromarray(pil_img.astype(np.uint8))
+        patch_img = transform(pil)
 
-            if patch_img.dim() == 4:
-                [
-                    self.area_list.append(
-                        [patch_img[j], label_data, desc_area, self.dig, self.meta_v]
-                    )
-                    for j in range(len(patch_img[:num]))
-                ]
-            else:
-                self.area_list.append(
-                    [patch_img, label_data, desc_area, self.dig, self.meta_v]
-                )
+        self.area_list.append(
+            [patch_img, label_data, desc_area, self.dig, self.meta_v]
+        )
 
-        func()
 
     def should_skip_image(self, j_name, equ_name):
         if equ_name == "01":
@@ -262,7 +239,7 @@ class CustomDataset_class(Dataset):
                 (
                     j_name.split("_")[2] == "Ft"
                     and j_name.split("_")[3].split(".")[0]
-                    in ["00", "01", "02", "03", "04", "05", "06"]
+                    in ["00", "01", "02", "03", "04", "05", "06", "07", "08"]
                 )
                 or (
                     j_name.split("_")[2] == "Fb"
@@ -289,7 +266,7 @@ class CustomDataset_class(Dataset):
             return (
                 (
                     j_name.split("_")[2] == "F"
-                    and j_name.split("_")[3].split(".")[0] in ["03", "04"]
+                    and j_name.split("_")[3].split(".")[0] in ["03", "04", "05", "06"]
                 )
                 or (
                     j_name.split("_")[2] == "L"
@@ -346,15 +323,26 @@ class CustomDataset_class(Dataset):
             ]
         )
 
-        def func_v():
+        def func_v(num):
             self.save_dict(transform_test)
-            if mode == "train":
-                for _ in range(5):
-                    for aug_mode in [transform_aug1, transform_aug2]:
-                        self.save_dict(aug_mode)
+            # if mode == "train":
+            #     for _ in range(5):
+            #         self.save_dict(transform_aug1)
+            #         self.save_dict(transform_aug2)
+            # else:
+            #     self.save_dict(transform_test)
 
         if self.args.mode == "class":
             data_list = dict(data_list)
+
+            grade_num = dict()
+            grade_num.update({key: len(value) for key, value in data_list[dig_k].items()})
+            
+            num_grade = [grade_num[num] for num in sorted(grade_num)]
+            
+            max_num = max(grade_num.values())
+            result = {k: (max_num // v) - 1 if max(grade_num.values()) == v else (max_num // v) for k, v in grade_num.items()}
+            
             for self.grade, class_dict in tqdm(
                 data_list[dig_k].items(), desc=f"{mode}_class"
             ):
@@ -362,16 +350,19 @@ class CustomDataset_class(Dataset):
                     tqdm(sorted(class_dict), desc=f"{self.dig}_{self.grade}")
                 ):
                     for self.i_path, self.meta_v in sub_folder:
-                        func_v()
+                        func_v(result[self.grade])
 
         else:
             for self.dig, v_list in tqdm(data_list.datasets, desc=f"{mode}_regression"):
                 if dig_k in self.dig:
                     for vv_list in tqdm(v_list, desc=f"{self.dig}"):
                         for self.i_path, self.value, self.meta_v in sorted(vv_list):
-                            func_v()
+                            func_v(None)
 
-        return self.area_list
+        if self.args.mode == "class":
+            return self.area_list, num_grade
+        else:
+            return self.area_list, 0
 
     def norm_reg(self, value):
         dig_v = self.dig.split("_")[-1]
@@ -421,13 +412,6 @@ class CustomDataset_regress(CustomDataset_class):
             ):
                 t_list = [v_list[idx] for idx in idx_list]
                 out_list.append([dig, t_list])
-                if len(self.json_dict_train[dig]) > 0:
-                    tt_list = [
-                        sub_list
-                        for idx in idx_list
-                        for sub_list in self.json_dict_train[dig][idx]
-                    ]
-                    out_list.append([dig, tt_list])
 
         self.train_list, self.val_list, self.test_list = (
             ConcatDataset(train_list),

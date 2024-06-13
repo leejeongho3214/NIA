@@ -13,6 +13,7 @@ from utils import (
     FocalLoss,
     save_checkpoint,
     save_image,
+    CB_loss
 )
 import os
 
@@ -36,6 +37,7 @@ class Model(object):
         model_num_class,
         writer,
         dig_k,
+        grade_num,
     ):
         (
             self.args,
@@ -49,6 +51,7 @@ class Model(object):
             self.model_num_class,
             self.writer,
             self.m_dig,
+            self.grade_num
         ) = (
             args,
             model,
@@ -61,6 +64,7 @@ class Model(object):
             model_num_class,
             writer,
             dig_k,
+            grade_num,
         )
 
         self.train_loss, self.val_loss = AverageMeter(), AverageMeter()
@@ -145,9 +149,6 @@ class Model(object):
                         f_gt.append(v1)
 
                 correlation, _ = pearsonr(f_gt, f_pred)
-                self.logger.info(
-                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
-                )
 
                 if self.args.mode == "class":
                     (
@@ -160,11 +161,19 @@ class Model(object):
                     )
 
                     self.logger.info(
-                        f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}] micro Precision: {(micro_precision * 100):.2f}%, micro Recall: {micro_recall:.4f}, micro F1: {micro_f1:.4f}"
+                        f"Epoch: {self.epoch} [{self.phase}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] micro Precision: {(micro_precision * 100):.2f}%, micro Recall: {micro_recall:.4f}, micro F1: {micro_f1:.4f}"
                     )
+                    self.logger.info(
+                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
+                    )
+                else:
+                    self.logger.info(
+                    f"Epoch: {self.epoch} [{self.phase}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] ---- >  loss: {self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
+                    )
+
             else:
                 self.logger.info(
-                    f"Epoch: {self.epoch} [{self.phase}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg:.04f}"
+                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}"
                 )
 
     def stop_early(self):
@@ -253,7 +262,10 @@ class Model(object):
         self.model.train()
         self.phase = "Train"
         self.criterion = (
-            FocalLoss(gamma=self.args.gamma)
+            CB_loss(samples_per_cls=self.grade_num, no_of_classes=len(self.grade_num), gamma = self.args.gamma)
+            # FocalLoss(gamma=self.args.gamma)
+            # nn.CrossEntropyLoss()
+            
             if self.args.mode == "class"
             else nn.L1Loss()
         )
@@ -285,9 +297,7 @@ class Model(object):
     def valid(self):
         self.phase = "Valid"
         self.criterion = (
-            nn.CrossEntropyLoss()
-            if self.args.mode == "class"
-            else nn.L1Loss()
+            nn.CrossEntropyLoss() if self.args.mode == "class" else nn.L1Loss()
         )
         with torch.no_grad():
             self.model.eval()
@@ -366,29 +376,6 @@ class Model_test(Model):
                 zero_division=0
             )
 
-            (
-                macro_precision,
-                macro_recall,
-                macro_f1,
-                _,
-            ) = precision_recall_fscore_support(
-                gt_value,
-                pred_value,
-                average="macro",
-                zero_division=0
-            )
-
-            (
-                weighted_precision,
-                weighted_recall,
-                weighted_f1,
-                _,
-            ) = precision_recall_fscore_support(
-                gt_value,
-                pred_value,
-                average="weighted",
-                zero_division=0
-            )
             correlation, p_value = pearsonr(gt_value, pred_value)
 
             top_3 = [
@@ -398,13 +385,6 @@ class Model_test(Model):
 
             self.logger.info(
                 f"[{self.m_dig}]Precision(=Acc): {micro_precision:.4f}, Recall: {micro_recall:.4f}, F1: {micro_f1:.4f}"
-            )
-
-            self.logger.info(
-                f"Macro Precision: {macro_precision:.4f}, Macro Recall: {macro_recall:.4f}, Macro F1: {macro_f1:.4f}"
-            )
-            self.logger.info(
-                f"Weighted Precision: {weighted_precision:.4f}, Weighted Recall: {weighted_recall:.4f}, Weighted F1: {weighted_f1:.4f}"
             )
             self.logger.info(
                 f"Correlation: {correlation:.2f}, P-value: {p_value:.4f}, Top-3 Acc: {top_3_acc:.4f}\n"
