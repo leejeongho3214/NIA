@@ -244,6 +244,19 @@ class CB_loss(nn.Module):
         # cb_loss = F.binary_cross_entropy(input = pred, target = labels_one_hot, weight = weights)
         
         return cb_loss
+    
+class mape_loss(nn.Module):
+    def __init__(self):
+        super(mape_loss, self).__init__()
+    
+    def forward(self, input, target):
+        error = abs(input - target)
+        error = error / target
+        
+        return error.mean()
+        
+        
+    
 
 def save_checkpoint(self):
     checkpoint_dir = os.path.join(self.args.output_dir, self.args.mode, self.args.name, "save_model", str(self.m_dig))

@@ -11,6 +11,7 @@ import torch.optim as optim
 from utils import (
     AverageMeter,
     FocalLoss,
+    mape_loss,
     save_checkpoint,
     save_image,
     CB_loss
@@ -267,14 +268,16 @@ class Model(object):
             # nn.CrossEntropyLoss()
             
             if self.args.mode == "class"
-            else nn.L1Loss()
+            # else nn.L1Loss()
+            # else nn.MSELoss()
+            else mape_loss()
         )
         random_num = random.randrange(0, len(self.train_loader))
 
         for self.iter, (img, label, self.img_names, _, meta_v) in enumerate(
             self.train_loader
         ):
-            img, label = img.to(device), label.to(device)
+            img, label = img.to(device), label.to(device).type(torch.float32)
 
             pred = self.model(img)
 
@@ -384,12 +387,8 @@ class Model_test(Model):
             top_3_acc = sum(top_3) / len(top_3)
 
             self.logger.info(
-                f"[{self.m_dig}]Precision(=Acc): {micro_precision:.4f}, Recall: {micro_recall:.4f}, F1: {micro_f1:.4f}"
+                f"[{self.m_dig}]Acc: {micro_precision:.4f} Correlation: {correlation:.2f}, P-value: {p_value:.4f}, Top-3 Acc: {top_3_acc:.4f}\n"
             )
-            self.logger.info(
-                f"Correlation: {correlation:.2f}, P-value: {p_value:.4f}, Top-3 Acc: {top_3_acc:.4f}\n"
-            )
-
         else:
             correlation, p_value = pearsonr(gt_value, pred_value)
             mae = mean_absolute_error(gt_value, pred_value)
