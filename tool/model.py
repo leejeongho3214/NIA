@@ -268,9 +268,9 @@ class Model(object):
             # nn.CrossEntropyLoss()
             
             if self.args.mode == "class"
-            # else nn.L1Loss()
+            else nn.L1Loss()
             # else nn.MSELoss()
-            else mape_loss()
+            # else mape_loss()
         )
         random_num = random.randrange(0, len(self.train_loader))
 
