@@ -27,11 +27,12 @@ def softmax(x):
     return e_x / torch.sum(e_x, dim=1).unsqueeze(dim=1)
 
 
-def resume_checkpoint(args, model, path):
+def resume_checkpoint(args, model, path, dig, test = True):
     state_dict = torch.load(path, map_location=device)
     if not args.transfer:
-        args.best_loss = state_dict["best_loss"]
-        args.load_epoch = state_dict["epoch"]
+        if state_dict["best_loss"][dig] != np.inf and test:
+            args.best_loss[dig] = state_dict["best_loss"][dig]
+        if test: args.load_epoch[dig] = state_dict["epoch"]
         if 'batch_size' in state_dict:
             args.batch_size = state_dict["batch_size"]
             if args.batch_size != state_dict['batch_size']:

@@ -180,6 +180,7 @@ def main(args):
     pass_list = list()
 
     args.best_loss = {item: np.inf for item in model_num_class}
+    args.load_epoch = {item: 0 for item in model_num_class}
 
     model_list = {
             key: models.coatnet.coatnet_4(num_classes=value)
@@ -221,6 +222,7 @@ def main(args):
                     args,
                     model_list[path],
                     os.path.join(model_path, f"{path}", "state_dict.bin"),
+                    path, 
                 )
                 if os.path.isdir(os.path.join(dig_path, "done")) and not args.transfer:
                     print(f"\043[92mPassing......{dig_path}\043[0m")
@@ -283,7 +285,7 @@ def main(args):
             grade_num
         )
 
-        for epoch in range(args.load_epoch, args.epoch):
+        for epoch in range(args.load_epoch[key], args.epoch):
             resnet_model.update_e(epoch + 1) if args.load_epoch else None
 
             resnet_model.train()

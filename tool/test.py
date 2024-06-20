@@ -145,7 +145,7 @@ def main(args):
     args.check_path = os.path.join(args.output_dir, args.mode, args.name)
 
     args.model = "coatnet"
-
+    
     if os.path.isdir(os.path.join(args.check_path, "log", "eval")):
         shutil.rmtree(os.path.join(args.check_path, "log", "eval"))
         
@@ -188,6 +188,8 @@ def main(args):
                     args,
                     model_list[path],
                     os.path.join(dig_path, "state_dict.bin"),
+                    path,
+                    False,
                 )
 
     dataset = (
