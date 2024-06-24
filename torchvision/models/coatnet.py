@@ -264,9 +264,7 @@ def coatnet_3():
     return CoAtNet((256, 256), 3, num_blocks, channels, num_classes=1000)
 
 
-def coatnet_4(num_classes, bias_v):
-    global bias
-    bias = bias_v
+def coatnet_4(num_classes):
     num_blocks = [2, 2, 12, 28, 2]          # L
     channels = [192, 192, 384, 768, 1536]   # D
     return CoAtNet((256, 256), 3, num_blocks, channels, num_classes)

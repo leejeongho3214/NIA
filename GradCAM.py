@@ -10,6 +10,7 @@ from pytorch_grad_cam import (
     FullGrad,
 )
 import GPUtil
+import torch.nn as nn
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from tool.utils import fix_seed, mkdir
@@ -48,17 +49,26 @@ model_num_class = {
 }
 
 
-model_list = {
-    key: models.resnet50(args = None)
-    for key, _ in model_num_class.items()
-}
 # model_list = {
-#         key: models.coatnet.coatnet_4(num_classes=value)
-#         for key, value in model_num_class.items()
-#     }
+#     key: models.resnet50(args = None)
+#     for key, _ in model_num_class.items()
+# }
 
-name = "cnn_each"
-task = "regression"
+
+model_list = {
+        key: models.coatnet.coatnet_4(num_classes=value)
+        for key, value in model_num_class.items()
+    }
+
+
+# for key, model in model_list.items(): 
+#     model.fc = nn.Linear(model.fc.in_features, model_num_class[key], bias = True)
+#     model_list.update({key: model})
+    
+    
+model = "coatnet"
+name = "coatnet_cb_aug"
+task = "class"
 
 if len(os.popen("git branch --show-current").readlines()):
     git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
@@ -359,7 +369,7 @@ for key in model_list:
         testset_loader = dataset.load_dataset("test", w_key)
         loader_datalist = data.DataLoader(
             dataset=testset_loader,
-            batch_size=8,
+            batch_size=32 if model == "cnn" else 8,
             num_workers=8,
             shuffle=False,
         )
@@ -384,14 +394,15 @@ for key in model_list:
                 .numpy()
             )
             
-            if not os.path.isdir(f"cam_output/GradCAM/ResNet/{w_key}"):
-                mkdir(f"cam_output/GradCAM/ResNet/{w_key}")
+            path = "cam_output/GradCAM/CoAtNet"
+            if not os.path.isdir(f"{path}/{w_key}"):
+                mkdir(f"{path}/{w_key}")
                 
             plt.figure(dpi=600)
             plt.xticks([], [])
             plt.yticks([], [])
             plt.imshow(c_img)
-            plt.savefig(f"cam_output/GradCAM/ResNet/{w_key}/{idx}.jpg")
+            plt.savefig(f"{path}/{w_key}/{idx}.jpg")
             
             torch.cuda.empty_cache()
             gc.collect()
