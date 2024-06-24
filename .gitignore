@@ -5,6 +5,7 @@
 *.xlsx
 *.ipynb
 *.pyc
+*.out
 
 
 img/
