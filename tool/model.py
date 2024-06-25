@@ -277,7 +277,8 @@ class Model(object):
         for self.iter, (img, label, self.img_names, _, meta_v) in enumerate(
             self.train_loader
         ):
-            img, label = img.to(device), label.to(device).type(torch.float32)
+            img = img.to(device)
+            label = label.to(device).type(torch.float32)
 
             pred = self.model(img)
 
