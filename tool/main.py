@@ -240,7 +240,7 @@ def main(args):
     logger.info(args)
     logger.info("Command Line: " + " ".join(sys.argv))
     logger.debug(inspect.getsource(CB_loss))
-    logger.debug(inspect.getsource(models.resnet.ResNet._forward_impl))
+    # logger.debug(inspect.getsource(models.resnet.ResNet._forward_impl))
     logger.debug(inspect.getsource(Model))
     logger.debug(inspect.getsource(CustomDataset_class))
 

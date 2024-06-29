@@ -263,9 +263,9 @@ class Model(object):
         self.model.train()
         self.phase = "Train"
         self.criterion = (
-            CB_loss(samples_per_cls=self.grade_num, no_of_classes=len(self.grade_num), gamma = self.args.gamma)
+            # CB_loss(samples_per_cls=self.grade_num, no_of_classes=len(self.grade_num), gamma = self.args.gamma)
             # FocalLoss(gamma=self.args.gamma)
-            # nn.CrossEntropyLoss()
+            nn.CrossEntropyLoss()
             
             if self.args.mode == "class"
             else nn.L1Loss()
@@ -278,7 +278,8 @@ class Model(object):
             self.train_loader
         ):
             img = img.to(device)
-            label = label.to(device).type(torch.float32)
+            # label = label.to(device).type(torch.float32)
+            label = label.to(device)
 
             pred = self.model(img)
 
