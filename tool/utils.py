@@ -228,7 +228,7 @@ class CB_loss(nn.Module):
         weights = (1.0 - self.beta) / np.array(effective_num)
         weights = weights / np.sum(weights) * self.no_of_classes
 
-        labels_one_hot = F.one_hot(labels.to(torch.int64), num_classes=self.no_of_classes).float()
+        labels_one_hot = F.one_hot(labels.to(torch.int64), self.no_of_classes).float()
 
         weights = torch.tensor(weights).float().cuda()
         weights = weights.unsqueeze(0)
