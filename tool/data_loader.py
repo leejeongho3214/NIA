@@ -98,10 +98,19 @@ class CustomDataset_class(Dataset):
                 )
                 grade_dict = dict(grade_dict)
 
-                for idx_list, out_list in zip(
+                for dataset_idx, (idx_list, out_list) in enumerate(zip(
                     [t_idx, v_idx, test_idx], [train_list, val_list, test_list]
-                ):
-                    t_list = [grade_dict[idx] for idx in idx_list]
+                )):
+                    if dataset_idx == 0:
+                        t_list = [grade_dict[idx] for idx in idx_list]
+                    else:
+                        t_list = list()
+                        for idx in idx_list:
+                            tt_list = list()
+                            for each_value in grade_dict[idx]:
+                                if each_value[0].split("_")[-2] in ["F", "L30", "R30"]:
+                                    tt_list.append(each_value)
+                            t_list.append(tt_list)
                     out_list[dig][grade] = t_list
 
         self.train_list, self.val_list, self.test_list = train_list, val_list, test_list
@@ -230,32 +239,32 @@ class CustomDataset_class(Dataset):
         self.area_list.append([patch_img, label_data, desc_area, self.dig, self.meta_v])
 
     def should_skip_image(self, j_name, equ_name):
+        
+        # 왼쪽 눈가/볼 ->  좌 15 & 30도
+        # 오른쪽 눈가/볼 -> 우 15 & 30도
+        # 턱선 -> 위, 아래
+        
         if equ_name == "01":
             return (
                 (
                     j_name.split("_")[2] == "Ft"
                     and j_name.split("_")[3].split(".")[0]
-                    in ["00", "01", "02", "03", "04", "05", "06", "07", "08"]
+                    in ["08"]
                 )
                 or (
                     j_name.split("_")[2] == "Fb"
                     and j_name.split("_")[3].split(".")[0]
-                    in ["00", "02", "03", "04", "05", "06", "07", "08"]
+                    in ["08"]
                 )
                 or (
-                    j_name.split("_")[2] == "F"
-                    and j_name.split("_")[3].split(".")[0] in ["03", "04", "05", "06"]
-                )
-                or (j_name.split("_")[2] in ["R15", "L15"])
-                or (
-                    j_name.split("_")[2] == "R30"
+                    j_name.split("_")[2] in ["R15", "R30"]
                     and j_name.split("_")[3].split(".")[0]
-                    in ["00", "01", "02", "04", "06", "07", "08"]
+                    in ["04", "06"]
                 )
                 or (
-                    j_name.split("_")[2] == "L30"
+                    j_name.split("_")[2] in ["L15", "L30"]
                     and j_name.split("_")[3].split(".")[0]
-                    in ["00", "01", "02", "03", "05", "07", "08"]
+                    in ["03", "05"]
                 )
             )
         elif equ_name == "02":
