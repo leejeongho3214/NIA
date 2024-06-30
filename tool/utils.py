@@ -321,7 +321,11 @@ def save_image(self, img):
     cv2.imwrite(os.path.join(path, f"epoch_{self.epoch}_iter_{self.iter}_{self.m_dig}.jpg"), img_mat.get()[:, :, (2, 1, 0)])
 
 def fix_seed(random_seed):
-
+    
+    torch.use_deterministic_algorithms(True)
+    os.environ['PYTHONHASHSEED'] = str(random_seed)
+    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':16:8'
+    
     torch.manual_seed(random_seed)
     torch.cuda.manual_seed(random_seed)
     torch.cuda.manual_seed_all(random_seed)  # if use multi-GPU
