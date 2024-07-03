@@ -328,6 +328,8 @@ class Model_test(Model):
         self.args = args
         self.pred = defaultdict(list)
         self.gt = defaultdict(list)
+        self.pred_2 = defaultdict(lambda: defaultdict(list))
+        self.gt_2 = defaultdict(lambda: defaultdict(list))
         self.logger = logger
 
     def test(self, model, testset_loader, key):
@@ -365,31 +367,42 @@ class Model_test(Model):
         p.close()
 
     def print_test(self):
-        gt_value = [value[0] for value in self.gt[self.m_dig]]
-        pred_value = [value[0] for value in self.pred[self.m_dig]]
+        gt_v = [value[0] for value in self.gt[self.m_dig]]
+        pred_v = [value[0] for value in self.pred[self.m_dig]]
+        
+        gt_F = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "F"]
+        gt_L30 = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "L30"]
+        gt_R30 = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "R30"]
+        
+        pred_F = [value[0] for value in self.pred[self.m_dig] if value[1].split("_")[-3] == "F"]
+        pred_L30 = [value[0] for value in self.pred[self.m_dig] if value[1].split("_")[-3] == "L30"]
+        pred_R30 = [value[0] for value in self.pred[self.m_dig] if value[1].split("_")[-3] == "R30"]
+        
         if self.args.mode == "class":
-            (
-                micro_precision,
-                micro_recall,
-                micro_f1,
-                _,
-            ) = precision_recall_fscore_support(
-                gt_value,
-                pred_value,
-                average="micro",
-                zero_division=0
-            )
+            for gt_value, pred_value in [(gt_v, pred_v), (gt_F, pred_F), (gt_L30, pred_L30), (gt_R30, pred_R30)]:
+                (
+                    micro_precision,
+                    micro_recall,
+                    micro_f1,
+                    _,
+                ) = precision_recall_fscore_support(
+                    gt_value,
+                    pred_value,
+                    average="micro",
+                    zero_division=0
+                )
 
-            correlation, p_value = pearsonr(gt_value, pred_value)
+                correlation, p_value = pearsonr(gt_value, pred_value)
 
-            top_3 = [
-                False if abs(g - p) > 1 else True for g, p in zip(gt_value, pred_value)
-            ]
-            top_3_acc = sum(top_3) / len(top_3)
+                top_3 = [
+                    False if abs(g - p) > 1 else True for g, p in zip(gt_value, pred_value)
+                ]
+                top_3_acc = sum(top_3) / len(top_3)
 
-            self.logger.info(
-                f"[{self.m_dig}]Acc: {micro_precision:.4f} Correlation: {correlation:.2f}, P-value: {p_value:.4f}, Top-3 Acc: {top_3_acc:.4f}\n"
-            )
+                self.logger.info(
+                    f"[{self.m_dig}]Acc: {micro_precision:.4f} Correlation: {correlation:.2f}, P-value: {p_value:.4f}, Top-3 Acc: {top_3_acc:.4f}\n"
+                )
+
         else:
             correlation, p_value = pearsonr(gt_value, pred_value)
             mae = mean_absolute_error(gt_value, pred_value)
@@ -430,3 +443,5 @@ class Model_test(Model):
                 [pred_item.argmax().item(), self.img_names[idx]]
             )
             self.gt[self.m_dig].append([gt_item.item(), self.img_names[idx]])
+            
+            
