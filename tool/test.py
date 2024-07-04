@@ -192,6 +192,8 @@ def main(args):
                     args,
                     model_list[path],
                     os.path.join(dig_path, "state_dict.bin"),
+                    path,
+                    False,
                 )
 
     dataset = (

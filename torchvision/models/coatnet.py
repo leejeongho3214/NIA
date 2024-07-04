@@ -4,12 +4,11 @@ import torch.nn as nn
 from einops import rearrange
 from einops.layers.torch import Rearrange
 
-bias = None
 
 def conv_3x3_bn(inp, oup, image_size, downsample=False):
     stride = 1 if downsample == False else 2
     return nn.Sequential(
-        nn.Conv2d(inp, oup, 3, stride, 1, bias=bias),
+        nn.Conv2d(inp, oup, 3, stride, 1, bias=False),
         nn.BatchNorm2d(oup),
         nn.GELU()
     )
@@ -30,9 +29,9 @@ class SE(nn.Module):
         super().__init__()
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Sequential(
-            nn.Linear(oup, int(inp * expansion), bias=bias),
+            nn.Linear(oup, int(inp * expansion), bias=False),
             nn.GELU(),
-            nn.Linear(int(inp * expansion), oup, bias=bias),
+            nn.Linear(int(inp * expansion), oup, bias=False),
             nn.Sigmoid()
         )
 
@@ -67,34 +66,34 @@ class MBConv(nn.Module):
 
         if self.downsample:
             self.pool = nn.MaxPool2d(3, 2, 1)
-            self.proj = nn.Conv2d(inp, oup, 1, 1, 0, bias=bias)
+            self.proj = nn.Conv2d(inp, oup, 1, 1, 0, bias=False)
 
         if expansion == 1:
             self.conv = nn.Sequential(
                 # dw
                 nn.Conv2d(hidden_dim, hidden_dim, 3, stride,
-                          1, groups=hidden_dim, bias=bias),
+                          1, groups=hidden_dim, bias=False),
                 nn.BatchNorm2d(hidden_dim),
                 nn.GELU(),
                 # pw-linear
-                nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=bias),
+                nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=False),
                 nn.BatchNorm2d(oup),
             )
         else:
             self.conv = nn.Sequential(
                 # pw
                 # down-sample in the first conv
-                nn.Conv2d(inp, hidden_dim, 1, stride, 0, bias=bias),
+                nn.Conv2d(inp, hidden_dim, 1, stride, 0, bias=False),
                 nn.BatchNorm2d(hidden_dim),
                 nn.GELU(),
                 # dw
                 nn.Conv2d(hidden_dim, hidden_dim, 3, 1, 1,
-                          groups=hidden_dim, bias=bias),
+                          groups=hidden_dim, bias=False),
                 nn.BatchNorm2d(hidden_dim),
                 nn.GELU(),
                 SE(inp, hidden_dim),
                 # pw-linear
-                nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=bias),
+                nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=False),
                 nn.BatchNorm2d(oup),
             )
         
@@ -134,7 +133,7 @@ class Attention(nn.Module):
         self.register_buffer("relative_index", relative_index)
 
         self.attend = nn.Softmax(dim=-1)
-        self.to_qkv = nn.Linear(inp, inner_dim * 3, bias=bias)
+        self.to_qkv = nn.Linear(inp, inner_dim * 3, bias=False)
 
         self.to_out = nn.Sequential(
             nn.Linear(inner_dim, oup),
@@ -173,7 +172,7 @@ class Transformer(nn.Module):
         if self.downsample:
             self.pool1 = nn.MaxPool2d(3, 2, 1)
             self.pool2 = nn.MaxPool2d(3, 2, 1)
-            self.proj = nn.Conv2d(inp, oup, 1, 1, 0, bias=bias)
+            self.proj = nn.Conv2d(inp, oup, 1, 1, 0, bias=False)
 
         self.attn = Attention(inp, oup, image_size, heads, dim_head, dropout)
         self.ff = FeedForward(oup, hidden_dim, dropout)
@@ -217,7 +216,8 @@ class CoAtNet(nn.Module):
             block[block_types[3]], channels[3], channels[4], num_blocks[4], (ih // 32, iw // 32))
 
         self.pool = nn.AvgPool2d(ih // 32, 1)
-        self.fc = nn.Linear(channels[-1], num_classes, bias=bias)
+        # self.fc = nn.Linear(channels[-1], num_classes, bias=False)
+        self.fc = nn.Linear(channels[-1], num_classes, bias=True)
 
     def forward(self, x):
         x = self.s0(x)
@@ -243,25 +243,25 @@ class CoAtNet(nn.Module):
 def coatnet_0():
     num_blocks = [2, 2, 3, 5, 2]            # L
     channels = [64, 96, 192, 384, 768]      # D
-    return CoAtNet((256, 256), 3, num_blocks, channels, num_classes=1000)
+    return CoAtNet((224, 224), 3, num_blocks, channels, num_classes=1000)
 
 
 def coatnet_1():
     num_blocks = [2, 2, 6, 14, 2]           # L
     channels = [64, 96, 192, 384, 768]      # D
-    return CoAtNet((256, 256), 3, num_blocks, channels, num_classes=1000)
+    return CoAtNet((224, 224), 3, num_blocks, channels, num_classes=1000)
 
 
 def coatnet_2():
     num_blocks = [2, 2, 6, 14, 2]           # L
     channels = [128, 128, 256, 512, 1026]   # D
-    return CoAtNet((256, 256), 3, num_blocks, channels, num_classes=1000)
+    return CoAtNet((224, 224), 3, num_blocks, channels, num_classes=1000)
 
 
 def coatnet_3():
     num_blocks = [2, 2, 6, 14, 2]           # L
     channels = [192, 192, 384, 768, 1536]   # D
-    return CoAtNet((256, 256), 3, num_blocks, channels, num_classes=1000)
+    return CoAtNet((224, 224), 3, num_blocks, channels, num_classes=1000)
 
 
 def coatnet_4(num_classes):
@@ -269,30 +269,7 @@ def coatnet_4(num_classes):
     channels = [192, 192, 384, 768, 1536]   # D
     return CoAtNet((256, 256), 3, num_blocks, channels, num_classes)
 
-
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
-if __name__ == '__main__':
-    img = torch.randn(1, 3, 256, 256)
-
-    net = coatnet_0()
-    out = net(img)
-    print(out.shape, count_parameters(net))
-
-    net = coatnet_1()
-    out = net(img)
-    print(out.shape, count_parameters(net))
-
-    net = coatnet_2()
-    out = net(img)
-    print(out.shape, count_parameters(net))
-
-    net = coatnet_3()
-    out = net(img)
-    print(out.shape, count_parameters(net))
-
-    net = coatnet_4()
-    out = net(img)
-    print(out.shape, count_parameters(net))
