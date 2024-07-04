@@ -59,7 +59,7 @@ for key, model in model_list.items():
     model_list.update({key: model})
     
     
-name = "cnn_cb_all_img"
+name = "cnn_cb_aug_1"
 task = "class"
 
 if len(os.popen("git branch --show-current").readlines()):
@@ -378,6 +378,10 @@ for key in model_list:
                         pil_img[:, :, (2, 1, 0)], grayscale_cam, use_rgb=True
                     )
                 )
+                
+            im = np.clip(np.array(img.permute(0, 2, 3, 1)) * 255, 0, 255).astype(np.int32)
+            for i in range(len(im)):
+                v_img.append(im[i])
                 
             stacked_images = np.stack(v_img, axis=0)
             c_img = (
