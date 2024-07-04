@@ -59,8 +59,7 @@ for key, model in model_list.items():
     model_list.update({key: model})
     
     
-model = "cnn"
-name = "cnn"
+name = "cnn_cb_all_img"
 task = "class"
 
 if len(os.popen("git branch --show-current").readlines()):
@@ -387,7 +386,7 @@ for key in model_list:
                 .numpy()
             )
             
-            path = "cam_output/GradCAM/CoAtNet"
+            path = f"cam_output/GradCAM/{name}"
             if not os.path.isdir(f"{path}/{w_key}"):
                 mkdir(f"{path}/{w_key}")
                 
