@@ -1,3 +1,4 @@
+import shutil
 import sys
 import os
 
@@ -12,12 +13,11 @@ from tool.data_loader import IEC_dataset
 import argparse
 from tool.logger import setup_logger
 from torch.utils import data
-
+import torch.nn as nn
 from tool.model import Model_test
 from tool.utils import resume_checkpoint, fix_seed
 
 fix_seed(523)
-
 if len(os.popen("git branch --show-current").readlines()):
     git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 else:
@@ -91,9 +91,17 @@ def parse_args():
         default=4,
         type=int,
     )
+    
+    parser.add_argument(
+        "--dropout",
+        default = 0.3,
+        type = float,
+    )
 
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--meta", action="store_true")
+    parser.add_argument("--bias", action="store_true")
+    parser.add_argument("--transfer", action="store_true")
 
     args = parser.parse_args()
 
@@ -102,8 +110,12 @@ def parse_args():
 
 def main(args):
     args.check_path = os.path.join(args.output_dir, args.mode, args.name)
-    args.save_img = os.path.join(args.check_path, "save_img")
 
+    args.model = "cnn"
+
+    if os.path.isdir(os.path.join(args.check_path, "log", "eval")):
+        shutil.rmtree(os.path.join(args.check_path, "log", "eval"))
+        
     logger = setup_logger(
         args.name,
         os.path.join(args.check_path, "log", "eval"),
@@ -112,12 +124,7 @@ def main(args):
     logger.info("Command Line: " + " ".join(sys.argv))
 
     model_num_class = (
-        {
-            "dryness": 5,
-            "pigmentation": 6,
-            "pore": 6,
-            "wrinkle": 7,
-        }  # dryness, pigmentation, pore, sagging, wrinkle
+        {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
         if args.mode == "class"
         else {
             "pigmentation": 1,
@@ -129,9 +136,13 @@ def main(args):
     )
 
     model_list = {
-        key: models.resnet50(weights=None, num_classes=value, args=args)
-        for key, value in model_num_class.items()
+        key: models.resnet50(weights=models.ResNet50_Weights.DEFAULT, args=args)
+        for key, _ in model_num_class.items()
     }
+
+    for key, model in model_list.items(): 
+        model.fc = nn.Linear(model.fc.in_features, model_num_class[key], bias = True)
+        model_list.update({key: model})
 
     if args.load_name == None:
         args.load_name = args.name
@@ -148,6 +159,8 @@ def main(args):
                     args,
                     model_list[path],
                     os.path.join(dig_path, "state_dict.bin"),
+                    path,
+                    False,
                 )
 
     dataset = IEC_dataset(args, logger)
@@ -173,7 +186,7 @@ def main(args):
     for key in model_list:
         model = model_list[key].cuda()
         for w_key in model_area_dict[key]:
-            testset = dataset.load_dataset(w_key)
+            testset, _ = dataset.load_dataset("test", w_key)
             testset_loader = data.DataLoader(
                 dataset=testset,
                 batch_size=args.batch_size,

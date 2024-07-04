@@ -11,8 +11,10 @@ import torch.optim as optim
 from utils import (
     AverageMeter,
     FocalLoss,
+    mape_loss,
     save_checkpoint,
     save_image,
+    CB_loss
 )
 import os
 
@@ -36,6 +38,7 @@ class Model(object):
         model_num_class,
         writer,
         dig_k,
+        grade_num,
     ):
         (
             self.args,
@@ -49,6 +52,7 @@ class Model(object):
             self.model_num_class,
             self.writer,
             self.m_dig,
+            self.grade_num
         ) = (
             args,
             model,
@@ -61,6 +65,7 @@ class Model(object):
             model_num_class,
             writer,
             dig_k,
+            grade_num,
         )
 
         self.train_loss, self.val_loss = AverageMeter(), AverageMeter()
@@ -107,7 +112,9 @@ class Model(object):
             betas=(0.9, 0.999),
             weight_decay=0,
         )
-        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, "min")
+        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            self.optimizer, "min", patience=20
+        )
 
     def acc_avg(self, name):
         return round(self.test_value[name].avg * 100, 2)
@@ -143,9 +150,6 @@ class Model(object):
                         f_gt.append(v1)
 
                 correlation, _ = pearsonr(f_gt, f_pred)
-                self.logger.info(
-                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
-                )
 
                 if self.args.mode == "class":
                     (
@@ -158,11 +162,19 @@ class Model(object):
                     )
 
                     self.logger.info(
-                        f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}] micro Precision: {(micro_precision * 100):.2f}%, micro Recall: {micro_recall:.4f}, micro F1: {micro_f1:.4f}"
+                        f"Epoch: {self.epoch} [{self.phase}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] micro Precision: {(micro_precision * 100):.2f}%, micro Recall: {micro_recall:.4f}, micro F1: {micro_f1:.4f}"
                     )
+                    self.logger.info(
+                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
+                    )
+                else:
+                    self.logger.info(
+                    f"Epoch: {self.epoch} [{self.phase}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] ---- >  loss: {self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
+                    )
+
             else:
                 self.logger.info(
-                    f"Epoch: {self.epoch} [{self.phase}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg:.04f}"
+                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}"
                 )
 
     def stop_early(self):
@@ -182,7 +194,7 @@ class Model(object):
     def class_loss(self, pred, gt):
         loss = self.criterion(pred, gt)
 
-        with torch.no_grad():        
+        with torch.no_grad():
             pred_v = [item.argmax().item() for item in pred]
             gt_v = [item.item() for item in gt]
 
@@ -202,7 +214,7 @@ class Model(object):
         pred = pred.flatten()
         loss = self.criterion(pred, gt)
 
-        with torch.no_grad():  
+        with torch.no_grad():
             pred_v = [item.item() for item in pred]
             gt_v = [item.item() for item in gt]
 
@@ -251,33 +263,32 @@ class Model(object):
         self.model.train()
         self.phase = "Train"
         self.criterion = (
-            (
-                FocalLoss(gamma=self.args.gamma)
-                if self.phase == "Train"
-                else nn.CrossEntropyLoss()
-            )
+            CB_loss(samples_per_cls=self.grade_num, no_of_classes=len(self.grade_num), gamma = self.args.gamma)
+            # FocalLoss(gamma=self.args.gamma)
+            # nn.CrossEntropyLoss()
+            
             if self.args.mode == "class"
             else nn.L1Loss()
+            # else nn.MSELoss()
+            # else mape_loss()
         )
         random_num = random.randrange(0, len(self.train_loader))
 
         for self.iter, (img, label, self.img_names, _, meta_v) in enumerate(
             self.train_loader
         ):
-            img, label = img.to(device), label.to(device)
+            img = img.to(device)
+            label = label.to(device).type(torch.float32)
 
-            pred = self.model(img, meta_v) if self.args.model != 'coatnet' else self.model(img)
+            pred = self.model(img, meta_v)
 
             if self.args.mode == "class":
                 loss = self.class_loss(pred, label)
             else:
                 loss = self.regression(pred, label)
 
-            if self.args.img:
+            if self.iter == random_num:
                 save_image(self, img)
-            else:
-                if self.iter == random_num:
-                    save_image(self, img)
 
             self.print_loss(len(self.train_loader))
 
@@ -290,13 +301,7 @@ class Model(object):
     def valid(self):
         self.phase = "Valid"
         self.criterion = (
-            (
-                FocalLoss(gamma=self.args.gamma)
-                if self.phase == "Train"
-                else nn.CrossEntropyLoss()
-            )
-            if self.args.mode == "class"
-            else nn.L1Loss()
+            nn.CrossEntropyLoss() if self.args.mode == "class" else nn.L1Loss()
         )
         with torch.no_grad():
             self.model.eval()
@@ -304,9 +309,9 @@ class Model(object):
                 self.valid_loader
             ):
                 img, label = img.to(device), label.to(device)
-                
-                pred = self.model(img, meta_v) if self.args.model != 'coatnet' else self.model(img)
-                
+
+                pred = self.model(img, meta_v)
+
                 if self.args.mode == "class":
                     self.class_loss(pred, label)
                 else:
@@ -324,6 +329,8 @@ class Model_test(Model):
         self.pred = defaultdict(list)
         self.norm_pred = defaultdict(list)
         self.gt = defaultdict(list)
+        self.pred_2 = defaultdict(lambda: defaultdict(list))
+        self.gt_2 = defaultdict(lambda: defaultdict(list))
         self.logger = logger
 
     def test(self, model, testset_loader, key):
@@ -332,11 +339,16 @@ class Model_test(Model):
         self.m_dig = key
         with torch.no_grad():
             self.model.eval()
-            for self.iter, (img, self.img_names) in enumerate(
+            for self.iter, (img, label, self.img_names, _, meta_v) in enumerate(
                 tqdm(self.testset_loader, desc=self.m_dig)
             ):
-                img = img.to(device)
-                pred = self.model.to(device)(img, None)
+                img, label = img.to(device), label.to(device)
+
+                pred = (
+                    self.model.to(device)(img, meta_v)
+                    if self.args.model != "coatnet"
+                    else self.model.to(device)(img)
+                )
 
                 if self.args.mode == "class":
                     self.get_test_acc(pred)
@@ -361,64 +373,42 @@ class Model_test(Model):
         p.close()
 
     def print_test(self):
-        gt_value = [value[0] for value in self.gt[self.m_dig]]
-        pred_value = [value[0] for value in self.pred[self.m_dig]]
+        gt_v = [value[0] for value in self.gt[self.m_dig]]
+        pred_v = [value[0] for value in self.pred[self.m_dig]]
+        
+        # gt_F = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "F"]
+        # gt_L30 = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "L30"]
+        # gt_R30 = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "R30"]
+        
+        # pred_F = [value[0] for value in self.pred[self.m_dig] if value[1].split("_")[-3] == "F"]
+        # pred_L30 = [value[0] for value in self.pred[self.m_dig] if value[1].split("_")[-3] == "L30"]
+        # pred_R30 = [value[0] for value in self.pred[self.m_dig] if value[1].split("_")[-3] == "R30"]
+        
         if self.args.mode == "class":
-            (
-                micro_precision,
-                micro_recall,
-                micro_f1,
-                _,
-            ) = precision_recall_fscore_support(
-                gt_value,
-                pred_value,
-                average="micro",
-                zero_division=1,
-            )
+            for gt_value, pred_value in [(gt_v, pred_v)]:
+            # for gt_value, pred_value in [(gt_v, pred_v), (gt_F, pred_F), (gt_L30, pred_L30), (gt_R30, pred_R30)]:
+                (
+                    micro_precision,
+                    micro_recall,
+                    micro_f1,
+                    _,
+                ) = precision_recall_fscore_support(
+                    gt_value,
+                    pred_value,
+                    average="micro",
+                    zero_division=0
+                )
 
-            (
-                macro_precision,
-                macro_recall,
-                macro_f1,
-                _,
-            ) = precision_recall_fscore_support(
-                gt_value,
-                pred_value,
-                average="macro",
-                zero_division=1,
-            )
+                correlation, p_value = pearsonr(gt_value, pred_value)
 
-            (
-                weighted_precision,
-                weighted_recall,
-                weighted_f1,
-                _,
-            ) = precision_recall_fscore_support(
-                gt_value,
-                pred_value,
-                average="weighted",
-                zero_division=1,
-            )
-            correlation, p_value = pearsonr(gt_value, pred_value)
+                top_3 = [
+                    False if abs(g - p) > 1 else True for g, p in zip(gt_value, pred_value)
+                ]
+                top_3_acc = sum(top_3) / len(top_3)
 
-            top_3 = [
-                False if abs(g - p) > 1 else True for g, p in zip(gt_value, pred_value)
-            ]
-            top_3_acc = sum(top_3) / len(top_3)
-
-            self.logger.info(
-                f"[{self.m_dig}]Micro Precision(=Acc): {micro_precision:.4f}, Micro Recall: {micro_recall:.4f}, Micro F1: {micro_f1:.4f}"
-            )
-
-            self.logger.info(
-                f"Macro Precision: {macro_precision:.4f}, Macro Recall: {macro_recall:.4f}, Macro F1: {macro_f1:.4f}"
-            )
-            self.logger.info(
-                f"Weighted Precision: {weighted_precision:.4f}, Weighted Recall: {weighted_recall:.4f}, Weighted F1: {weighted_f1:.4f}"
-            )
-            self.logger.info(
-                f"Correlation: {correlation:.2f}, P-value: {p_value:.4f}, Top-3 Acc: {top_3_acc:.4f}\n"
-            )
+                self.logger.info(
+                    f"[{self.m_dig}]Acc: {micro_precision:.4f} Correlation: {correlation:.2f}, P-value: {p_value:.4f}, Top-3 Acc: {top_3_acc:.4f}\n"
+                )
 
         else:
             correlation, p_value = pearsonr(gt_value, pred_value)
@@ -442,16 +432,23 @@ class Model_test(Model):
 
         elif "pore" in self.m_dig:
             value = 2600
-        
+
         else:
             assert 0, "error"
 
-        for idx, pred_item in enumerate(pred):
-            self.pred[self.m_dig].append([round(pred_item.item() * value, 3), self.img_names[idx]])
-            self.norm_pred[self.m_dig].append([round(pred_item.item(), 3), self.img_names[idx]])
+        for idx, (pred_item, gt_item) in enumerate(zip(pred, gt)):
+            self.pred[self.m_dig].append(
+                [round(pred_item.item() * value, 3), self.img_names[idx]]
+            )
+            self.gt[self.m_dig].append(
+                [round(gt_item.item() * value, 3), self.img_names[idx]]
+            )
 
     def get_test_acc(self, pred):
         for idx, pred_item in enumerate(pred):
             self.pred[self.m_dig].append(
                 [pred_item.argmax().item(), self.img_names[idx]]
             )
+            self.gt[self.m_dig].append([gt_item.item(), self.img_names[idx]])
+            
+            

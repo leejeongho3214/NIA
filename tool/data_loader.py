@@ -17,8 +17,6 @@ from torch.utils.data import ConcatDataset, Dataset
 
 
 def mkdir(path):
-    # if it is the current folder, skip.
-    # otherwise the original code will raise FileNotFoundError
     if path == "":
         return
     try:
@@ -158,7 +156,6 @@ class CustomDataset_class(Dataset):
         return idx_list[idx], self.sub_path[idx_list[idx]], self.train_num
 
     def generate_datasets(self):
-        # train_list, val_list, test_list = list(), list(), list()
         train_list, val_list, test_list = (
             defaultdict(lambda: defaultdict()),
             defaultdict(lambda: defaultdict()),
@@ -177,22 +174,22 @@ class CustomDataset_class(Dataset):
                 )
                 grade_dict = dict(grade_dict)
 
-                for idx_list, out_list in zip(
+                for dataset_idx, (idx_list, out_list) in enumerate(zip(
                     [t_idx, v_idx, test_idx], [train_list, val_list, test_list]
-                ):
-                    t_list = [grade_dict[idx] for idx in idx_list]
+                )):
+                    if dataset_idx == 0:
+                        t_list = [grade_dict[idx] for idx in idx_list]
+                    else:
+                        t_list = list()
+                        for idx in idx_list:
+                            tt_list = list()
+                            for each_value in grade_dict[idx]:
+                                if each_value[0].split("_")[-2] in ["F"]:
+                                    tt_list.append(each_value)
+                            t_list.append(tt_list)
                     out_list[dig][grade] = t_list
 
-
-
-                
-
         self.train_list, self.val_list, self.test_list = train_list, val_list, test_list
-        # self.train_list, self.val_list, self.test_list = (
-        #     ConcatDataset(train_list),
-        #     ConcatDataset(val_list),
-        #     ConcatDataset(test_list),
-        # )
 
     def load_list(self, args, mode="train"):
         self.mode = mode
@@ -235,12 +232,10 @@ class CustomDataset_class(Dataset):
                 ):
                     continue
 
-                ## Classifying meaningful images for training from various angles of images
                 for j_name in os.listdir(folder_path):
                     if self.should_skip_image(j_name, equ_name):
                         continue
 
-                    # Load the json file for image
                     with open(os.path.join(folder_path, j_name), "r") as f:
                         json_meta = json.load(f)
                         self.process_json_meta(
@@ -274,14 +269,9 @@ class CustomDataset_class(Dataset):
                 if dig in ["wrinkle", "pigmentation"] and self.mode == "test":
                     dig = f"{dig}_{area}"
 
-                if equ_name == "01":
-                    self.json_dict[dig][str(grade)][sub_fold].append(
-                        [os.path.join(pre_name, j_name.split(".")[0]), meta_v]
-                    )
-                else:
-                    self.json_dict_train[dig][str(grade)][sub_fold].append(
-                        [os.path.join(pre_name, j_name.split(".")[0]), meta_v]
-                    )
+                self.json_dict[dig][str(grade)][sub_fold].append(
+                    [os.path.join(pre_name, j_name.split(".")[0]), meta_v]
+                )
         else:
             for dig_n, value in json_meta["equipment"].items():
                 matching_dig = [
@@ -289,25 +279,17 @@ class CustomDataset_class(Dataset):
                 ]
                 if matching_dig:
                     dig = matching_dig[0]
-                    if equ_name == "01":
-                        self.json_dict[dig][sub_fold].append(
-                            [
-                                os.path.join(pre_name, j_name.split(".")[0]),
-                                value,
-                                meta_v,
-                            ]
-                        )
-                    else:
-                        self.json_dict_train[dig][sub_fold].append(
-                            [
-                                os.path.join(pre_name, j_name.split(".")[0]),
-                                value,
-                                meta_v,
-                            ]
-                        )
+                    self.json_dict[dig][value].append(
+                        [
+                            os.path.join(pre_name, j_name.split(".")[0]),
+                            value,
+                            meta_v,
+                        ]
+                    )
 
-    def save_dict(self, transform, flip=False, num=-1):
+    def save_dict(self, transform, num=-1):
         pil_img = cv2.imread(os.path.join("dataset/cropped_img", self.i_path + ".jpg"))
+        pil_img = cv2.cvtColor(pil_img, cv2.COLOR_BGR2RGB)
 
         s_list = self.i_path.split("/")[-1].split("_")
         desc_area = (
@@ -327,31 +309,17 @@ class CustomDataset_class(Dataset):
             norm_v = self.norm_reg(self.value)
             label_data = norm_v
 
-        def func():
-            pil = Image.fromarray(pil_img.astype(np.uint8))
-            patch_img = transform(pil)
+        pil = Image.fromarray(pil_img.astype(np.uint8))
+        patch_img = transform(pil)
 
-            if patch_img.dim() == 4:
-                [
-                    self.area_list.append(
-                        [patch_img[j], label_data, desc_area, self.dig, self.meta_v]
-                    )
-                    for j in range(len(patch_img[:num]))
-                ]
-            else:
-                self.area_list.append(
-                    [patch_img, label_data, desc_area, self.dig, self.meta_v]
-                )
-
-        if flip:
-            for j in range(2):
-                if j:
-                    pil_img = cv2.flip(pil_img, flipCode=1)
-                func()
-        else:
-            func()
+        self.area_list.append([patch_img, label_data, desc_area, self.dig, self.meta_v])
 
     def should_skip_image(self, j_name, equ_name):
+        
+        # 왼쪽 눈가/볼 ->  좌 15 & 30도
+        # 오른쪽 눈가/볼 -> 우 15 & 30도
+        # 턱선 -> 위, 아래
+        
         if equ_name == "01":
             return j_name.split("_")[2] != "F"
 
@@ -359,7 +327,7 @@ class CustomDataset_class(Dataset):
             return (
                 (
                     j_name.split("_")[2] == "F"
-                    and j_name.split("_")[3].split(".")[0] in ["03", "04"]
+                    and j_name.split("_")[3].split(".")[0] in ["03", "04", "05", "06"]
                 )
                 or (
                     j_name.split("_")[2] == "L"
@@ -392,46 +360,56 @@ class CustomDataset_class(Dataset):
 
         transform_test = transforms.Compose(
             [
+                transforms.Resize((self.args.res, self.args.res), antialias=True),
                 transforms.ToTensor(),
-                transforms.Resize(self.args.res, antialias=True),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ]
         )
 
-        def func_v():
-            transform_list = [transform_test]
+        def func_v(num):
+            self.save_dict(transform_test)
 
-            if mode == "train":
-                for transform in transform_list:
-                    self.save_dict(transform, True)
-            else:
-                self.save_dict(transform_test)
-
-        
         if self.args.mode == "class":
             data_list = dict(data_list)
+
+            grade_num = dict()
+            grade_num.update(
+                {key: len(value) for key, value in data_list[dig_k].items()}
+            )
+
+            num_grade = [grade_num[num] for num in sorted(grade_num)]
+
+            max_num = max(grade_num.values())
+            result = {
+                k: (
+                    (max_num // v) - 1
+                    if max(grade_num.values()) == v
+                    else (max_num // v)
+                )
+                for k, v in grade_num.items()
+            }
+
             for self.grade, class_dict in tqdm(
                 data_list[dig_k].items(), desc=f"{mode}_class"
             ):
                 for self.idx, sub_folder in enumerate(
                     tqdm(sorted(class_dict), desc=f"{self.dig}_{self.grade}")
                 ):
-                    if self.idx == self.args.data_num:
-                        break
-
                     for self.i_path, self.meta_v in sub_folder:
-                        func_v()
+                        func_v(result[self.grade])
 
         else:
             for self.dig, v_list in tqdm(data_list.datasets, desc=f"{mode}_regression"):
-                # if self.dig in dig_k:
                 if dig_k in self.dig:
-                    for vv_list in tqdm(v_list, desc=f"{self.dig}"):
-                        for idx, (self.i_path, self.value, self.meta_v) in enumerate(
-                            sorted(vv_list)
-                        ):
-                            func_v()
+                    for self.i_path, self.value, self.meta_v in tqdm(
+                        v_list, desc=f"{self.dig}"
+                    ):
+                        func_v(None)
 
-        return self.area_list
+        if self.args.mode == "class":
+            return self.area_list, num_grade
+        else:
+            return self.area_list, 0 
 
     def norm_reg(self, value):
         dig_v = self.dig.split("_")[-1]
@@ -464,100 +442,26 @@ class CustomDataset_regress(CustomDataset_class):
 
     def generate_datasets(self):
         train_list, val_list, test_list = list(), list(), list()
-        for dig, v_list in self.json_dict.items():
-            random_list = list(self.json_dict[dig].keys())
-            random.shuffle(random_list)
+        for dig, value_list in self.json_dict.items():
+            t_list, v_list, te_list = list(), list(), list()
+            key_index = sorted(value_list)
+            i = 0
+            for idx in key_index:
+                for value in value_list[idx]:
+                    if i % 8 == 0:
+                        v_list.append(value)
+                    elif i % 8 == 1:
+                        te_list.append(value)
+                    else:
+                        t_list.append(value)
+                    i += 1
 
-            t_len, v_len = int(len(v_list) * 0.8), int(len(v_list) * 0.1)
-            t_idx, v_idx, test_idx = (
-                random_list[:t_len],
-                random_list[t_len : t_len + v_len],
-                random_list[t_len + v_len :],
-            )
-            v_list = dict(v_list)
-
-            for idx_list, out_list in zip(
-                [t_idx, v_idx, test_idx], [train_list, val_list, test_list]
-            ):
-                t_list = [v_list[idx] for idx in idx_list]
-                out_list.append([dig, t_list])
-                if len(self.json_dict_train[dig]) > 0:
-                    tt_list = [
-                        sub_list
-                        for idx in idx_list
-                        for sub_list in self.json_dict_train[dig][idx]
-                    ]
-                    out_list.append([dig, tt_list])
+            train_list.append([dig, t_list]), val_list.append(
+                [dig, v_list]
+            ), test_list.append([dig, te_list])
 
         self.train_list, self.val_list, self.test_list = (
             ConcatDataset(train_list),
             ConcatDataset(val_list),
             ConcatDataset(test_list),
         )
-
-
-"""
-pigmentation_0 -> 406
-pigmentation_1 -> 1355
-pigmentation_2 -> 789
-pigmentation_3 -> 602
-pigmentation_4 -> 198
-pigmentation_5 -> 82
-wrinkle_0 -> 374
-wrinkle_1 -> 1566
-wrinkle_2 -> 777
-wrinkle_3 -> 644
-wrinkle_4 -> 327
-wrinkle_5 -> 321
-wrinkle_6 -> 273
-pore_0 -> 45
-pore_1 -> 297
-pore_2 -> 1035
-pore_3 -> 221
-pore_4 -> 92
-pore_5 -> 18
-sagging_0 -> 794
-sagging_1 -> 346
-sagging_2 -> 222
-sagging_3 -> 200
-sagging_4 -> 88
-sagging_5 -> 56
-sagging_6 -> 2
-dryness_0 -> 18
-dryness_1 -> 141
-dryness_2 -> 520
-dryness_3 -> 158
-dryness_4 -> 19
-ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ
-pigmentation_0 -> 1218
-pigmentation_1 -> 1355
-pigmentation_2 -> 789
-pigmentation_3 -> 1204
-pigmentation_4 -> 1188
-pigmentation_5 -> 984
-wrinkle_0 -> 1496
-wrinkle_1 -> 1566
-wrinkle_2 -> 1554
-wrinkle_3 -> 1288
-wrinkle_4 -> 1308
-wrinkle_5 -> 1284
-wrinkle_6 -> 1365
-pore_0 -> 540
-pore_1 -> 891
-pore_2 -> 1035
-pore_3 -> 884
-pore_4 -> 1104
-pore_5 -> 216
-sagging_0 -> 794
-sagging_1 -> 692
-sagging_2 -> 666
-sagging_3 -> 800
-sagging_4 -> 880
-sagging_5 -> 672
-sagging_6 -> 24
-dryness_0 -> 216
-dryness_1 -> 423
-dryness_2 -> 520
-dryness_3 -> 474
-dryness_4 -> 228
-"""

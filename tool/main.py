@@ -1,8 +1,6 @@
 import inspect
 import os
 import sys
-import sys
-import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -11,21 +9,18 @@ import torch
 import gc
 from torch.utils import data
 import shutil
-
+import torch.nn as nn
 import numpy as np
 from torchvision import models
 from tensorboardX import SummaryWriter
-from utils import FocalLoss, mkdir, resume_checkpoint, fix_seed
+from utils import FocalLoss, mkdir, resume_checkpoint, fix_seed, CB_loss
 from logger import setup_logger
 from model import Model
 from data_loader import CustomDataset_class, CustomDataset_regress
 import argparse
 
 fix_seed(523)
-if len(os.popen("git branch --show-current").readlines()):
-    git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
-else:
-    git_name = os.popen("git describe --tags").readlines()[0].rstrip()
+git_name = os.popen("git describe --tags").readlines()[0].rstrip()
 
 
 def parse_args():
@@ -45,7 +40,7 @@ def parse_args():
 
     parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
 
-    parser.add_argument("--stop_early", type=int, default=30)
+    parser.add_argument("--stop_early", type=int, default=50)
 
     parser.add_argument(
         "--mode",
@@ -114,7 +109,7 @@ def parse_args():
 
     parser.add_argument(
         "--gamma",
-        default=3,
+        default=2,
         type=int,
     )
 
@@ -141,6 +136,12 @@ def parse_args():
         default=32,
         type=int,
     )
+    
+    parser.add_argument(
+        "--transfer_path",
+        default=None,
+        type=str,
+    )
 
     parser.add_argument(
         "--num_workers",
@@ -148,9 +149,11 @@ def parse_args():
         type=int,
     )
 
+
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--img", action="store_true")
     parser.add_argument("--meta", action="store_true")
+    parser.add_argument("--transfer", action="store_true")
 
     args = parser.parse_args()
 
@@ -176,14 +179,32 @@ def main(args):
     )
     pass_list = list()
 
-    args.best_loss, model_list = {item: np.inf for item in model_num_class}, {
-        key: models.resnet50(weights=None, num_classes=value, args=args)
-        for key, value in model_num_class.items()
+    args.best_loss = {item: np.inf for item in model_num_class}
+    args.load_epoch = {item: 0 for item in model_num_class}
+
+    model_list = {
+        key: models.resnet50(weights=models.ResNet50_Weights.DEFAULT, args=args)
+        for key, _ in model_num_class.items()
     }
+
+    if args.transfer: 
+        model_path = os.path.join(args.output_dir, args.mode, args.transfer_path, "save_model")
+        print("transfer learning...")
+    else:
+        model_path = os.path.join(check_path, "save_model")
+        
+    for key, model in model_list.items(): 
+        model.fc = nn.Linear(model.fc.in_features, model_num_class[key], bias = True)
+        if args.transfer:
+            for i, (name, param) in enumerate(model.named_parameters()):
+                param.requires_grad = False
+                if len(list(model.named_parameters())) - i == 3:
+                    break
+        model_list.update({key: model})
 
     args.save_img = os.path.join(check_path, "save_img")
     args.pred_path = os.path.join(check_path, "prediction")
-    model_path = os.path.join(check_path, "save_model")
+    
 
     if args.reset:
         print(f"\033[90mReseting......{check_path}\033[0m")
@@ -192,20 +213,20 @@ def main(args):
         if os.path.isdir(log_path):
             shutil.rmtree(log_path)
 
-    else:
-        if os.path.isdir(model_path):
-            for path in os.listdir(model_path):
-                dig_path = os.path.join(model_path, path)
-                if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
-                    print(f"\033[92mResuming......{dig_path}\033[0m")
-                    model_list[path] = resume_checkpoint(
-                        args,
-                        model_list[path],
-                        os.path.join(model_path, f"{path}", "state_dict.bin"),
-                    )
-                    if os.path.isdir(os.path.join(dig_path, "done")):
-                        print(f"\043[92mPassing......{dig_path}\043[0m")
-                        pass_list.append(path)
+    if os.path.isdir(model_path):
+        for path in os.listdir(model_path):
+            dig_path = os.path.join(model_path, path)
+            if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
+                print(f"\033[92mResuming......{dig_path}\033[0m")
+                model_list[path] = resume_checkpoint(
+                    args,
+                    model_list[path],
+                    os.path.join(model_path, f"{path}", "state_dict.bin"),
+                    path, 
+                )
+                if os.path.isdir(os.path.join(dig_path, "done")) and not args.transfer:
+                    print(f"\043[92mPassing......{dig_path}\043[0m")
+                    pass_list.append(path)
 
     pass_list = pass_list + args.pass_list
 
@@ -218,9 +239,10 @@ def main(args):
     )
     logger.info(args)
     logger.info("Command Line: " + " ".join(sys.argv))
-    logger.debug(inspect.getsource(FocalLoss))
+    logger.debug(inspect.getsource(CB_loss))
     logger.debug(inspect.getsource(models.resnet.ResNet._forward_impl))
-    logger.debug(inspect.getsource(Model.train))
+    logger.debug(inspect.getsource(Model))
+    logger.debug(inspect.getsource(CustomDataset_class))
 
     dataset = (
         CustomDataset_class(args, logger, "train")
@@ -234,7 +256,7 @@ def main(args):
 
         model = model_list[key].cuda()
 
-        trainset = dataset.load_dataset("train", key)
+        trainset, grade_num = dataset.load_dataset("train", key)
         trainset_loader = data.DataLoader(
             dataset=trainset,
             batch_size=args.batch_size,
@@ -242,8 +264,7 @@ def main(args):
             shuffle=True,
         )
 
-
-        valset = dataset.load_dataset("valid", key)
+        valset, _ = dataset.load_dataset("valid", key)
         valset_loader = data.DataLoader(
             dataset=valset,
             batch_size=args.batch_size,
@@ -261,9 +282,10 @@ def main(args):
             model_num_class,
             writer,
             key,
+            grade_num
         )
 
-        for epoch in range(args.load_epoch, args.epoch):
+        for epoch in range(args.load_epoch[key], args.epoch):
             resnet_model.update_e(epoch + 1) if args.load_epoch else None
 
             resnet_model.train()
