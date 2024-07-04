@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from torchvision import models
-from tool.data_loader import IEC_dataset
+from tool.data_loader import CustomDataset_class, CustomDataset_regress
 import argparse
 from tool.logger import setup_logger
 from torch.utils import data
@@ -47,6 +47,8 @@ def parse_args():
 
     parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
 
+    parser.add_argument("--stop_early", type=int, default=30)
+
     parser.add_argument(
         "--mode",
         default="class",
@@ -75,14 +77,44 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--epoch",
+        default=300,
+        type=int,
+    )
+
+    parser.add_argument(
+        "--smooth",
+        default=0.1,
+        type=float,
+    )
+
+    parser.add_argument(
         "--res",
         default=256,
         type=int,
     )
 
     parser.add_argument(
+        "--data_num",
+        default=-1,
+        type=int,
+    )
+
+    parser.add_argument(
+        "--load_epoch",
+        default=0,
+        type=int,
+    )
+
+    parser.add_argument(
+        "--lr",
+        default=1e-3,
+        type=float,
+    )
+
+    parser.add_argument(
         "--batch_size",
-        default=32,
+        default=128,
         type=int,
     )
 
@@ -99,6 +131,7 @@ def parse_args():
     )
 
     parser.add_argument("--reset", action="store_true")
+    parser.add_argument("--cross", action="store_true")
     parser.add_argument("--meta", action="store_true")
     parser.add_argument("--bias", action="store_true")
     parser.add_argument("--transfer", action="store_true")
@@ -159,27 +192,34 @@ def main(args):
                     args,
                     model_list[path],
                     os.path.join(dig_path, "state_dict.bin"),
-                    path,
-                    False,
                 )
 
-    dataset = IEC_dataset(args, logger)
+    dataset = (
+        CustomDataset_class(args, logger, "test")
+        if args.mode == "class"
+        else CustomDataset_regress(args, logger)
+    )
     resnet_model = Model_test(args, logger)
 
     model_area_dict = (
         {
-            "dryness": ["lip"],
-            "pigmentation": ["forehead", "l_cheek", "r_cheek"],
-            "pore": ["l_cheek", "r_cheek"],
-            "wrinkle": ["forehead", "glabellus", "l_peroucular", "r_peroucular"],
+            "dryness": ["dryness"],
+            "pigmentation": ["pigmentation_forehead", "pigmentation_cheek"],
+            "pore": ["pore"],
+            "sagging": ["sagging"],
+            "wrinkle": ["wrinkle_forehead", "wrinkle_glabellus", "wrinkle_perocular"],
         }
         if args.mode == "class"
         else {
-            "pigmentation": ["face"],
-            "moisture": ["forehead", "l_cheek", "r_cheek"],
-            "elasticity_R2": ["forehead", "l_cheek", "r_cheek"],
-            "wrinkle_Ra": ["l_peroucular", "r_peroucular"],
-            "pore": ["l_cheek", "r_cheek"],
+            "pigmentation": ["pigmentation"],
+            "moisture": ["forehead_moisture", "cheek_moisture", "chin_moisture"],
+            "elasticity_R2": [
+                "forehead_elasticity_R2",
+                "cheek_elasticity_R2",
+                "chin_elasticity_R2",
+            ],
+            "wrinkle_Ra": ["perocular_wrinkle_Ra"],
+            "pore": ["cheek_pore"],
         }
     )
 
@@ -193,10 +233,10 @@ def main(args):
                 num_workers=args.num_workers,
                 shuffle=False,
             )
-            resnet_model.test(model, testset_loader, f"{key}_{w_key}")
+            resnet_model.test(model, testset_loader, w_key)
+            resnet_model.print_test()
             torch.cuda.empty_cache()
             gc.collect()
-
     resnet_model.save_value()
 
 

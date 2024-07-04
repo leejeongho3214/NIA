@@ -11,7 +11,6 @@ import torch.optim as optim
 from utils import (
     AverageMeter,
     FocalLoss,
-    mape_loss,
     save_checkpoint,
     save_image,
     CB_loss
@@ -269,18 +268,19 @@ class Model(object):
             
             if self.args.mode == "class"
             else nn.L1Loss()
-            # else nn.MSELoss()
-            # else mape_loss()
         )
         random_num = random.randrange(0, len(self.train_loader))
 
         for self.iter, (img, label, self.img_names, _, meta_v) in enumerate(
             self.train_loader
         ):
-            img = img.to(device)
-            label = label.to(device).type(torch.float32)
+            img, label = img.to(device), label.to(device)
 
-            pred = self.model(img, meta_v)
+            pred = (
+                self.model(img, meta_v)
+                if self.args.model != "coatnet"
+                else self.model(img)
+            )
 
             if self.args.mode == "class":
                 loss = self.class_loss(pred, label)
@@ -310,7 +310,11 @@ class Model(object):
             ):
                 img, label = img.to(device), label.to(device)
 
-                pred = self.model(img, meta_v)
+                pred = (
+                    self.model(img, meta_v)
+                    if self.args.model != "coatnet"
+                    else self.model(img)
+                )
 
                 if self.args.mode == "class":
                     self.class_loss(pred, label)
@@ -327,10 +331,7 @@ class Model_test(Model):
     def __init__(self, args, logger):
         self.args = args
         self.pred = defaultdict(list)
-        self.norm_pred = defaultdict(list)
         self.gt = defaultdict(list)
-        self.pred_2 = defaultdict(lambda: defaultdict(list))
-        self.gt_2 = defaultdict(lambda: defaultdict(list))
         self.logger = logger
 
     def test(self, model, testset_loader, key):
@@ -339,7 +340,7 @@ class Model_test(Model):
         self.m_dig = key
         with torch.no_grad():
             self.model.eval()
-            for self.iter, (img, label, self.img_names, _, meta_v) in enumerate(
+            for self.iter, (img, label, self.img_names, self.digs, meta_v) in enumerate(
                 tqdm(self.testset_loader, desc=self.m_dig)
             ):
                 img, label = img.to(device), label.to(device)
@@ -351,64 +352,51 @@ class Model_test(Model):
                 )
 
                 if self.args.mode == "class":
-                    self.get_test_acc(pred)
+                    self.get_test_acc(pred, label)
                 else:
-                    self.get_test_loss(pred)
-                    
-                if not self.iter:
-                    self.epoch = "test"
-                    save_image(self, img)
+                    self.get_test_loss(pred, label)
 
     def save_value(self):
         pred_path = os.path.join(self.args.check_path, "prediction")
         mkdir(pred_path)
         with open(os.path.join(pred_path, f"pred.txt"), "w") as p:
-            for key in list(self.pred.keys()):
-                if len(self.norm_pred) != 0:
-                    for p_v, p_n in zip(self.pred[key], self.norm_pred[key]):
-                        p.write(f"{key}, {p_v[0]}, {p_n[0]}, {p_n[1]}\n")
-                else:
-                    for p_v in self.pred[key]:
-                        p.write(f"{key}, {p_v[0]}, {p_v[1]}\n")
+            with open(os.path.join(pred_path, f"gt.txt"), "w") as g:
+                for key in list(self.pred.keys()):
+                    for p_v, g_v in zip(self.pred[key], self.gt[key]):
+                        p.write(f"{key}, {p_v[0]}, {p_v[1]} \n")
+                        g.write(f"{key}, {g_v[0]}, {g_v[1]} \n")
+        g.close()
         p.close()
 
     def print_test(self):
-        gt_v = [value[0] for value in self.gt[self.m_dig]]
-        pred_v = [value[0] for value in self.pred[self.m_dig]]
-        
-        # gt_F = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "F"]
-        # gt_L30 = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "L30"]
-        # gt_R30 = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "R30"]
-        
-        # pred_F = [value[0] for value in self.pred[self.m_dig] if value[1].split("_")[-3] == "F"]
-        # pred_L30 = [value[0] for value in self.pred[self.m_dig] if value[1].split("_")[-3] == "L30"]
-        # pred_R30 = [value[0] for value in self.pred[self.m_dig] if value[1].split("_")[-3] == "R30"]
-        
+        gt_value = [value[0] for value in self.gt[self.m_dig]]
+        pred_value = [value[0] for value in self.pred[self.m_dig]]
         if self.args.mode == "class":
-            for gt_value, pred_value in [(gt_v, pred_v)]:
-            # for gt_value, pred_value in [(gt_v, pred_v), (gt_F, pred_F), (gt_L30, pred_L30), (gt_R30, pred_R30)]:
-                (
-                    micro_precision,
-                    micro_recall,
-                    micro_f1,
-                    _,
-                ) = precision_recall_fscore_support(
-                    gt_value,
-                    pred_value,
-                    average="micro",
-                    zero_division=0
-                )
+            (
+                micro_precision,
+                micro_recall,
+                micro_f1,
+                _,
+            ) = precision_recall_fscore_support(
+                gt_value,
+                pred_value,
+                average="micro",
+                zero_division=1,
+            )
 
-                correlation, p_value = pearsonr(gt_value, pred_value)
+            correlation, p_value = pearsonr(gt_value, pred_value)
 
-                top_3 = [
-                    False if abs(g - p) > 1 else True for g, p in zip(gt_value, pred_value)
-                ]
-                top_3_acc = sum(top_3) / len(top_3)
+            top_3 = [
+                False if abs(g - p) > 1 else True for g, p in zip(gt_value, pred_value)
+            ]
+            top_3_acc = sum(top_3) / len(top_3)
 
-                self.logger.info(
-                    f"[{self.m_dig}]Acc: {micro_precision:.4f} Correlation: {correlation:.2f}, P-value: {p_value:.4f}, Top-3 Acc: {top_3_acc:.4f}\n"
-                )
+            self.logger.info(
+                f"[{self.m_dig}]Micro Precision(=Acc): {micro_precision:.4f}, Micro Recall: {micro_recall:.4f}, Micro F1: {micro_f1:.4f}"
+            )
+            self.logger.info(
+                f"Correlation: {correlation:.2f}, P-value: {p_value:.4f}, Top-3 Acc: {top_3_acc:.4f}\n"
+            )
 
         else:
             correlation, p_value = pearsonr(gt_value, pred_value)
@@ -417,7 +405,7 @@ class Model_test(Model):
                 f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae:.4f}\n"
             )
 
-    def get_test_loss(self, pred):
+    def get_test_loss(self, pred, gt):
         if "elasticity_R2" in self.m_dig:
             value = 1
 
@@ -427,7 +415,7 @@ class Model_test(Model):
         elif "wrinkle_Ra" in self.m_dig:
             value = 50
 
-        elif "pigmentation" in self.m_dig:
+        elif self.m_dig == "pigmentation":
             value = 350
 
         elif "pore" in self.m_dig:
@@ -444,11 +432,9 @@ class Model_test(Model):
                 [round(gt_item.item() * value, 3), self.img_names[idx]]
             )
 
-    def get_test_acc(self, pred):
-        for idx, pred_item in enumerate(pred):
+    def get_test_acc(self, pred, gt):
+        for idx, (pred_item, gt_item) in enumerate(zip(pred, gt)):
             self.pred[self.m_dig].append(
                 [pred_item.argmax().item(), self.img_names[idx]]
             )
             self.gt[self.m_dig].append([gt_item.item(), self.img_names[idx]])
-            
-            

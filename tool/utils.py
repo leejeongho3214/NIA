@@ -27,12 +27,11 @@ def softmax(x):
     return e_x / torch.sum(e_x, dim=1).unsqueeze(dim=1)
 
 
-def resume_checkpoint(args, model, path, dig, test = True):
+def resume_checkpoint(args, model, path):
     state_dict = torch.load(path, map_location=device)
     if not args.transfer:
-        if state_dict["best_loss"][dig] != np.inf and test:
-            args.best_loss[dig] = state_dict["best_loss"][dig]
-        if test: args.load_epoch[dig] = state_dict["epoch"]
+        args.best_loss = state_dict["best_loss"]
+        args.load_epoch = state_dict["epoch"]
         if 'batch_size' in state_dict:
             args.batch_size = state_dict["batch_size"]
             if args.batch_size != state_dict['batch_size']:
@@ -228,7 +227,7 @@ class CB_loss(nn.Module):
         weights = (1.0 - self.beta) / np.array(effective_num)
         weights = weights / np.sum(weights) * self.no_of_classes
 
-        labels_one_hot = F.one_hot(labels.to(torch.int64), self.no_of_classes).float()
+        labels_one_hot = F.one_hot(labels, self.no_of_classes).float()
 
         weights = torch.tensor(weights).float().cuda()
         weights = weights.unsqueeze(0)
@@ -245,19 +244,6 @@ class CB_loss(nn.Module):
         # cb_loss = F.binary_cross_entropy(input = pred, target = labels_one_hot, weight = weights)
         
         return cb_loss
-    
-class mape_loss(nn.Module):
-    def __init__(self):
-        super(mape_loss, self).__init__()
-    
-    def forward(self, input, target):
-        error = abs(input - target)
-        error = error / target
-        
-        return error.mean()
-        
-        
-    
 
 def save_checkpoint(self):
     checkpoint_dir = os.path.join(self.args.output_dir, self.args.mode, self.args.name, "save_model", str(self.m_dig))
@@ -321,11 +307,7 @@ def save_image(self, img):
     cv2.imwrite(os.path.join(path, f"epoch_{self.epoch}_iter_{self.iter}_{self.m_dig}.jpg"), img_mat.get()[:, :, (2, 1, 0)])
 
 def fix_seed(random_seed):
-    
-    torch.use_deterministic_algorithms(True)
-    os.environ['PYTHONHASHSEED'] = str(random_seed)
-    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':16:8'
-    
+
     torch.manual_seed(random_seed)
     torch.cuda.manual_seed(random_seed)
     torch.cuda.manual_seed_all(random_seed)  # if use multi-GPU
