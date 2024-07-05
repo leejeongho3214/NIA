@@ -41,24 +41,19 @@ def resume_checkpoint(model, path):
 
 # %%
 model_num_class = {
-    "dryness": 5,
-    "pigmentation": 6,
-    "pore": 6,
-    # "sagging": 7,
-    # "wrinkle": 7,
+    # "dryness": 5,
+    # "pigmentation": 6,
+    # "pore": 6,
+    "sagging": 7,
+    "wrinkle": 7,
 }
 
-
-# model_list = {
-#     key: models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
-#     for key, _ in model_num_class.items()
-# }
 model_list = {
         key: models.coatnet.coatnet_4(num_classes=value)
         for key, value in model_num_class.items()
     }
 
-name = "coatnet_cb_lr_low"
+name = "coatnet_all_img"
 task = "class"
 
 if len(os.popen("git branch --show-current").readlines()):
@@ -348,7 +343,6 @@ model_area_dict = {
 }
 import gc
 from torchvision.utils import make_grid
-from GPUtil import showUtilization as gpu_usage
 
 
 for key in model_list:
@@ -369,6 +363,7 @@ for key in model_list:
         ):
             v_img = list()
             grayscale_cams = cam(input_tensor=img, targets=None)
+            img = img.detach().cpu()
             for i in range(len(grayscale_cams)):
                 grayscale_cam = grayscale_cams[i, :]
                 pil_img = np.array(pil_imgs[i, :] / pil_imgs[i, :].max())
@@ -378,6 +373,10 @@ for key in model_list:
                     )
                 )
                 
+            im = np.clip(np.array(img.permute(0, 2, 3, 1)) * 255, 0, 255).astype(np.int32)
+            for i in range(len(im)):
+                v_img.append(im[i])
+                
             stacked_images = np.stack(v_img, axis=0)
             c_img = (
                 make_grid(torch.tensor(stacked_images).permute(0, 3, 1, 2), nrow=4)
@@ -385,20 +384,25 @@ for key in model_list:
                 .numpy()
             )
             
-            path = os.path.join("cam_output/GradCAM", name, task, w_key)
-            
-            if not os.path.isdir(path):
-                mkdir(path)
+            path = f"cam_output/GradCAM/{name}"
+            if not os.path.isdir(f"{path}/{w_key}"):
+                mkdir(f"{path}/{w_key}")
                 
             plt.figure(dpi=600)
             plt.xticks([], [])
             plt.yticks([], [])
             plt.imshow(c_img)
-            plt.savefig(f"{path}/{idx}.jpg")
+            plt.savefig(f"{path}/{w_key}/{idx}.jpg")
             
+            del img, label, pil_imgs, grayscale_cams, v_img, c_img, stacked_images
             torch.cuda.empty_cache()
             gc.collect()
             if idx == 3:
                 break
+            
+        del testset_loader
+        del loader_datalist
+        torch.cuda.empty_cache()
+        gc.collect()
 
     
