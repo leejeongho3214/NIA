@@ -303,20 +303,23 @@ class Model(object):
         self.criterion = (
             nn.CrossEntropyLoss() if self.args.mode == "class" else nn.L1Loss()
         )
+        random_num = random.randrange(0, len(self.train_loader))
         with torch.no_grad():
             self.model.eval()
             for self.iter, (img, label, self.img_names, _, meta_v) in enumerate(
                 self.valid_loader
             ):
                 img, label = img.to(device), label.to(device)
-
                 pred = self.model(img, meta_v)
 
                 if self.args.mode == "class":
                     self.class_loss(pred, label)
                 else:
                     self.regression(pred, label)
-
+                    
+                if self.iter == random_num:
+                    save_image(self, img)
+                    
                 self.print_loss(len(self.valid_loader))
 
             self.scheduler.step(self.val_loss.avg)
