@@ -385,9 +385,11 @@ class CustomDataset_regress(CustomDataset_class):
             i = 0
             for idx in key_index:
                 for value in value_list[idx]:
-                    if i % 8 == 0:
+                    if value[0].split("_")[-2] not in ["F"]:
+                        continue
+                    if i % 8 == 0 :
                         v_list.append(value)
-                    elif i % 8 == 1:
+                    elif i % 8 == 1 :
                         te_list.append(value)
                     else:
                         t_list.append(value)
