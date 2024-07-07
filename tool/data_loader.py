@@ -295,31 +295,6 @@ class CustomDataset_class(Dataset):
         self.area_list = list()
         self.dig = dig_k
 
-        transform_aug1 = transforms.Compose(
-            [
-                transforms.Resize((self.args.res, self.args.res), antialias=True),
-                transforms.RandomRotation([-180, 180]),
-                transforms.ColorJitter(
-                    brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1
-                ),
-                transforms.ToTensor(),
-                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-            ]
-        )
-
-        transform_aug2 = transforms.Compose(
-            [
-                transforms.Resize((self.args.res, self.args.res), antialias=True),
-                transforms.RandomHorizontalFlip(p=1),
-                transforms.RandomRotation([-180, 180]),
-                transforms.ColorJitter(
-                    brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1
-                ),
-                transforms.ToTensor(),
-                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-            ]
-        )
-
         transform_test = transforms.Compose(
             [
                 transforms.Resize((self.args.res, self.args.res), antialias=True),
@@ -330,12 +305,6 @@ class CustomDataset_class(Dataset):
 
         def func_v(num):
             self.save_dict(transform_test)
-            # if mode == "train":
-            #     for _ in range(4):
-            #         self.save_dict(transform_aug1)
-            #         self.save_dict(transform_aug2)
-            # else:
-            #     self.save_dict(transform_test)
 
         if self.args.mode == "class":
             data_list = dict(data_list)
@@ -416,9 +385,11 @@ class CustomDataset_regress(CustomDataset_class):
             i = 0
             for idx in key_index:
                 for value in value_list[idx]:
-                    if i % 8 == 0:
+                    if value[0].split("_")[-2] not in ["F"]:
+                        continue
+                    if i % 8 == 0 :
                         v_list.append(value)
-                    elif i % 8 == 1:
+                    elif i % 8 == 1 :
                         te_list.append(value)
                     else:
                         t_list.append(value)
