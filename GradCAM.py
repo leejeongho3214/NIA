@@ -62,10 +62,7 @@ for key, model in model_list.items():
 name = "cnn_cb_all_img"
 task = "class"
 
-if len(os.popen("git branch --show-current").readlines()):
-    git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
-else:
-    git_name = os.popen("git describe --tags").readlines()[0].rstrip()
+git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
 ## Adjust the number of output in model for each region image
 check_path = os.path.join("checkpoint", git_name, task, name, "save_model")
@@ -349,8 +346,6 @@ model_area_dict = {
 }
 import gc
 from torchvision.utils import make_grid
-from GPUtil import showUtilization as gpu_usage
-
 
 for key in model_list:
     model = model_list[key].cuda()
@@ -379,6 +374,10 @@ for key in model_list:
                     )
                 )
                 
+            im = np.clip(np.array(img.permute(0, 2, 3, 1)) * 255, 0, 255).astype(np.int32)
+            for i in range(len(im)):
+                v_img.append(im[i])
+                
             stacked_images = np.stack(v_img, axis=0)
             c_img = (
                 make_grid(torch.tensor(stacked_images).permute(0, 3, 1, 2), nrow=4)
@@ -390,14 +389,13 @@ for key in model_list:
             if not os.path.isdir(f"{path}/{w_key}"):
                 mkdir(f"{path}/{w_key}")
                 
-            plt.figure(dpi=600)
-            plt.xticks([], [])
-            plt.yticks([], [])
-            plt.imshow(c_img)
-            plt.savefig(f"{path}/{w_key}/{idx}.jpg")
-            
-            torch.cuda.empty_cache()
-            gc.collect()
+            cv2.imwrite(f"{path}/{w_key}/{idx}.jpg",c_img[:, :, (2, 1, 0)])
+            # plt.figure(dpi=600)
+            # plt.xticks([], [])
+            # plt.yticks([], [])
+            # plt.imshow(c_img)
+            # plt.savefig(f"{path}/{w_key}/{idx}.jpg")
+        
             if idx == 3:
                 break
 
