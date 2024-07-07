@@ -408,8 +408,8 @@ class Model_test(Model):
                 )
 
         else:
-            correlation, p_value = pearsonr(gt_value, pred_value)
-            mae = mean_absolute_error(gt_value, pred_value)
+            correlation, p_value = pearsonr(gt_v, pred_v)
+            mae = mean_absolute_error(gt_v, pred_v)
             self.logger.info(
                 f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae:.4f}\n"
             )
