@@ -41,11 +41,11 @@ def resume_checkpoint(model, path):
 
 # %%
 model_num_class = {
-    # "dryness": 5,
-    # "pigmentation": 6,
-    # "pore": 6,
-    "sagging": 7,
-    "wrinkle": 7,
+    "dryness": 5,
+    "pigmentation": 6,
+    "pore": 6,
+    # "sagging": 7,
+    # "wrinkle": 7,
 }
 
 model_list = {
@@ -53,7 +53,7 @@ model_list = {
         for key, value in model_num_class.items()
     }
 
-name = "coatnet_all_img"
+name = "coatnet_cb_F_img_F_val"
 task = "class"
 
 if len(os.popen("git branch --show-current").readlines()):
@@ -388,21 +388,14 @@ for key in model_list:
             if not os.path.isdir(f"{path}/{w_key}"):
                 mkdir(f"{path}/{w_key}")
                 
-            plt.figure(dpi=600)
-            plt.xticks([], [])
-            plt.yticks([], [])
-            plt.imshow(c_img)
-            plt.savefig(f"{path}/{w_key}/{idx}.jpg")
-            
-            del img, label, pil_imgs, grayscale_cams, v_img, c_img, stacked_images
-            torch.cuda.empty_cache()
-            gc.collect()
+            cv2.imwrite(f"{path}/{w_key}/{idx}.jpg",c_img[:, :, (2, 1, 0)])
+            # plt.figure(dpi=600)
+            # plt.xticks([], [])
+            # plt.yticks([], [])
+            # plt.imshow(c_img)
+            # plt.savefig(f"{path}/{w_key}/{idx}.jpg")
+        
             if idx == 3:
                 break
-            
-        del testset_loader
-        del loader_datalist
-        torch.cuda.empty_cache()
-        gc.collect()
 
     
