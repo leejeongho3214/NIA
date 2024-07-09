@@ -17,6 +17,7 @@ from utils import (
     CB_loss
 )
 import os
+import torch.autograd as autograd
 
 from sklearn.metrics import precision_recall_fscore_support, mean_absolute_error
 
@@ -322,6 +323,7 @@ class Model(object):
                     save_image(self, img)
                     
                 self.print_loss(len(self.valid_loader))
+                autograd.set_detect_anomaly(True)
 
             self.scheduler.step(self.val_loss.avg)
             self.print_loss(len(self.valid_loader), final_flag=True)
