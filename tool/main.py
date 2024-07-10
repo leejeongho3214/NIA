@@ -127,7 +127,7 @@ def parse_args():
 
     parser.add_argument(
         "--lr",
-        default=0.0001,
+        default=0.00005,
         type=float,
     )
 

@@ -154,7 +154,7 @@ class FocalLoss(nn.Module):
             return focal_loss
 
 
-
+import torch.nn.functional as F
 class CB_loss(nn.Module):
     def __init__(self, samples_per_cls, no_of_classes,  beta = 0.999, gamma = 2):
         super(CB_loss, self).__init__()
@@ -200,7 +200,9 @@ class CB_loss(nn.Module):
         weighted_loss = alpha * loss
         focal_loss = torch.sum(weighted_loss)
 
-        focal_loss /= torch.sum(labels)
+        # focal_loss /= torch.sum(labels)
+        focal_loss /= torch.sum(labels).clamp(min=1e-10)
+        
         return focal_loss
         
 
