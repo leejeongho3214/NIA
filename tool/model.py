@@ -413,8 +413,9 @@ class Model_test(Model):
         else:
             correlation, p_value = pearsonr(gt_v, pred_v)
             mae = mean_absolute_error(gt_v, pred_v)
+            mape = mape_loss()(np.array(pred_v), np.array(gt_v))
             self.logger.info(
-                f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae:.4f}\n"
+                f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae:.4f}, MAPE: {mape:.3f}\n"
             )
 
     def get_test_loss(self, pred, gt):
