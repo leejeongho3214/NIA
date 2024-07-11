@@ -212,8 +212,8 @@ class CustomDataset_class(Dataset):
                     )
 
     def save_dict(self, transform, num=-1):
-        pil_img = cv2.imread(os.path.join("dataset/cropped_img", self.i_path + ".jpg"))
-        pil_img = cv2.cvtColor(pil_img, cv2.COLOR_BGR2RGB)
+        pil_img2 = cv2.imread(os.path.join("dataset/cropped_img", self.i_path + ".jpg"))
+        pil_img = cv2.cvtColor(pil_img2, cv2.COLOR_BGR2RGB)
 
         s_list = self.i_path.split("/")[-1].split("_")
         desc_area = (
@@ -236,7 +236,7 @@ class CustomDataset_class(Dataset):
         pil = Image.fromarray(pil_img.astype(np.uint8))
         patch_img = transform(pil)
 
-        self.area_list.append([patch_img, label_data, desc_area, self.dig, self.meta_v])
+        self.area_list.append([patch_img, label_data, desc_area, self.dig, self.meta_v, pil_img2])
 
     def should_skip_image(self, j_name, equ_name):
         
