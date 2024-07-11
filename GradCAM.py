@@ -2,17 +2,8 @@
 import argparse
 from pytorch_grad_cam import (
     GradCAM,
-    HiResCAM,
-    ScoreCAM,
-    GradCAMPlusPlus,
-    AblationCAM,
-    XGradCAM,
-    EigenCAM,
-    FullGrad,
 )
-import GPUtil
 import torch.nn as nn
-from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from tool.utils import fix_seed, mkdir
 from torchvision import models
@@ -20,14 +11,7 @@ import os
 import torch
 import cv2
 import numpy as np
-from torchvision import transforms
-from PIL import Image
-from matplotlib import pyplot as plt
-from torch.utils.data import random_split, ConcatDataset, Dataset
-import natsort
-from collections import defaultdict
 from tqdm import tqdm
-import json
 from torch.utils import data
 
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
@@ -160,7 +144,7 @@ def resume_checkpoint(model, path):
     return model
 
 name = "cnn_cb_F_img_F_val"
-args.mode = "regression"
+args.mode = "class"
 # %%
 model_num_class = (
         {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
@@ -169,8 +153,8 @@ model_num_class = (
             "pigmentation": 1,
             "moisture": 1,
             "elasticity_R2": 1,
-            # "wrinkle_Ra": 1,
-            # "pore": 1,
+            "wrinkle_Ra": 1,
+            "pore": 1,
         }
     )
 
@@ -184,7 +168,6 @@ for key, model in model_list.items():
     model_list.update({key: model})
     
     
-
 if len(os.popen("git branch --show-current").readlines()):
     git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 else:
@@ -203,9 +186,6 @@ if os.path.isdir(check_path):
 
 
 # %%
-import copy
-import random
-import torch.nn.functional as F
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
 
 dataset = (
@@ -235,9 +215,7 @@ model_area_dict = ({
         "pore": ["cheek_pore"],
     }
     )
-import gc
 from torchvision.utils import make_grid
-from GPUtil import showUtilization as gpu_usage
 
 
 for key in model_list:
@@ -264,7 +242,7 @@ for key in model_list:
                 pil_img = np.array(pil_imgs[i, :] / pil_imgs[i, :].max())
                 v_img.append(
                     show_cam_on_image(
-                        pil_img, grayscale_cam, use_rgb=True
+                        pil_img, grayscale_cam, use_rgb=False
                     )
                 )
                 
