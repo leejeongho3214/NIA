@@ -192,16 +192,18 @@ class CB_loss(nn.Module):
         if self.gamma == 0.0:
             modulator = 1.0
         else:
-            modulator = torch.exp(-self.gamma * labels * logits - self.gamma * torch.log(1 + 
-                torch.exp(-1.0 * logits)))
+            logits_clamped = torch.clamp(logits, min=-15.0, max=15.0)  # 적절한 범위로 클램핑
+            modulator = torch.exp(-self.gamma * labels * logits_clamped - self.gamma * torch.log(1 + torch.exp(-1.0 * logits_clamped)))
+
+            # modulator = torch.exp(-self.gamma * labels * logits - self.gamma * torch.log(1 + 
+            #     torch.exp(-1.0 * logits)))
 
         loss = modulator * BCLoss
 
         weighted_loss = alpha * loss
         focal_loss = torch.sum(weighted_loss)
 
-        # focal_loss /= torch.sum(labels)
-        focal_loss /= torch.sum(labels).clamp(min=1e-10)
+        focal_loss /= torch.sum(labels)
         
         return focal_loss
         

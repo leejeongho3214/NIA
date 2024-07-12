@@ -165,11 +165,11 @@ model_num_class = (
         {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
         if args.mode == "class"
         else {
-            # "pigmentation": 1,
-            # "moisture": 1,
-            # "elasticity_R2": 1,
-            "wrinkle_Ra": 1,
-            "pore": 1,
+            "pigmentation": 1,
+            "moisture": 1,
+            "elasticity_R2": 1,
+            # "wrinkle_Ra": 1,
+            # "pore": 1,
         }
     )
 
@@ -258,7 +258,7 @@ for key in model_list:
                 pil_img = np.array(pil_imgs[i, :] / pil_imgs[i, :].max())
                 v_img.append(
                     show_cam_on_image(
-                        pil_img, grayscale_cam, use_rgb=True
+                        pil_img, grayscale_cam, use_rgb=False
                     )
                 )
                 
