@@ -158,11 +158,14 @@ def resume_checkpoint(model, path):
 
     return model
 
-name = "coatnet_cb_F_img_F_val"
-args.mode = "regression"
+name = "coatnet_cb_all_img"
+args.mode = "class"
 # %%
 model_num_class = (
-        {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
+        {
+            # "dryness": 5, "pigmentation": 6, "pore": 6,
+         "sagging": 7, "wrinkle": 7
+         }
         if args.mode == "class"
         else {
             "pigmentation": 1,
