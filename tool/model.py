@@ -376,14 +376,7 @@ class Model_test(Model):
     def print_test(self):
         gt_v = [value[0] for value in self.gt[self.m_dig]]
         pred_v = [value[0] for value in self.pred[self.m_dig]]
-        
-        # gt_F = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "F"]
-        # gt_L30 = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "L30"]
-        # gt_R30 = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "R30"]
-        
-        # pred_F = [value[0] for value in self.pred[self.m_dig] if value[1].split("_")[-3] == "F"]
-        # pred_L30 = [value[0] for value in self.pred[self.m_dig] if value[1].split("_")[-3] == "L30"]
-        # pred_R30 = [value[0] for value in self.pred[self.m_dig] if value[1].split("_")[-3] == "R30"]
+    
         
         if self.args.mode == "class":
             for gt_value, pred_value in [(gt_v, pred_v)]:
