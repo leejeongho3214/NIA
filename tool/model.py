@@ -271,7 +271,7 @@ class Model(object):
         )
         random_num = random.randrange(0, len(self.train_loader))
 
-        for self.iter, (img, label, self.img_names, _, meta_v) in enumerate(
+        for self.iter, (img, label, self.img_names, _, meta_v, _) in enumerate(
             self.train_loader
         ):
             img, label = img.to(device), label.to(device)
@@ -305,7 +305,7 @@ class Model(object):
         )
         with torch.no_grad():
             self.model.eval()
-            for self.iter, (img, label, self.img_names, _, meta_v) in enumerate(
+            for self.iter, (img, label, self.img_names, _, meta_v, _) in enumerate(
                 self.valid_loader
             ):
                 img, label = img.to(device), label.to(device)
