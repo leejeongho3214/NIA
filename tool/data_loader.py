@@ -85,8 +85,10 @@ class CustomDataset_class(Dataset):
             defaultdict(lambda: defaultdict()),
             defaultdict(lambda: defaultdict()),
         )
-        for dig, class_dict in self.json_dict.items():
-            for grade, grade_dict in class_dict.items():
+        for dig in sorted(self.json_dict.keys()):
+            class_dict = self.json_dict[dig]
+            for grade in sorted(class_dict.keys()):
+                grade_dict = class_dict[grade]
                 random_list = list(grade_dict.keys())
                 random.shuffle(random_list)
 
