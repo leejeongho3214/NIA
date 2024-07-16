@@ -11,6 +11,7 @@ import torch.optim as optim
 from utils import (
     AverageMeter,
     FocalLoss,
+    mape_loss,
     save_checkpoint,
     save_image,
     CB_loss
@@ -168,7 +169,7 @@ class Model(object):
                     )
                 else:
                     self.logger.info(
-                    f"Epoch: {self.epoch} [{self.phase}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] ---- >  loss: {self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
+                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] ---- >  loss: {self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
                     )
 
             else:
@@ -303,6 +304,7 @@ class Model(object):
         self.criterion = (
             nn.CrossEntropyLoss() if self.args.mode == "class" else nn.L1Loss()
         )
+        random_num = random.randrange(0, len(self.valid_loader))
         with torch.no_grad():
             self.model.eval()
             for self.iter, (img, label, self.img_names, _, meta_v, _) in enumerate(
@@ -369,40 +371,49 @@ class Model_test(Model):
         p.close()
 
     def print_test(self):
-        gt_value = [value[0] for value in self.gt[self.m_dig]]
-        pred_value = [value[0] for value in self.pred[self.m_dig]]
+        gt_v = [value[0] for value in self.gt[self.m_dig]]
+        pred_v = [value[0] for value in self.pred[self.m_dig]]
+        
+        # gt_F = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "F"]
+        # gt_L30 = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "L30"]
+        # gt_R30 = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "R30"]
+        
+        # pred_F = [value[0] for value in self.pred[self.m_dig] if value[1].split("_")[-3] == "F"]
+        # pred_L30 = [value[0] for value in self.pred[self.m_dig] if value[1].split("_")[-3] == "L30"]
+        # pred_R30 = [value[0] for value in self.pred[self.m_dig] if value[1].split("_")[-3] == "R30"]
+        
         if self.args.mode == "class":
-            (
-                micro_precision,
-                micro_recall,
-                micro_f1,
-                _,
-            ) = precision_recall_fscore_support(
-                gt_value,
-                pred_value,
-                average="micro",
-                zero_division=1,
-            )
+            for gt_value, pred_value in [(gt_v, pred_v)]:
+            # for gt_value, pred_value in [(gt_v, pred_v), (gt_F, pred_F), (gt_L30, pred_L30), (gt_R30, pred_R30)]:
+                (
+                    micro_precision,
+                    micro_recall,
+                    micro_f1,
+                    _,
+                ) = precision_recall_fscore_support(
+                    gt_value,
+                    pred_value,
+                    average="micro",
+                    zero_division=0
+                )
 
-            correlation, p_value = pearsonr(gt_value, pred_value)
+                correlation, p_value = pearsonr(gt_value, pred_value)
 
-            top_3 = [
-                False if abs(g - p) > 1 else True for g, p in zip(gt_value, pred_value)
-            ]
-            top_3_acc = sum(top_3) / len(top_3)
+                top_3 = [
+                    False if abs(g - p) > 1 else True for g, p in zip(gt_value, pred_value)
+                ]
+                top_3_acc = sum(top_3) / len(top_3)
 
-            self.logger.info(
-                f"[{self.m_dig}]Micro Precision(=Acc): {micro_precision:.4f}, Micro Recall: {micro_recall:.4f}, Micro F1: {micro_f1:.4f}"
-            )
-            self.logger.info(
-                f"Correlation: {correlation:.2f}, P-value: {p_value:.4f}, Top-3 Acc: {top_3_acc:.4f}\n"
-            )
+                self.logger.info(
+                    f"[{self.m_dig}]Acc: {micro_precision:.4f} Correlation: {correlation:.2f}, P-value: {p_value:.4f}, Top-3 Acc: {top_3_acc:.4f}\n"
+                )
 
         else:
-            correlation, p_value = pearsonr(gt_value, pred_value)
-            mae = mean_absolute_error(gt_value, pred_value)
+            correlation, p_value = pearsonr(gt_v, pred_v)
+            mae = mean_absolute_error(gt_v, pred_v)
+            mape = mape_loss()(np.array(pred_v), np.array(gt_v))
             self.logger.info(
-                f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae:.4f}\n"
+                f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae:.4f}, MAPE: {mape:.3f}\n"
             )
 
     def get_test_loss(self, pred, gt):
