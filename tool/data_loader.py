@@ -100,9 +100,9 @@ class CustomDataset_class(Dataset):
                 )
                 grade_dict = dict(grade_dict)
 
-                for dataset_idx, (idx_list, out_list) in enumerate(zip(
-                    [t_idx, v_idx, test_idx], [train_list, val_list, test_list]
-                )):
+                for dataset_idx, (idx_list, out_list) in enumerate(
+                    zip([t_idx, v_idx, test_idx], [train_list, val_list, test_list])
+                ):
                     if dataset_idx == 0:
                         t_list = [grade_dict[idx] for idx in idx_list]
                     else:
@@ -238,35 +238,33 @@ class CustomDataset_class(Dataset):
         pil = Image.fromarray(pil_img.astype(np.uint8))
         patch_img = transform(pil)
 
-        self.area_list.append([patch_img, label_data, desc_area, self.dig, self.meta_v, pil_img2])
+        self.area_list.append(
+            [patch_img, label_data, desc_area, self.dig, self.meta_v, pil_img2]
+        )
 
     def should_skip_image(self, j_name, equ_name):
-        
+
         # 왼쪽 눈가/볼 ->  좌 15 & 30도
         # 오른쪽 눈가/볼 -> 우 15 & 30도
         # 턱선 -> 위, 아래
-        
+
         if equ_name == "01":
             return (
                 (
                     j_name.split("_")[2] == "Ft"
-                    and j_name.split("_")[3].split(".")[0]
-                    in ["08"]
+                    and j_name.split("_")[3].split(".")[0] in ["08"]
                 )
                 or (
                     j_name.split("_")[2] == "Fb"
-                    and j_name.split("_")[3].split(".")[0]
-                    in ["08"]
+                    and j_name.split("_")[3].split(".")[0] in ["08"]
                 )
                 or (
                     j_name.split("_")[2] in ["R15", "R30"]
-                    and j_name.split("_")[3].split(".")[0]
-                    in ["04", "06"]
+                    and j_name.split("_")[3].split(".")[0] in ["04", "06"]
                 )
                 or (
                     j_name.split("_")[2] in ["L15", "L30"]
-                    and j_name.split("_")[3].split(".")[0]
-                    in ["03", "05"]
+                    and j_name.split("_")[3].split(".")[0] in ["03", "05"]
                 )
             )
         elif equ_name == "02":
@@ -348,7 +346,7 @@ class CustomDataset_class(Dataset):
         if self.args.mode == "class":
             return self.area_list, num_grade
         else:
-            return self.area_list, 0 
+            return self.area_list, 0
 
     def norm_reg(self, value):
         dig_v = self.dig.split("_")[-1]
@@ -386,14 +384,17 @@ class CustomDataset_regress(CustomDataset_class):
             key_index = sorted(self.json_dict[dig])
             i = 0
             for idx in key_index:
+
                 for value in self.json_dict[dig][idx]:
-                    if i % 8 == 0 and value[0].split("_")[-2] in ["F"]:
-                        v_list.append(value)
-                    elif i % 8 == 1 and value[0].split("_")[-2] in ["F"] :
-                        te_list.append(value)
+                    if i % 8 == 0:
+                        if value[0].split("_")[-2] in ["F"]:
+                            v_list.append(value)
+                    elif i % 8 == 1:
+                        if value[0].split("_")[-2] in ["F"]:
+                            te_list.append(value)
                     else:
                         t_list.append(value)
-                    i += 1
+                i += 1
 
             train_list.append([dig, t_list]), val_list.append(
                 [dig, v_list]
