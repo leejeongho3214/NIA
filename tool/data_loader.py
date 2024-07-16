@@ -373,7 +373,7 @@ class CustomDataset_regress(CustomDataset_class):
                         te_list.append(value)
                     else:
                         t_list.append(value)
-                    i += 1
+                i += 1
 
             train_list.append([dig, t_list]), val_list.append(
                 [dig, v_list]
