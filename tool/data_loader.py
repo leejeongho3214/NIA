@@ -1,7 +1,6 @@
 import copy
 import errno
 import random
-import unicodedata
 from PIL import Image
 import natsort
 import torch
@@ -64,81 +63,6 @@ img_num = {
     "02": 3,
     "03": 3,
 }
-
-transform_test = transforms.Compose(
-    [
-        transforms.ToTensor(),
-        transforms.Resize((256, 256), antialias=True),
-    ]
-)
-
-
-# 유니코드 정규화 함수
-def normalize_unicode(s):
-    return unicodedata.normalize("NFC", s)
-
-
-class IEC_dataset(Dataset):
-    def __init__(self, args, logger):
-        self.args = args
-        self.logger = logger
-        self.area_img_list = defaultdict(list)
-        self.load_img()
-        self.area_img_list = dict(self.area_img_list)
-        self.dig_list = None
-
-    def __len__(self):
-        return len(self.dig_list)
-
-    def __getitem__(self, idx):
-        return self.dig_list[idx]
-
-    def load_dataset(self, dig):
-        self.dig_list = self.area_img_list[dig]
-        return self.dig_list
-
-    def load_img(self):
-        # with open("IEC_korea_data/test.json", "r", encoding="utf-8") as f:
-        #     bbox_anno = json.load(f)
-        
-        with open("IEC_korea_data/test4.json", "r", encoding="utf-8") as f:
-            bbox_anno = json.load(f)
-
-        img_path_list = list()
-        # for root, _, files in os.walk("IEC_korea_data"):
-        #     for file in files:
-        #         if ".jpg" in file or ".JPG" in file:
-        #             img_path_list.append(os.path.join(root, file))
-        
-        for root, _, files in os.walk("IEC_korea_data/test"):
-            for file in files:
-                if ".jpg" in file or ".JPG" in file:
-                    img_path_list.append(os.path.join(root, file))
-
-        # img_path랑 anno key 값에 한글이 있어서 정규화 시켜줘서 에러 방지
-        normalized_bbox_anno = {normalize_unicode(k): v for k, v in bbox_anno.items()}
-
-        for img_path in tqdm(img_path_list):
-            pil_img = cv2.imread(img_path)
-            query = "/".join(img_path.split("/")[1:])
-            normalized_query = normalize_unicode(query)
-            if normalized_query in normalized_bbox_anno:
-                for area, bbox in normalized_bbox_anno[normalized_query].items():
-                    # 이미지 크기가 400 x 800에서 bbox 좌표를 받은거라 튜닝해줌
-                    # 현재 이미지는 3000 x 5000 이미지
-                    bbox[0], bbox[2] = bbox[0] * 8.64, bbox[2] * 8.64
-                    bbox[1], bbox[3] = bbox[1] * 6.48, bbox[3] * 6.48
-                    bbox = list(map(int, bbox))
-                    bbox = [0 if a < 0 else a for a in bbox]
-                    crop_img = pil_img[bbox[1] : bbox[3], bbox[0] : bbox[2]]
-
-                    pil = Image.fromarray(crop_img.astype(np.uint8))
-                    patch_img = transform_test(pil)
-                    self.area_img_list[area].append([patch_img, img_path])
-
-                pil = Image.fromarray(pil_img.astype(np.uint8))
-                patch_img = transform_test(pil)
-                self.area_img_list["face"].append([patch_img, img_path])
 
 
 class CustomDataset_class(Dataset):
@@ -343,14 +267,7 @@ class CustomDataset_class(Dataset):
                 )
             )
         return False
-    
-    # def add_dataset(self):
-    #     for a, b, c in os.walk("dataset/diff_img"):
-    #         for os.path.join()
-            
 
-                # if dig == "dryness" and grade in ["0", "4"]:
-                #     for a, b, c in os.walk(f"dataset/diff_img/{grade}"):
     def load_dataset(self, mode, dig_k):
         data_list = (
             self.train_list
@@ -444,15 +361,15 @@ class CustomDataset_regress(CustomDataset_class):
 
     def generate_datasets(self):
         train_list, val_list, test_list = list(), list(), list()
-        for dig, value_list in self.json_dict.items():
+        for dig in sorted(self.json_dict):
             t_list, v_list, te_list = list(), list(), list()
-            key_index = sorted(value_list)
+            key_index = sorted(self.json_dict[dig])
             i = 0
             for idx in key_index:
-                for value in value_list[idx]:
+                for value in self.json_dict[dig][idx]:
                     if i % 8 == 0:
                         v_list.append(value)
-                    elif i % 8 == 1:
+                    elif i % 8 == 1 :
                         te_list.append(value)
                     else:
                         t_list.append(value)
