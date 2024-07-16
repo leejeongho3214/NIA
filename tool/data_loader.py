@@ -381,19 +381,22 @@ class CustomDataset_regress(CustomDataset_class):
 
     def generate_datasets(self):
         train_list, val_list, test_list = list(), list(), list()
-        for dig, value_list in self.json_dict.items():
+        for dig in sorted(self.json_dict):
             t_list, v_list, te_list = list(), list(), list()
-            key_index = sorted(value_list)
+            key_index = sorted(self.json_dict[dig])
             i = 0
             for idx in key_index:
-                for value in value_list[idx]:
-                    if i % 8 == 0 and value[0].split("_")[-2] in ["F", "L30", "R30"]:
-                        v_list.append(value)
-                    elif i % 8 == 1 and value[0].split("_")[-2] in ["F", "L30", "R30"]:
-                        te_list.append(value)
-                    elif i % 8 > 1:
+
+                for value in self.json_dict[dig][idx]:
+                    if i % 8 == 0:
+                        if value[0].split("_")[-2] in ["F", "L30", "R30"]:
+                            v_list.append(value)
+                    elif i % 8 == 1:
+                        if value[0].split("_")[-2] in ["F", "L30", "R30"]:
+                            te_list.append(value)
+                    else:
                         t_list.append(value)
-                    i += 1
+                i += 1
 
             train_list.append([dig, t_list]), val_list.append(
                 [dig, v_list]

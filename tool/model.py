@@ -169,7 +169,7 @@ class Model(object):
                     )
                 else:
                     self.logger.info(
-                    f"Epoch: {self.epoch} [{self.phase}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] ---- >  loss: {self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
+                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] ---- >  loss: {self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
                     )
 
             else:
