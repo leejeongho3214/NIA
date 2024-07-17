@@ -266,6 +266,16 @@ def save_checkpoint(self):
     
     return checkpoint_dir
 
+class mape_loss(nn.Module):
+    def __init__(self):
+        super(mape_loss, self).__init__()
+    
+    def forward(self, input, target):
+        error = abs(input - target)
+        error = error / target
+        
+        return error.mean()
+        
 
 def mkdir(path):
     # if it is the current folder, skip.

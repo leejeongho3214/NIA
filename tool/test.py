@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from torchvision import models
-from tool.data_loader import CustomDataset_class, CustomDataset_regress, IEC_dataset
+from tool.data_loader import CustomDataset_class, CustomDataset_regress
 import argparse
 from tool.logger import setup_logger
 from torch.utils import data
