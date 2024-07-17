@@ -341,7 +341,7 @@ class Model_test(Model):
         self.m_dig = key
         with torch.no_grad():
             self.model.eval()
-            for self.iter, (img, label, self.img_names, self.digs, meta_v) in enumerate(
+            for self.iter, (img, label, self.img_names, self.digs, meta_v, _) in enumerate(
                 tqdm(self.testset_loader, desc=self.m_dig)
             ):
                 img, label = img.to(device), label.to(device)
