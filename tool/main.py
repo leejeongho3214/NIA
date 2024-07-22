@@ -201,6 +201,7 @@ def main(args):
                 if len(list(model.named_parameters())) - i == 3:
                     break
         model_list.update({key: model})
+        
 
     args.save_img = os.path.join(check_path, "save_img")
     args.pred_path = os.path.join(check_path, "prediction")
