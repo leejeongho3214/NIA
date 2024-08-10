@@ -375,8 +375,11 @@ class Model_test(Model):
     def print_test(self):
         gt_v = [value[0] for value in self.gt[self.m_dig]]
         pred_v = [value[0] for value in self.pred[self.m_dig]]
-    
         
+        n_gt_v = [value[0]/value[-1] for value in self.gt[self.m_dig]]
+        n_pred_v = [value[0]/value[-1] for value in self.pred[self.m_dig]]
+        
+
         if self.args.mode == "class":
             for gt_value, pred_value in [(gt_v, pred_v)]:
             # for gt_value, pred_value in [(gt_v, pred_v), (gt_F, pred_F), (gt_L30, pred_L30), (gt_R30, pred_R30)]:
@@ -407,8 +410,9 @@ class Model_test(Model):
             correlation, p_value = pearsonr(gt_v, pred_v)
             mae = mean_absolute_error(gt_v, pred_v)
             mape = mape_loss()(np.array(pred_v), np.array(gt_v))
+            nmae = mean_absolute_error(n_gt_v, n_pred_v)
             self.logger.info(
-                f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae:.4f}, MAPE: {mape:.3f}\n"
+                f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae:.4f}, MAPE: {mape:.3f}, NMAE: {nmae:.3f}\n"
             )
 
     def get_test_loss(self, pred, gt):
@@ -432,10 +436,10 @@ class Model_test(Model):
 
         for idx, (pred_item, gt_item) in enumerate(zip(pred, gt)):
             self.pred[self.m_dig].append(
-                [round(pred_item.item() * value, 3), self.img_names[idx]]
+                [round(pred_item.item() * value, 3), self.img_names[idx], value]
             )
             self.gt[self.m_dig].append(
-                [round(gt_item.item() * value, 3), self.img_names[idx]]
+                [round(gt_item.item() * value, 3), self.img_names[idx], value]
             )
 
     def get_test_acc(self, pred, gt):
