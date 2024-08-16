@@ -227,7 +227,7 @@ for key in model_list:
         testset_loader, _ = dataset.load_dataset("test", w_key)
         loader_datalist = data.DataLoader(
             dataset=testset_loader,
-            batch_size=32 if model == "cnn" else 8,
+            batch_size=1,
             num_workers=4,
             shuffle=False,
         )
@@ -263,7 +263,7 @@ for key in model_list:
                 
             cv2.imwrite(f"{path}/{w_key}/{idx}.jpg",c_img)
             
-            if idx == 3:
+            if idx == 30:
                 break
 
     
