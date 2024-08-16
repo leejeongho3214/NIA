@@ -143,8 +143,6 @@ def resume_checkpoint(model, path):
 
     return model
 
-name = "cnn_cb_all_img_F_val"
-args.mode = "class"
 # %%
 model_num_class = (
         {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
