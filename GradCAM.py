@@ -135,7 +135,6 @@ def parse_args():
 args = parse_args()
 
 fix_seed(523)
-# %%
 def resume_checkpoint(model, path):
     state_dict = torch.load(path, map_location="cuda")
     model.load_state_dict(state_dict["model_state"], strict=False)
@@ -171,8 +170,7 @@ if len(os.popen("git branch --show-current").readlines()):
 else:
     git_name = os.popen("git describe --tags").readlines()[0].rstrip()
 
-## Adjust the number of output in model for each region image
-check_path = os.path.join("checkpoint", git_name, args.mode, name, "save_model")
+check_path = os.path.join("checkpoint", git_name, args.mode, args.name, "save_model")
 
 if os.path.isdir(check_path):
     for key, model in model_list.items():
@@ -183,7 +181,6 @@ if os.path.isdir(check_path):
         print(f"success => {key}")
 
 
-# %%
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
 
 dataset = (
@@ -232,6 +229,8 @@ for key in model_list:
         for idx, (img, label, img_name, _, _, pil_imgs) in enumerate(
             tqdm(loader_datalist, desc=w_key)
         ):
+            if label < 4:
+                continue
             v_img = list()
             grayscale_cams = cam(input_tensor=img, targets=None)
             img = img.detach().cpu()
@@ -248,20 +247,15 @@ for key in model_list:
             for i in range(len(im)):
                 v_img.append(im[i])
                 
-            stacked_images = np.stack(v_img, axis=0)
+            stacked_images = np.stack(v_img[::-1], axis=0)
             c_img = (
                 make_grid(torch.tensor(stacked_images).permute(0, 3, 1, 2), nrow=4)
                 .permute(1, 2, 0)
                 .numpy()
             )
             
-            path = f"cam_output/GradCAM/{args.mode}/{name}"
+            path = f"cam_output/GradCAM/{args.mode}/{args.name}"
             if not os.path.isdir(f"{path}/{w_key}"):
                 mkdir(f"{path}/{w_key}")
                 
             cv2.imwrite(f"{path}/{w_key}/{idx}.jpg",c_img)
-            
-            if idx == 30:
-                break
-
-    
