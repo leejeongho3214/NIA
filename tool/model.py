@@ -376,8 +376,9 @@ class Model_test(Model):
         gt_v = [value[0] for value in self.gt[self.m_dig]]
         pred_v = [value[0] for value in self.pred[self.m_dig]]
         
-        n_gt_v = [value[0]/value[-1] for value in self.gt[self.m_dig]]
-        n_pred_v = [value[0]/value[-1] for value in self.pred[self.m_dig]]
+        if self.args.mode == "regression":
+            n_gt_v = [value[0]/value[-1] for value in self.gt[self.m_dig]]
+            n_pred_v = [value[0]/value[-1] for value in self.pred[self.m_dig]]
         
 
         if self.args.mode == "class":
