@@ -263,8 +263,8 @@ class Model(object):
         self.model.train()
         self.phase = "Train"
         self.criterion = (
-            CB_loss(samples_per_cls=self.grade_num, no_of_classes=len(self.grade_num), gamma = self.args.gamma)
-            # FocalLoss(gamma=self.args.gamma)
+            # CB_loss(samples_per_cls=self.grade_num, no_of_classes=len(self.grade_num), gamma = self.args.gamma)
+            FocalLoss(gamma=self.args.gamma)
             # nn.CrossEntropyLoss()
             
             if self.args.mode == "class"
@@ -374,8 +374,9 @@ class Model_test(Model):
         gt_v = [value[0] for value in self.gt[self.m_dig]]
         pred_v = [value[0] for value in self.pred[self.m_dig]]
         
-        n_gt_v = [value[0]/value[-1] for value in self.gt[self.m_dig]]
-        n_pred_v = [value[0]/value[-1] for value in self.pred[self.m_dig]]
+        if self.args.mode == "regression":
+            n_gt_v = [value[0]/value[-1] for value in self.gt[self.m_dig]]
+            n_pred_v = [value[0]/value[-1] for value in self.pred[self.m_dig]]
         
         # gt_F = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "F"]
         # gt_L30 = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "L30"]
