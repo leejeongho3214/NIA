@@ -304,7 +304,6 @@ class Model(object):
         self.criterion = (
             nn.CrossEntropyLoss() if self.args.mode == "class" else nn.L1Loss()
         )
-        random_num = random.randrange(0, len(self.valid_loader))
         with torch.no_grad():
             self.model.eval()
             for self.iter, (img, label, self.img_names, _, meta_v, _) in enumerate(

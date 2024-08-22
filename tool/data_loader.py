@@ -366,14 +366,16 @@ class CustomDataset_regress(CustomDataset_class):
             key_index = sorted(self.json_dict[dig])
             i = 0
             for idx in key_index:
-                for value in self.json_dict[dig][idx]:
-                    if i % 8 == 0:
-                        v_list.append(value)
-                    elif i % 8 == 1 :
-                        te_list.append(value)
-                    else:
-                        t_list.append(value)
-                i += 1
+                for value_list in self.json_dict[dig][idx]:
+                    if type(value_list[0]) == str: value_list = [value_list]
+                    for value in value_list:
+                        if i % 10 == 8:
+                            v_list.append(value)
+                        elif i % 10 == 9:
+                            te_list.append(value)
+                        else:
+                            t_list.append(value)
+                        i += 1
 
             train_list.append([dig, t_list]), val_list.append(
                 [dig, v_list]
