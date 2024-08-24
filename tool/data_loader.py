@@ -103,16 +103,16 @@ class CustomDataset_class(Dataset):
                 for dataset_idx, (idx_list, out_list) in enumerate(zip(
                     [t_idx, v_idx, test_idx], [train_list, val_list, test_list]
                 )):
-                    # if dataset_idx == 0:
-                    #     t_list = [grade_dict[idx] for idx in idx_list]
-                    # else:
-                    t_list = list()
-                    for idx in idx_list:
-                        tt_list = list()
-                        for each_value in grade_dict[idx]:
-                            if each_value[0].split("_")[-2] in ["F", "L30", "R30"]:
-                                tt_list.append(each_value)
-                        t_list.append(tt_list)
+                    if dataset_idx == 0:
+                        t_list = [grade_dict[idx] for idx in idx_list]
+                    else:
+                        t_list = list()
+                        for idx in idx_list:
+                            tt_list = list()
+                            for each_value in grade_dict[idx]:
+                                if each_value[0].split("_")[-2] in ["F", "L30", "R30"]:
+                                    tt_list.append(each_value)
+                            t_list.append(tt_list)
                     out_list[dig][grade] = t_list
 
         self.train_list, self.val_list, self.test_list = train_list, val_list, test_list
