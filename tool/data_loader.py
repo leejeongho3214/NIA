@@ -364,7 +364,6 @@ class CustomDataset_class(Dataset):
         else:
             assert 0, "dig_v is not here"
 
-
 class CustomDataset_regress(CustomDataset_class):
     def __init__(self, args, logger):
         self.args = args
