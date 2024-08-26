@@ -164,12 +164,7 @@ for key, model in model_list.items():
     model.fc = nn.Linear(model.fc.in_features, model_num_class[key], bias = True)
     model_list.update({key: model})
     
-    
-if len(os.popen("git branch --show-current").readlines()):
-    git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
-else:
-    git_name = os.popen("git describe --tags").readlines()[0].rstrip()
-
+git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 check_path = os.path.join("checkpoint", git_name, args.mode, args.name, "save_model")
 
 if os.path.isdir(check_path):
@@ -188,7 +183,6 @@ dataset = (
     if args.mode == "class"
     else CustomDataset_regress(args, None)
 )
-    
 
 model_area_dict = ({
     "dryness": ["dryness"],
@@ -222,40 +216,42 @@ for key in model_list:
         testset_loader, _ = dataset.load_dataset("test", w_key)
         loader_datalist = data.DataLoader(
             dataset=testset_loader,
-            batch_size=1,
-            num_workers=4,
+            batch_size=32,
+            num_workers=8,
             shuffle=False,
         )
         for idx, (img, label, img_name, _, _, pil_imgs) in enumerate(
             tqdm(loader_datalist, desc=w_key)
         ):
-            if label < 4:
-                continue
-            v_img = list()
             grayscale_cams = cam(input_tensor=img, targets=None)
             img = img.detach().cpu()
-            for i in range(len(grayscale_cams)):
-                grayscale_cam = grayscale_cams[i, :]
-                pil_img = np.array(pil_imgs[i, :] / pil_imgs[i, :].max())
-                v_img.append(
-                    show_cam_on_image(
-                        pil_img, grayscale_cam, use_rgb=False
+            for j in range(len(grayscale_cams) // 8):
+                v_img = list()
+                if len(grayscale_cams) % 8 != 0 and j == len(grayscale_cams) // 8 - 1:
+                    k = len(grayscale_cams) % 8
+                else:
+                    k = 8
+                for i in range(k):
+                    i = j * 8 + i
+                    grayscale_cam = grayscale_cams[i, :]
+                    pil_img = np.array(pil_imgs[i, :] / pil_imgs[i, :].max())
+                    v_img.append(
+                        show_cam_on_image(
+                            pil_img, grayscale_cam, use_rgb=False
+                        )
                     )
+                    v_img.append(pil_img * 255.0)
+                    
+                    
+                stacked_images = np.stack(v_img[::-1], axis=0)
+                c_img = (
+                    make_grid(torch.tensor(stacked_images).permute(0, 3, 1, 2), nrow=4)
+                    .permute(1, 2, 0)
+                    .numpy()
                 )
                 
-            im = pil_imgs
-            for i in range(len(im)):
-                v_img.append(im[i])
-                
-            stacked_images = np.stack(v_img[::-1], axis=0)
-            c_img = (
-                make_grid(torch.tensor(stacked_images).permute(0, 3, 1, 2), nrow=4)
-                .permute(1, 2, 0)
-                .numpy()
-            )
-            
-            path = f"cam_output/GradCAM/{args.mode}/{args.name}"
-            if not os.path.isdir(f"{path}/{w_key}"):
-                mkdir(f"{path}/{w_key}")
-                
-            cv2.imwrite(f"{path}/{w_key}/{idx}.jpg",c_img)
+                path = f"cam_output/GradCAM/{args.mode}/{args.name}"
+                if not os.path.isdir(f"{path}/{w_key}"):
+                    mkdir(f"{path}/{w_key}")
+                    
+                cv2.imwrite(f"{path}/{w_key}/{idx}_{j}.jpg",c_img)
