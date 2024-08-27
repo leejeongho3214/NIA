@@ -227,16 +227,15 @@ for key in model_list:
             img = img.detach().cpu()
             pil_imgs = pil_imgs.detach().cpu()
             pil_img = np.array(pil_imgs / 255.0)
-            for j in range(len(grayscale_cams) // 8):
+            for j in range((len(grayscale_cams) + 7) // 8):
                 v_img = list()
-                if len(grayscale_cams) % 8 != 0 and j == len(grayscale_cams) // 8 - 1:
+                if len(grayscale_cams) % 8 != 0 and j == (len(grayscale_cams) + 7) // 8 - 1:
                     k = len(grayscale_cams) % 8
                 else:
                     k = 8
                 for i in range(k):
                     i = j * 8 + i
                     grayscale_cam = grayscale_cams[i, :]
-
                     cv2.putText(pil_img[i], img_name[i], (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (1, 1, 1), 1)
                     v_img.append(
                         show_cam_on_image(
