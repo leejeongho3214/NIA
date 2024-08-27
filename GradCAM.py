@@ -233,6 +233,7 @@ for key in model_list:
                     k = len(grayscale_cams) % 8
                 else:
                     k = 8
+                    
                 for i in range(k):
                     i = j * 8 + i
                     grayscale_cam = grayscale_cams[i, :]
