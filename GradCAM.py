@@ -225,6 +225,8 @@ for key in model_list:
         ):
             grayscale_cams = cam(input_tensor=img, targets=None)
             img = img.detach().cpu()
+            pil_imgs = pil_imgs.detach().cpu()
+            pil_img = np.array(pil_imgs / 255.0)
             for j in range(len(grayscale_cams) // 8):
                 v_img = list()
                 if len(grayscale_cams) % 8 != 0 and j == len(grayscale_cams) // 8 - 1:
@@ -234,13 +236,14 @@ for key in model_list:
                 for i in range(k):
                     i = j * 8 + i
                     grayscale_cam = grayscale_cams[i, :]
-                    pil_img = np.array(pil_imgs[i, :] / pil_imgs[i, :].max())
+
+                    cv2.putText(pil_img[i], img_name[i], (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (1, 1, 1), 1)
                     v_img.append(
                         show_cam_on_image(
-                            pil_img, grayscale_cam, use_rgb=False
+                            pil_img[i], grayscale_cam, use_rgb=False
                         )
                     )
-                    v_img.append(pil_img * 255.0)
+                    v_img.append(pil_img[i] * 255.0)
                     
                     
                 stacked_images = np.stack(v_img[::-1], axis=0)
