@@ -136,9 +136,7 @@ class CustomDataset_class(Dataset):
         ]
 
         self.json_dict = (
-            defaultdict(lambda: defaultdict(list))
-            if self.args.mode == "regression"
-            else defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+            defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
         )
         self.json_dict_train = copy.deepcopy(self.json_dict)
 
@@ -205,7 +203,7 @@ class CustomDataset_class(Dataset):
                 ]
                 if matching_dig:
                     dig = matching_dig[0]
-                    self.json_dict[dig][value].append(
+                    self.json_dict[dig][value][sub_fold].append(
                         [
                             os.path.join(pre_name, j_name.split(".")[0]),
                             value,
@@ -249,12 +247,7 @@ class CustomDataset_class(Dataset):
         if equ_name == "01":
             return (
                 (
-                    j_name.split("_")[2] == "Ft"
-                    and j_name.split("_")[3].split(".")[0]
-                    in ["08"]
-                )
-                or (
-                    j_name.split("_")[2] == "Fb"
+                    j_name.split("_")[2] in ["Ft", "Fb"]
                     and j_name.split("_")[3].split(".")[0]
                     in ["08"]
                 )
@@ -386,17 +379,17 @@ class CustomDataset_regress(CustomDataset_class):
             key_index = sorted(self.json_dict[dig])
             i = 0
             for idx in key_index:
-
-                for value in self.json_dict[dig][idx]:
-                    if i % 8 == 0:
-                        if value[0].split("_")[-2] in ["F", "L30", "R30"]:
-                            v_list.append(value)
-                    elif i % 8 == 1:
-                        if value[0].split("_")[-2] in ["F", "L30", "R30"]:
-                            te_list.append(value)
-                    else:
-                        t_list.append(value)
-                i += 1
+                for _, value_list in self.json_dict[dig][idx].items():
+                    for value in value_list:
+                        if i % 10 == 8:
+                            if value[0].split("_")[-2] in ["F", "L30", "R30"]:
+                                v_list.append(value)
+                        elif i % 10 == 9:
+                            if value[0].split("_")[-2] in ["F", "L30", "R30"]:
+                                te_list.append(value)
+                        else:
+                            t_list.append(value)
+                    i += 1
 
             train_list.append([dig, t_list]), val_list.append(
                 [dig, v_list]
