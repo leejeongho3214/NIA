@@ -10,7 +10,6 @@ from data_loader import mkdir
 import torch.optim as optim
 from utils import (
     AverageMeter,
-    FocalLoss,
     mape_loss,
     save_checkpoint,
     save_image,
@@ -162,7 +161,7 @@ class Model(object):
                     )
 
                     self.logger.info(
-                        f"Epoch: {self.epoch} [{self.phase}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] micro Precision: {(micro_precision * 100):.2f}%, micro Recall: {micro_recall:.4f}, micro F1: {micro_f1:.4f}"
+                        f"Epoch: {self.epoch} [{self.phase}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] micro Precision: {(micro_precision * 100):.2f}%, micro F1: {micro_f1:.4f}"
                     )
                     self.logger.info(
                     f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
@@ -263,24 +262,19 @@ class Model(object):
         self.model.train()
         self.phase = "Train"
         self.criterion = (
-            # CB_loss(samples_per_cls=self.grade_num, no_of_classes=len(self.grade_num), gamma = self.args.gamma)
-            FocalLoss(gamma=self.args.gamma)
-            # nn.CrossEntropyLoss()
-            
+            CB_loss(samples_per_cls=self.grade_num, no_of_classes=len(self.grade_num), gamma = self.args.gamma)
             if self.args.mode == "class"
             else nn.L1Loss()
-            # else nn.MSELoss()
-            # else mape_loss()
         )
         random_num = random.randrange(0, len(self.train_loader))
 
-        for self.iter, (img, label, self.img_names, _, meta_v, _) in enumerate(
+        for self.iter, (img, label, self.img_names) in enumerate(
             self.train_loader
         ):
             img = img.to(device)
             label = label.to(device).type(torch.float32)
 
-            pred = self.model(img, meta_v)
+            pred = self.model(img)
 
             if self.args.mode == "class":
                 loss = self.class_loss(pred, label)
@@ -306,12 +300,12 @@ class Model(object):
         random_num = random.randrange(0, len(self.valid_loader))
         with torch.no_grad():
             self.model.eval()
-            for self.iter, (img, label, self.img_names, _, meta_v, _) in enumerate(
+            for self.iter, (img, label, self.img_names) in enumerate(
                 self.valid_loader
             ):
                 img, label = img.to(device), label.to(device)
 
-                pred = self.model(img, meta_v)
+                pred = self.model(img)
 
                 if self.args.mode == "class":
                     self.class_loss(pred, label)
@@ -342,7 +336,7 @@ class Model_test(Model):
         self.m_dig = key
         with torch.no_grad():
             self.model.eval()
-            for self.iter, (img, label, self.img_names, self.digs, meta_v, _) in enumerate(
+            for self.iter, (img, label, self.img_names) in enumerate(
                 tqdm(self.testset_loader, desc=self.m_dig)
             ):
                 img, label = img.to(device), label.to(device)
@@ -378,21 +372,12 @@ class Model_test(Model):
             n_gt_v = [value[0]/value[-1] for value in self.gt[self.m_dig]]
             n_pred_v = [value[0]/value[-1] for value in self.pred[self.m_dig]]
         
-        # gt_F = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "F"]
-        # gt_L30 = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "L30"]
-        # gt_R30 = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "R30"]
-        
-        # pred_F = [value[0] for value in self.pred[self.m_dig] if value[1].split("_")[-3] == "F"]
-        # pred_L30 = [value[0] for value in self.pred[self.m_dig] if value[1].split("_")[-3] == "L30"]
-        # pred_R30 = [value[0] for value in self.pred[self.m_dig] if value[1].split("_")[-3] == "R30"]
-        
         if self.args.mode == "class":
             for gt_value, pred_value in [(gt_v, pred_v)]:
-            # for gt_value, pred_value in [(gt_v, pred_v), (gt_F, pred_F), (gt_L30, pred_L30), (gt_R30, pred_R30)]:
                 (
                     micro_precision,
-                    micro_recall,
-                    micro_f1,
+                    _,
+                    _,
                     _,
                 ) = precision_recall_fscore_support(
                     gt_value,

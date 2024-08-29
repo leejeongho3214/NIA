@@ -274,8 +274,7 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def _forward_impl(self, x: Tensor, meta: Tensor) -> Tensor:
-        # See note [TorchScript super()]
+    def _forward_impl(self, x: Tensor) -> Tensor:
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -289,19 +288,12 @@ class ResNet(nn.Module):
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
 
-        # if self.args.meta:
-        #     x = torch.concat([x, meta.cuda()], dim = -1)
-        #     x = self.fcc(x)
-        #     x = self.relu(x)
-        
-        # x = self.dropout(x) # newly added
-        
         x = self.fc(x)
 
         return x 
         
-    def forward(self, x: Tensor, meta: Tensor) -> Tensor:
-        return self._forward_impl(x, meta)
+    def forward(self, x: Tensor) -> Tensor:
+        return self._forward_impl(x)
 
 
 def _resnet(

@@ -18,11 +18,7 @@ from tool.model import Model_test
 from tool.utils import resume_checkpoint, fix_seed
 
 fix_seed(523)
-if len(os.popen("git branch --show-current").readlines()):
-    git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
-else:
-    git_name = os.popen("git describe --tags").readlines()[0].rstrip()
-
+git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -30,18 +26,6 @@ def parse_args():
     parser.add_argument(
         "--name",
         default="none",
-        type=str,
-    )
-
-    parser.add_argument(
-        "--img_path",
-        default="dataset/img",
-        type=str,
-    )
-
-    parser.add_argument(
-        "--load_name",
-        default=None,
         type=str,
     )
 
@@ -57,22 +41,8 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--json_path",
-        default="dataset/label",
-        type=str,
-    )
-
-    parser.add_argument(
         "--output_dir",
         default=f"checkpoint/{git_name}",
-        type=str,
-    )
-
-    parser.add_argument(
-        "--aug",
-        default=None,
-        nargs="+",
-        choices=["jitter", "crop"],
         type=str,
     )
 
@@ -83,59 +53,23 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--smooth",
-        default=0.1,
-        type=float,
-    )
-
-    parser.add_argument(
         "--res",
         default=256,
         type=int,
     )
 
     parser.add_argument(
-        "--data_num",
-        default=-1,
-        type=int,
-    )
-
-    parser.add_argument(
-        "--load_epoch",
-        default=0,
-        type=int,
-    )
-
-    parser.add_argument(
-        "--lr",
-        default=1e-3,
-        type=float,
-    )
-
-    parser.add_argument(
         "--batch_size",
-        default=128,
+        default=32,
         type=int,
     )
 
     parser.add_argument(
         "--num_workers",
-        default=4,
+        default=8,
         type=int,
     )
     
-    parser.add_argument(
-        "--dropout",
-        default = 0.3,
-        type = float,
-    )
-
-    parser.add_argument("--reset", action="store_true")
-    parser.add_argument("--cross", action="store_true")
-    parser.add_argument("--meta", action="store_true")
-    parser.add_argument("--bias", action="store_true")
-    parser.add_argument("--transfer", action="store_true")
-
     args = parser.parse_args()
 
     return args
@@ -143,8 +77,6 @@ def parse_args():
 
 def main(args):
     args.check_path = os.path.join(args.output_dir, args.mode, args.name)
-
-    args.model = "cnn"
 
     if os.path.isdir(os.path.join(args.check_path, "log", "eval")):
         shutil.rmtree(os.path.join(args.check_path, "log", "eval"))
@@ -176,9 +108,6 @@ def main(args):
     for key, model in model_list.items(): 
         model.fc = nn.Linear(model.fc.in_features, model_num_class[key], bias = True)
         model_list.update({key: model})
-
-    if args.load_name == None:
-        args.load_name = args.name
 
     model_path = os.path.join(
         os.path.join(args.output_dir, args.mode, args.load_name), "save_model"
@@ -237,8 +166,8 @@ def main(args):
             )
             resnet_model.test(model, testset_loader, w_key)
             resnet_model.print_test()
-            torch.cuda.empty_cache()
-            gc.collect()
+        torch.cuda.empty_cache()
+        gc.collect()
     resnet_model.save_value()
 
 
