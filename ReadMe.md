@@ -68,5 +68,35 @@
     <img src="assets/figure2.png", width="1000" height="400">
 </p>
 
+## 코드
+### 데이터 셋 제작
+기본적으로 CNN 모델의 입력 이미지는 정사각형의 형태임. 입력으로 넣기 위해, resize를 바로 하게 되면 이미지 왜곡이 발생함. 그래서 아래 코드에서는 데이터셋에서 주어진 영역의 bbox의 센터값을 기준으로 정사각형으로 영역 이미지를 획득함
+
+다른 방법으로는 주어진 영역 이미지(직사각형)에서 0-padding을 주어 정사각형을 만드는 것도 하나의 방법임.
+```
+python tool/img_crop.py
+```
+
+### 폴더
+```
+{$ROOT}
+|-- dataset
+    ㄴㅡ img
+    ㄴㅡ label
+    ㄴㅡ cropped_img
+|-- tool
+
+```
+### 학습
+mode는 따로 입력하지 않으면 "육안평가"가 되고 mode를 regression을 입력하면 "정밀 기기측정값" 예측이 된다
+```
+python tool/main.py --name "체크포인트 이름" --mode "class" or "regression"
+```
+
+### 검증
+```
+python tool/test.py --name "앞서 저장한 체크포인트 이름" --mode "class" or "regression"
+```
+
 ## 문의
 단국대학교 컴퓨터학과 박사과정 이정호(72210297@dankook.ac.kr)에게 메일 보내주세요
