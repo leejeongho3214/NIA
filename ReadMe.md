@@ -45,7 +45,7 @@
     - 처짐: 턱 <br><br>
 
 <p align="middle">
-    <img src="assets/figure1.png", width="900" height="250">
+    <img src="assets/figure1.png", width="2000" height="600">
 </p>
 
 ### 손실 함수
@@ -62,10 +62,10 @@
 
 ### 결과
 <p align="middle">
-    <img src="assets/table1.png", width="500" height="350">
+    <img src="assets/table1.png", width="=900" height="350">
 </p>
 <p align="middle">
-    <img src="assets/figure2.png", width="900" height="400">
+    <img src="assets/figure2.png", width="1000" height="400">
 </p>
 
 ## 문의
