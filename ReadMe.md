@@ -45,7 +45,7 @@
     - 처짐: 턱 <br><br>
 
 <p align="middle">
-    <img src="assets/figure1.png", width="2000" height="600">
+    <img src="assets/figure1.png", width="2000" height="400">
 </p>
 
 ### 손실 함수
