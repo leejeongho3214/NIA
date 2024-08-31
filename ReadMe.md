@@ -81,9 +81,9 @@ python tool/img_crop.py
 ```
 {$ROOT}
 |-- dataset
-    ㄴㅡ img
-    ㄴㅡ label
-    ㄴㅡ cropped_img
+|    ㄴㅡ img
+|    ㄴㅡ label
+|    ㄴㅡ cropped_img
 |-- tool
 
 ```
