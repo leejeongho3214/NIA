@@ -18,7 +18,7 @@ from torch.utils.data import ConcatDataset, Dataset
 def mkdir(path):
     if path == "":
         return
-    try:
+    try:    
         os.makedirs(path)
     except OSError as e:
         if e.errno != errno.EEXIST:
