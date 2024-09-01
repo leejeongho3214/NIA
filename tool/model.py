@@ -154,7 +154,7 @@ class Model(object):
                 if self.args.mode == "class":
                     (
                         micro_precision,
-                        micro_recall,
+                        _,
                         micro_f1,
                         _,
                     ) = precision_recall_fscore_support(
@@ -162,7 +162,7 @@ class Model(object):
                     )
 
                     self.logger.info(
-                        f"Epoch: {self.epoch} [{self.phase}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] micro Precision: {(micro_precision * 100):.2f}%, micro Recall: {micro_recall:.4f}, micro F1: {micro_f1:.4f}"
+                        f"Epoch: {self.epoch} [{self.phase}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Gamma: {self.args.gamma}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] micro Precision: {(micro_precision * 100):.2f}%, micro F1: {micro_f1:.4f}"
                     )
                     self.logger.info(
                     f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
@@ -264,9 +264,6 @@ class Model(object):
         self.phase = "Train"
         self.criterion = (
             CB_loss(samples_per_cls=self.grade_num, no_of_classes=len(self.grade_num), gamma = self.args.gamma)
-            # FocalLoss(gamma=self.args.gamma)
-            # nn.CrossEntropyLoss()
-            
             if self.args.mode == "class"
             else nn.L1Loss()
         )
@@ -277,12 +274,7 @@ class Model(object):
         ):
             img, label = img.to(device), label.to(device)
 
-            pred = (
-                self.model(img, meta_v)
-                if self.args.model != "coatnet"
-                else self.model(img)
-            )
-
+            pred = self.model(img, meta_v)
             if self.args.mode == "class":
                 loss = self.class_loss(pred, label)
             else:
@@ -311,11 +303,8 @@ class Model(object):
             ):
                 img, label = img.to(device), label.to(device)
 
-                pred = (
-                    self.model(img, meta_v)
-                    if self.args.model != "coatnet"
-                    else self.model(img)
-                )
+                pred = self.model(img, meta_v)
+                
 
                 if self.args.mode == "class":
                     self.class_loss(pred, label)
@@ -373,24 +362,17 @@ class Model_test(Model):
         gt_v = [value[0] for value in self.gt[self.m_dig]]
         pred_v = [value[0] for value in self.pred[self.m_dig]]
         
-        n_gt_v = [value[0]/value[-1] for value in self.gt[self.m_dig]]
-        n_pred_v = [value[0]/value[-1] for value in self.pred[self.m_dig]]
+        if self.args.mode == "regression":
+            n_gt_v = [value[0]/value[-1] for value in self.gt[self.m_dig]]
+            n_pred_v = [value[0]/value[-1] for value in self.pred[self.m_dig]]
         
-        # gt_F = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "F"]
-        # gt_L30 = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "L30"]
-        # gt_R30 = [value[0] for value in self.gt[self.m_dig] if value[1].split("_")[-3] == "R30"]
-        
-        # pred_F = [value[0] for value in self.pred[self.m_dig] if value[1].split("_")[-3] == "F"]
-        # pred_L30 = [value[0] for value in self.pred[self.m_dig] if value[1].split("_")[-3] == "L30"]
-        # pred_R30 = [value[0] for value in self.pred[self.m_dig] if value[1].split("_")[-3] == "R30"]
         
         if self.args.mode == "class":
             for gt_value, pred_value in [(gt_v, pred_v)]:
-            # for gt_value, pred_value in [(gt_v, pred_v), (gt_F, pred_F), (gt_L30, pred_L30), (gt_R30, pred_R30)]:
                 (
                     micro_precision,
-                    micro_recall,
-                    micro_f1,
+                    _,
+                    _,
                     _,
                 ) = precision_recall_fscore_support(
                     gt_value,
