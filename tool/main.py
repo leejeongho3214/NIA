@@ -32,12 +32,6 @@ def parse_args():
         type=str,
     )
 
-    parser.add_argument(
-        "--img_path",
-        default="dataset/img",
-        type=str,
-    )
-
     parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
 
     parser.add_argument("--stop_early", type=int, default=50)
@@ -46,46 +40,6 @@ def parse_args():
         "--mode",
         default="class",
         choices=["regression", "class"],
-        type=str,
-    )
-
-    parser.add_argument(
-        "--aug",
-        default=None,
-        nargs="+",
-        choices=["jitter", "crop"],
-        type=str,
-    )
-
-    parser.add_argument(
-        "--pass_list",
-        default=[],
-        nargs="+",
-        choices=[
-            "dryness",
-            "pigmentation_forehead",
-            "pigmentation_cheek",
-            "pore",
-            "sagging",
-            "wrinkle_forehead",
-            "wrinkle_glabellus",
-            "wrinkle_perocular",
-            "pigmentation",
-            "forehead_moisture",
-            "forehead_elasticity_R2",
-            "perocular_wrinkle_Ra",
-            "cheek_moisture",
-            "cheek_elasticity_R2",
-            "cheek_pore",
-            "chin_moisture",
-            "chin_elasticity_R2",
-        ],
-        type=str,
-    )
-
-    parser.add_argument(
-        "--json_path",
-        default="dataset/label",
         type=str,
     )
 
@@ -114,12 +68,6 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--data_num",
-        default=-1,
-        type=int,
-    )
-
-    parser.add_argument(
         "--load_epoch",
         default=0,
         type=int,
@@ -138,12 +86,6 @@ def parse_args():
     )
     
     parser.add_argument(
-        "--transfer_path",
-        default=None,
-        type=str,
-    )
-
-    parser.add_argument(
         "--num_workers",
         default=8,
         type=int,
@@ -151,9 +93,6 @@ def parse_args():
 
 
     parser.add_argument("--reset", action="store_true")
-    parser.add_argument("--img", action="store_true")
-    parser.add_argument("--meta", action="store_true")
-    parser.add_argument("--transfer", action="store_true")
 
     args = parser.parse_args()
 
@@ -163,9 +102,6 @@ def parse_args():
 def main(args):
     check_path = os.path.join(args.output_dir, args.mode, args.name)
     log_path = os.path.join("tensorboard", git_name, args.mode, args.name)
-
-    args.model = "cnn"
-
     model_num_class = (
         {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
         if args.mode == "class"
@@ -187,24 +123,15 @@ def main(args):
         for key, _ in model_num_class.items()
     }
 
-    if args.transfer: 
-        model_path = os.path.join(args.output_dir, args.mode, args.transfer_path, "save_model")
-        print("transfer learning...")
-    else:
-        model_path = os.path.join(check_path, "save_model")
+    model_path = os.path.join(check_path, "save_model")
         
     for key, model in model_list.items(): 
         model.fc = nn.Linear(model.fc.in_features, model_num_class[key], bias = True)
-        if args.transfer:
-            for i, (name, param) in enumerate(model.named_parameters()):
-                param.requires_grad = False
-                if len(list(model.named_parameters())) - i == 3:
-                    break
         model_list.update({key: model})
+        
 
     args.save_img = os.path.join(check_path, "save_img")
     args.pred_path = os.path.join(check_path, "prediction")
-    
 
     if args.reset:
         print(f"\033[90mReseting......{check_path}\033[0m")
@@ -224,12 +151,12 @@ def main(args):
                     os.path.join(model_path, f"{path}", "state_dict.bin"),
                     path, 
                 )
-                if os.path.isdir(os.path.join(dig_path, "done")) and not args.transfer:
+                if os.path.isdir(os.path.join(dig_path, "done")):
                     print(f"\043[92mPassing......{dig_path}\043[0m")
                     pass_list.append(path)
 
-    pass_list = pass_list + args.pass_list
 
+    gamma = args.gamma
     mkdir(model_path)
     mkdir(log_path)
     writer = SummaryWriter(log_path)
@@ -253,7 +180,10 @@ def main(args):
     for key in model_list:
         if key in pass_list:
             continue
-
+        if key in ["dryness", "sagging"]:
+            args.gamma = 3
+        else:
+            args.gamma = gamma
         model = model_list[key].cuda()
 
         trainset, grade_num = dataset.load_dataset("train", key)

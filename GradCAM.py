@@ -2,17 +2,8 @@
 import argparse
 from pytorch_grad_cam import (
     GradCAM,
-    HiResCAM,
-    ScoreCAM,
-    GradCAMPlusPlus,
-    AblationCAM,
-    XGradCAM,
-    EigenCAM,
-    FullGrad,
 )
-import GPUtil
 import torch.nn as nn
-from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from tool.utils import fix_seed, mkdir
 from torchvision import models
@@ -20,14 +11,7 @@ import os
 import torch
 import cv2
 import numpy as np
-from torchvision import transforms
-from PIL import Image
-from matplotlib import pyplot as plt
-from torch.utils.data import random_split, ConcatDataset, Dataset
-import natsort
-from collections import defaultdict
 from tqdm import tqdm
-import json
 from torch.utils import data
 
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
@@ -182,7 +166,6 @@ for key, model in model_list.items():
     model_list.update({key: model})
     
     
-
 if len(os.popen("git branch --show-current").readlines()):
     git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 else:
@@ -201,9 +184,6 @@ if os.path.isdir(check_path):
 
 
 # %%
-import copy
-import random
-import torch.nn.functional as F
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
 
 dataset = (
@@ -233,9 +213,7 @@ model_area_dict = ({
         "pore": ["cheek_pore"],
     }
     )
-import gc
 from torchvision.utils import make_grid
-from GPUtil import showUtilization as gpu_usage
 
 
 for key in model_list:
@@ -247,7 +225,7 @@ for key in model_list:
         testset_loader, _ = dataset.load_dataset("test", w_key)
         loader_datalist = data.DataLoader(
             dataset=testset_loader,
-            batch_size=1,
+            batch_size=32 if model == "cnn" else 8,
             num_workers=4,
             shuffle=False,
         )
