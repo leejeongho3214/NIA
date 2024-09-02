@@ -383,11 +383,10 @@ class Model_test(Model):
 
         if self.args.mode == "class":
             for gt_value, pred_value in [(gt_v, pred_v)]:
-            # for gt_value, pred_value in [(gt_v, pred_v), (gt_F, pred_F), (gt_L30, pred_L30), (gt_R30, pred_R30)]:
                 (
                     micro_precision,
-                    micro_recall,
-                    micro_f1,
+                    _,
+                    _,
                     _,
                 ) = precision_recall_fscore_support(
                     gt_value,
