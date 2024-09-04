@@ -48,6 +48,12 @@ def parse_args():
         default=f"checkpoint/{git_name}",
         type=str,
     )
+    
+    parser.add_argument(
+        "--v_loss",
+        default=f"cb",
+        type=str,
+    )
 
     parser.add_argument(
         "--epoch",
@@ -194,7 +200,7 @@ def main(args):
             shuffle=True,
         )
 
-        valset, _ = dataset.load_dataset("valid", key)
+        valset, grade_num2 = dataset.load_dataset("valid", key)
         valset_loader = data.DataLoader(
             dataset=valset,
             batch_size=args.batch_size,
@@ -212,7 +218,8 @@ def main(args):
             model_num_class,
             writer,
             key,
-            grade_num
+            grade_num,
+            grade_num2
         )
 
         for epoch in range(args.load_epoch[key], args.epoch):
