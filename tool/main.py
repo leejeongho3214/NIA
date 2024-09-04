@@ -186,10 +186,6 @@ def main(args):
     for key in model_list:
         if key in pass_list:
             continue
-        if key in ["dryness", "sagging"]:
-            args.gamma = 3
-        else:
-            args.gamma = gamma
         model = model_list[key].cuda()
 
         trainset, grade_num = dataset.load_dataset("train", key)
