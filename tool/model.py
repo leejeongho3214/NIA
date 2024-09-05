@@ -302,24 +302,26 @@ class Model(object):
             else nn.CrossEntropyLoss()
         ) if self.args.mode == "class" else nn.L1Loss()
 
-        # with torch.no_grad():
-        # self.model.eval()
-        for self.iter, (img, label, self.img_names, _, meta_v, _) in enumerate(
-            self.valid_loader
-        ):
-            img, label = img.to(device), label.to(device)
+        with torch.no_grad():
+            self.model.eval()
+            for self.iter, (img, label, self.img_names, _, meta_v, _) in enumerate(
+                self.valid_loader
+            ):
+                img, label = img.to(device), label.to(device)
 
-            pred = self.model(img, meta_v)
+                pred = self.model(img, meta_v)
+                
 
-            if self.args.mode == "class":
-                self.class_loss(pred, label)
-            else:
-                self.regression(pred, label)
+                if self.args.mode == "class":
+                    self.class_loss(pred, label)
+                else:
+                    self.regression(pred, label)
 
-            self.print_loss(len(self.valid_loader))
+                self.print_loss(len(self.valid_loader))
 
-        self.scheduler.step(self.val_loss.avg)
-        self.print_loss(len(self.valid_loader), final_flag=True)
+            if self.val_loss.avg == 0: self.val_loss.avg = np.inf
+            self.scheduler.step(self.val_loss.avg)
+            self.print_loss(len(self.valid_loader), final_flag=True)
 
 
 class Model_test(Model):
