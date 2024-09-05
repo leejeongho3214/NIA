@@ -13,7 +13,7 @@ import torch.nn as nn
 import numpy as np
 from torchvision import models
 from tensorboardX import SummaryWriter
-from utils import FocalLoss, mkdir, resume_checkpoint, fix_seed, CB_loss
+from utils import mkdir, resume_checkpoint, fix_seed
 from logger import setup_logger
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
 from model import Model
@@ -155,8 +155,6 @@ def main(args):
                     print(f"\043[92mPassing......{dig_path}\043[0m")
                     pass_list.append(path)
 
-
-    gamma = args.gamma
     mkdir(model_path)
     mkdir(log_path)
     writer = SummaryWriter(log_path)
@@ -176,10 +174,6 @@ def main(args):
     for key in model_list:
         if key in pass_list:
             continue
-        if key in ["dryness", "sagging"]:
-            args.gamma = 3
-        else:
-            args.gamma = gamma
         model = model_list[key].cuda()
 
         trainset, grade_num = dataset.load_dataset("train", key)

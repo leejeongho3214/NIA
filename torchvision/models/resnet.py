@@ -289,13 +289,6 @@ class ResNet(nn.Module):
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
 
-        # if self.args.meta:
-        #     x = torch.concat([x, meta.cuda()], dim = -1)
-        #     x = self.fcc(x)
-        #     x = self.relu(x)
-        
-        # x = self.dropout(x) # newly added
-        
         x = self.fc(x)
 
         return x 

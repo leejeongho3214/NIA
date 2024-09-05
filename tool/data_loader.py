@@ -220,24 +220,8 @@ class CustomDataset_class(Dataset):
                     in ["03", "05"]
                 )
             )
-        elif equ_name == "02":
-            return (
-                (
-                    j_name.split("_")[2] == "F"
-                    and j_name.split("_")[3].split(".")[0] in ["03", "04", "05", "06"]
-                )
-                or (
-                    j_name.split("_")[2] == "L"
-                    and j_name.split("_")[3].split(".")[0]
-                    in ["03", "05"]
-                )
-                or (
-                    j_name.split("_")[2] == "R"
-                    and j_name.split("_")[3].split(".")[0]
-                    in ["04", "06"]
-                )
-            )
-        return False
+        else:
+            return False
 
     def load_dataset(self, mode, dig):
         data_list = (
