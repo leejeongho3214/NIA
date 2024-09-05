@@ -304,7 +304,6 @@ class Model(object):
             ):
                 img, label = img.to(device), label.to(device)
                 pred = self.model(img, meta_v)
-                
 
                 if self.args.mode == "class":
                     self.class_loss(pred, label)
