@@ -39,7 +39,6 @@ class Model(object):
         writer,
         dig_k,
         grade_num,
-        grade_num2
     ):
         (
             self.args,
@@ -54,7 +53,6 @@ class Model(object):
             self.writer,
             self.m_dig,
             self.grade_num,
-            self.grade_num2
         ) = (
             args,
             model,
@@ -68,7 +66,6 @@ class Model(object):
             writer,
             dig_k,
             grade_num,
-            grade_num2
         )
 
         self.train_loss, self.val_loss = AverageMeter(), AverageMeter()
@@ -296,11 +293,7 @@ class Model(object):
 
     def valid(self):
         self.phase = "Valid"
-        self.criterion = (
-            CB_loss(samples_per_cls=self.grade_num2, no_of_classes=len(self.grade_num2), gamma=self.args.gamma) 
-            if self.args.v_loss == "cb" 
-            else nn.CrossEntropyLoss()
-        ) if self.args.mode == "class" else nn.L1Loss()
+        self.criterion = nn.CrossEntropyLoss() if self.args.mode == "class" else nn.L1Loss()
 
         with torch.no_grad():
             self.model.eval()
@@ -311,7 +304,6 @@ class Model(object):
 
                 pred = self.model(img, meta_v)
                 
-
                 if self.args.mode == "class":
                     self.class_loss(pred, label)
                 else:
@@ -319,7 +311,6 @@ class Model(object):
 
                 self.print_loss(len(self.valid_loader))
 
-            if self.val_loss.avg == 0: self.val_loss.avg = np.inf
             self.scheduler.step(self.val_loss.avg)
             self.print_loss(len(self.valid_loader), final_flag=True)
 

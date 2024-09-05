@@ -48,12 +48,6 @@ def parse_args():
         default=f"checkpoint/{git_name}",
         type=str,
     )
-    
-    parser.add_argument(
-        "--v_loss",
-        default=f"cb",
-        type=str,
-    )
 
     parser.add_argument(
         "--epoch",
@@ -161,8 +155,6 @@ def main(args):
                     print(f"\043[92mPassing......{dig_path}\043[0m")
                     pass_list.append(path)
 
-
-    gamma = args.gamma
     mkdir(model_path)
     mkdir(log_path)
     writer = SummaryWriter(log_path)
@@ -172,10 +164,6 @@ def main(args):
     )
     logger.info(args)
     logger.info("Command Line: " + " ".join(sys.argv))
-    logger.debug(inspect.getsource(CB_loss))
-    logger.debug(inspect.getsource(models.resnet.ResNet._forward_impl))
-    logger.debug(inspect.getsource(Model))
-    logger.debug(inspect.getsource(CustomDataset_class))
 
     dataset = (
         CustomDataset_class(args, logger, "train")
@@ -196,7 +184,7 @@ def main(args):
             shuffle=True,
         )
 
-        valset, grade_num2 = dataset.load_dataset("valid", key)
+        valset, _ = dataset.load_dataset("valid", key)
         valset_loader = data.DataLoader(
             dataset=valset,
             batch_size=args.batch_size,
@@ -214,8 +202,7 @@ def main(args):
             model_num_class,
             writer,
             key,
-            grade_num,
-            grade_num2
+            grade_num
         )
 
         for epoch in range(args.load_epoch[key], args.epoch):
