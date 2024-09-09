@@ -211,7 +211,6 @@ class ResNet(nn.Module):
         self.block_expansion = block.expansion
         
         self.fc = nn.Linear(512 * block.expansion, num_classes)
-        # self.dropout = nn.Dropout(p = args.dropout)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):

@@ -64,7 +64,7 @@ def parse_args():
     parser.add_argument(
         "--gamma",
         default=2,
-        type=int,
+        type=float,
     )
 
     parser.add_argument(
