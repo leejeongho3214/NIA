@@ -13,6 +13,7 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 from torch.utils import data
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
@@ -223,38 +224,34 @@ for key in model_list:
         for idx, (img, label, img_name, _, _, pil_imgs) in enumerate(
             tqdm(loader_datalist, desc=w_key)
         ):
-            grayscale_cams = cam(input_tensor=img, targets=None)
+            v_img = list()
+            grayscale_cams = cam(input_tensor=img, targets=[ClassifierOutputTarget(i.item()) for i in label])
             img = img.detach().cpu()
-            pil_imgs = pil_imgs.detach().cpu()
-            pil_img = np.array(pil_imgs / 255.0)
-            for j in range((len(grayscale_cams) + 7) // 8):
-                v_img = list()
-                if len(grayscale_cams) % 8 != 0 and j == (len(grayscale_cams) + 7) // 8 - 1:
-                    k = len(grayscale_cams) % 8
-                else:
-                    k = 8
-                    
-                for i in range(k):
-                    i = j * 8 + i
-                    grayscale_cam = grayscale_cams[i, :]
-                    cv2.putText(pil_img[i], img_name[i], (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (1, 1, 1), 1)
-                    v_img.append(
-                        show_cam_on_image(
-                            pil_img[i], grayscale_cam, use_rgb=False
-                        )
-                    )
-                    v_img.append(pil_img[i] * 255.0)
-                    
-                    
-                stacked_images = np.stack(v_img[::-1], axis=0)
-                c_img = (
-                    make_grid(torch.tensor(stacked_images).permute(0, 3, 1, 2), nrow=4)
-                    .permute(1, 2, 0)
-                    .numpy()
-                )
+            for i in range(len(grayscale_cams)):
+                grayscale_cam = grayscale_cams[i, :]
+                pil_img = np.array(pil_imgs[i, :] / pil_imgs[i, :].max())
+                v_img.append(
+                    show_cam_on_image(
+                        pil_img, grayscale_cam, use_rgb=False                ))
                 
-                path = f"cam_output/GradCAM/{args.mode}/{args.name}"
-                if not os.path.isdir(f"{path}/{w_key}"):
-                    mkdir(f"{path}/{w_key}")
-                    
-                cv2.imwrite(f"{path}/{w_key}/{idx}_{j}.jpg",c_img)
+            im = pil_imgs
+            for i in range(len(im)):
+                v_img.append(im[i])
+                
+            stacked_images = np.stack(v_img, axis=0)
+            c_img = (
+                make_grid(torch.tensor(stacked_images).permute(0, 3, 1, 2), nrow=4)
+                .permute(1, 2, 0)
+                .numpy()
+            )
+            
+            path = f"cam_output/GradCAM/{args.mode}/{args.name}"
+            if not os.path.isdir(f"{path}/{w_key}"):
+                mkdir(f"{path}/{w_key}")
+                
+            cv2.imwrite(f"{path}/{w_key}/{idx}.jpg",c_img)
+            
+            if idx == 3:
+                break
+
+    
