@@ -12,7 +12,8 @@ import cv2
 import json
 from collections import defaultdict
 from tqdm import tqdm
-from torch.utils.data import ConcatDataset, Dataset
+from torch.utils.data import Dataset
+from sklearn.model_selection import KFold, train_test_split
 
 
 def mkdir(path):
@@ -49,7 +50,8 @@ class CustomDataset_class(Dataset):
             for grade in sorted(class_dict.keys()):
                 grade_dict = class_dict[grade]
                 random_list = list(grade_dict.keys())
-                random.shuffle(random_list)
+                
+                # random.shuffle(random_list)
 
                 train_len, val_len = int(len(grade_dict) * 0.8), int(len(grade_dict) * 0.1)
                 train_idx, val_idx, test_idx = (

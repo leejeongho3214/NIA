@@ -13,6 +13,7 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 from torch.utils import data
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
@@ -143,9 +144,6 @@ def resume_checkpoint(model, path):
 
     return model
 
-name = "cnn_cb_F_img_F_val"
-args.mode = "regression"
-# %%
 model_num_class = (
         {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
         if args.mode == "class"
@@ -174,7 +172,7 @@ else:
     git_name = os.popen("git describe --tags").readlines()[0].rstrip()
 
 ## Adjust the number of output in model for each region image
-check_path = os.path.join("checkpoint", git_name, args.mode, name, "save_model")
+check_path = os.path.join("checkpoint", git_name, args.mode, args.name, "save_model")
 
 if os.path.isdir(check_path):
     for key, model in model_list.items():
@@ -227,15 +225,15 @@ for key in model_list:
         testset_loader, _ = dataset.load_dataset("test", w_key)
         loader_datalist = data.DataLoader(
             dataset=testset_loader,
-            batch_size=32 if model == "cnn" else 8,
-            num_workers=4,
+            batch_size=32,
+            num_workers=8,
             shuffle=False,
         )
         for idx, (img, label, img_name, _, _, pil_imgs) in enumerate(
             tqdm(loader_datalist, desc=w_key)
         ):
             v_img = list()
-            grayscale_cams = cam(input_tensor=img, targets=None)
+            grayscale_cams = cam(input_tensor=img, targets=[ClassifierOutputTarget(i.item()) for i in label])
             img = img.detach().cpu()
             for i in range(len(grayscale_cams)):
                 grayscale_cam = grayscale_cams[i, :]
@@ -257,7 +255,7 @@ for key in model_list:
                 .numpy()
             )
             
-            path = f"cam_output/GradCAM/{args.mode}/{name}"
+            path = f"cam_output/GradCAM/{args.mode}/{args.name}"
             if not os.path.isdir(f"{path}/{w_key}"):
                 mkdir(f"{path}/{w_key}")
                 
