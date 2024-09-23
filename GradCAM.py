@@ -13,6 +13,7 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 from torch.utils import data
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
@@ -225,15 +226,15 @@ for key in model_list:
         testset_loader, _ = dataset.load_dataset("test", w_key)
         loader_datalist = data.DataLoader(
             dataset=testset_loader,
-            batch_size=32 if model == "cnn" else 8,
-            num_workers=4,
+            batch_size=32,
+            num_workers=8,
             shuffle=False,
         )
         for idx, (img, label, img_name, _, _, pil_imgs) in enumerate(
             tqdm(loader_datalist, desc=w_key)
         ):
             v_img = list()
-            grayscale_cams = cam(input_tensor=img, targets=None)
+            grayscale_cams = cam(input_tensor=img, targets=[ClassifierOutputTarget(i.item()) for i in label])
             img = img.detach().cpu()
             for i in range(len(grayscale_cams)):
                 grayscale_cam = grayscale_cams[i, :]
@@ -260,5 +261,8 @@ for key in model_list:
                 mkdir(f"{path}/{w_key}")
                 
             cv2.imwrite(f"{path}/{w_key}/{idx}.jpg",c_img)
+            
+            if idx == 3:
+                break
 
     
