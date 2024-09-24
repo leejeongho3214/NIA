@@ -1,5 +1,6 @@
 # %%
 import argparse
+import gc
 from pytorch_grad_cam import (
     GradCAM,
     HiResCAM,
