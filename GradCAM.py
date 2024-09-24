@@ -28,6 +28,7 @@ from collections import defaultdict
 from tqdm import tqdm
 import json
 from torch.utils import data
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
@@ -158,12 +159,10 @@ def resume_checkpoint(model, path):
 
     return model
 
-name = "coatnet_cb_all_img"
-args.mode = "class"
 # %%
 model_num_class = (
         {
-            # "dryness": 5, "pigmentation": 6, "pore": 6,
+            "dryness": 5, "pigmentation": 6, "pore": 6,
          "sagging": 7, "wrinkle": 7
          }
         if args.mode == "class"
@@ -171,8 +170,8 @@ model_num_class = (
             "pigmentation": 1,
             "moisture": 1,
             "elasticity_R2": 1,
-            # "wrinkle_Ra": 1,
-            # "pore": 1,
+            "wrinkle_Ra": 1,
+            "pore": 1,
         }
     )
 
@@ -182,14 +181,11 @@ model_list = {
     }
 
 
+git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
-if len(os.popen("git branch --show-current").readlines()):
-    git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
-else:
-    git_name = os.popen("git describe --tags").readlines()[0].rstrip()
 
 ## Adjust the number of output in model for each region image
-check_path = os.path.join("checkpoint", git_name, args.mode, name, "save_model")
+check_path = os.path.join("checkpoint", git_name, args.mode, args.name, "save_model")
 
 if os.path.isdir(check_path):
     for key, model in model_list.items():
@@ -200,10 +196,6 @@ if os.path.isdir(check_path):
         print(f"success => {key}")
 
 
-# %%
-import copy
-import random
-import torch.nn.functional as F
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
 
 dataset = (
@@ -233,7 +225,6 @@ model_area_dict = ({
         "pore": ["cheek_pore"],
     }
     )
-import gc
 from torchvision.utils import make_grid
 
 
@@ -247,14 +238,14 @@ for key in model_list:
         loader_datalist = data.DataLoader(
             dataset=testset_loader,
             batch_size=8,
-            num_workers=4,
+            num_workers=8,
             shuffle=False,
         )
         for idx, (img, label, img_name, _, _, pil_imgs) in enumerate(
             tqdm(loader_datalist, desc=w_key)
         ):
             v_img = list()
-            grayscale_cams = cam(input_tensor=img, targets=None)
+            grayscale_cams = cam(input_tensor=img, targets=[ClassifierOutputTarget(i.item()) for i in label])
             img = img.detach().cpu()
             for i in range(len(grayscale_cams)):
                 grayscale_cam = grayscale_cams[i, :]
@@ -276,7 +267,7 @@ for key in model_list:
                 .numpy()
             )
             
-            path = f"cam_output/GradCAM/{args.mode}/{name}"
+            path = f"cam_output/GradCAM/{args.mode}/{args.name}"
             if not os.path.isdir(f"{path}/{w_key}"):
                 mkdir(f"{path}/{w_key}")
                 
