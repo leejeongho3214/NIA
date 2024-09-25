@@ -192,7 +192,7 @@ def main(args):
             shuffle=False,
         )
 
-        resnet_model = Model(
+ㅁ주         resnet_model = Model(
             args,
             model,
             trainset_loader,
