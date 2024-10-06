@@ -360,6 +360,14 @@ class Model_test(Model):
         gt_v = [value[0] for value in self.gt[self.m_dig]]
         pred_v = [value[0] for value in self.pred[self.m_dig]]
         
+        correct_ = defaultdict(int)
+        all_ = defaultdict(int)
+        
+        for gt, pred in zip(gt_v, pred_v):
+            all_[gt] += 1
+            if gt == pred:
+                correct_[gt] += 1
+        
         if self.args.mode == "regression":
             n_gt_v = [value[0]/value[-1] for value in self.gt[self.m_dig]]
             n_pred_v = [value[0]/value[-1] for value in self.pred[self.m_dig]]
@@ -389,6 +397,11 @@ class Model_test(Model):
                 self.logger.info(
                     f"[{self.m_dig}]Acc: {micro_precision:.4f} Correlation: {correlation:.2f}, P-value: {p_value:.4f}, Top-3 Acc: {top_3_acc:.4f}\n"
                 )
+                
+                for grade in all_:
+                    self.logger.info(
+                        f"          {grade} grade Acc: {correct_[grade]} / {all_[grade]} -> {(correct_[grade]/all_[grade] * 100):.2f} %\n"
+                    )
 
         else:
             correlation, p_value = pearsonr(gt_v, pred_v)

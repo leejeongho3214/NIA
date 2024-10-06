@@ -122,6 +122,13 @@ class CustomDataset_class(Dataset):
 
                     with open(os.path.join(folder_path, j_name), "r") as f:
                         json_meta = json.load(f)
+                        
+                        if (j_name.split('.')[0][:-3] != json_meta['info']['filename'].split('.')[0]) or \
+                                (str(json_meta['images']['facepart']).zfill(2) != j_name.split('_')[-1].split('.')[0]):
+                                assert 0
+                        
+                            # (str(json_meta['images']['angle']).zfill(2) != j_name.split('_')[-1].split('.')[0]) or \
+                        
                         self.process_json_meta(
                             json_meta, j_name, sub_path, target_list, sub_fold
                         )
