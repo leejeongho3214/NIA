@@ -2,6 +2,8 @@ import inspect
 import os
 import sys
 
+import yaml
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -51,7 +53,7 @@ def parse_args():
 
     parser.add_argument(
         "--epoch",
-        default=200,
+        default=100,
         type=int,
     )
 
@@ -64,7 +66,7 @@ def parse_args():
     parser.add_argument(
         "--gamma",
         default=2,
-        type=int,
+        type=float,
     )
 
     parser.add_argument(
@@ -157,12 +159,24 @@ def main(args):
 
     mkdir(model_path)
     mkdir(log_path)
+    code_path = os.path.join(check_path, "code")
+    mkdir(code_path)
     writer = SummaryWriter(log_path)
+    
+    [shutil.copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), "tool", code_name), os.path.join(code_path, code_name.split("/")[-1])) \
+        for code_name in ["main.py", "data_loader.py", "model.py", "../torchvision/models/resnet.py"]]
+    
+    args_dict = vars(args)
+
+    # YAML 파일에 저장
+    yaml_file_path = os.path.join(code_path, 'config.yaml')
+    with open(yaml_file_path, 'w') as yaml_file:
+        yaml.dump(args_dict, yaml_file, default_flow_style=False)
+    
 
     logger = setup_logger(
         args.name + args.mode, os.path.join(check_path, "log", "train")
     )
-    logger.info(args)
     logger.info("Command Line: " + " ".join(sys.argv))
 
     dataset = (
@@ -216,7 +230,8 @@ def main(args):
 
             if resnet_model.stop_early():
                 break
-
+        
+        resnet_model.print_best()
         del trainset_loader, valset_loader
 
         torch.cuda.empty_cache()

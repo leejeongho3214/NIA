@@ -307,7 +307,7 @@ def save_image(self, img):
         min_v = -min_v
     s_img = (c_img - min_v) * (255.0 / (max_v - min_v))
 
-    path = os.path.join(self.args.save_img, self.m_dig)
+    path = os.path.join(self.args.save_img, self.m_dig, self.phase)
     mkdir(path)
     img_mat = cv2.UMat(s_img)
     j = self.args.batch_size // 4
