@@ -29,14 +29,13 @@ def softmax(x):
 
 def resume_checkpoint(args, model, path, dig, test = True):
     state_dict = torch.load(path, map_location=device)
-    if not args.transfer:
-        if state_dict["best_loss"][dig] != np.inf and test:
-            args.best_loss[dig] = state_dict["best_loss"][dig]
-        if test: args.load_epoch[dig] = state_dict["epoch"]
-        if 'batch_size' in state_dict:
-            args.batch_size = state_dict["batch_size"]
-            if args.batch_size != state_dict['batch_size']:
-                print(f"batch_size update 128 ->> {args.batch_size}")
+    if state_dict["best_loss"][dig] != np.inf and test:
+        args.best_loss[dig] = state_dict["best_loss"][dig]
+    if test: args.load_epoch[dig] = state_dict["epoch"]
+    if 'batch_size' in state_dict:
+        args.batch_size = state_dict["batch_size"]
+        if args.batch_size != state_dict['batch_size']:
+            print(f"batch_size update 128 ->> {args.batch_size}")
     model.load_state_dict(state_dict["model_state"], strict=False)
     del state_dict
 
@@ -192,11 +191,8 @@ class CB_loss(nn.Module):
         if self.gamma == 0.0:
             modulator = 1.0
         else:
-            logits_clamped = torch.clamp(logits, min=-15.0, max=15.0)  # 적절한 범위로 클램핑
-            modulator = torch.exp(-self.gamma * labels * logits_clamped - self.gamma * torch.log(1 + torch.exp(-1.0 * logits_clamped)))
-
-            # modulator = torch.exp(-self.gamma * labels * logits - self.gamma * torch.log(1 + 
-            #     torch.exp(-1.0 * logits)))
+            modulator = torch.exp(-self.gamma * labels * logits - self.gamma * torch.log(1 + 
+                torch.exp(-1.0 * logits)))
 
         loss = modulator * BCLoss
 
@@ -232,7 +228,7 @@ class CB_loss(nn.Module):
         weights = (1.0 - self.beta) / np.array(effective_num)
         weights = weights / np.sum(weights) * self.no_of_classes
 
-        labels_one_hot = F.one_hot(labels.to(torch.int64), self.no_of_classes).float()
+        labels_one_hot = F.one_hot(labels, self.no_of_classes).float()
 
         weights = torch.tensor(weights).float().cuda()
         weights = weights.unsqueeze(0)
@@ -249,19 +245,6 @@ class CB_loss(nn.Module):
         # cb_loss = F.binary_cross_entropy(input = pred, target = labels_one_hot, weight = weights)
         
         return cb_loss
-    
-class mape_loss(nn.Module):
-    def __init__(self):
-        super(mape_loss, self).__init__()
-    
-    def forward(self, input, target):
-        error = abs(input - target)
-        error = error / target
-        
-        return error.mean()
-        
-        
-    
 
 def save_checkpoint(self):
     checkpoint_dir = os.path.join(self.args.output_dir, self.args.mode, self.args.name, "save_model", str(self.m_dig))
@@ -284,6 +267,16 @@ def save_checkpoint(self):
     
     return checkpoint_dir
 
+class mape_loss(nn.Module):
+    def __init__(self):
+        super(mape_loss, self).__init__()
+    
+    def forward(self, input, target):
+        error = abs(input - target)
+        error = error / target
+        
+        return error.mean()
+        
 
 def mkdir(path):
     # if it is the current folder, skip.
@@ -315,7 +308,7 @@ def save_image(self, img):
         min_v = -min_v
     s_img = (c_img - min_v) * (255.0 / (max_v - min_v))
 
-    path = os.path.join(self.args.save_img, self.m_dig)
+    path = os.path.join(self.args.save_img, self.m_dig, self.phase)
     mkdir(path)
     img_mat = cv2.UMat(s_img)
     j = self.args.batch_size // 4
@@ -325,11 +318,7 @@ def save_image(self, img):
     cv2.imwrite(os.path.join(path, f"epoch_{self.epoch}_iter_{self.iter}_{self.m_dig}.jpg"), img_mat.get()[:, :, (2, 1, 0)])
 
 def fix_seed(random_seed):
-    
-    torch.use_deterministic_algorithms(True)
-    os.environ['PYTHONHASHSEED'] = str(random_seed)
-    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':16:8'
-    
+
     torch.manual_seed(random_seed)
     torch.cuda.manual_seed(random_seed)
     torch.cuda.manual_seed_all(random_seed)  # if use multi-GPU
