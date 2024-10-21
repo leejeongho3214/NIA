@@ -49,8 +49,6 @@ class CustomDataset_class(Dataset):
             for grade in sorted(class_dict.keys()):
                 grade_dict = class_dict[grade]
                 random_list = list(grade_dict.keys())
-                
-                # random.shuffle(random_list)
 
                 train_len, val_len = int(len(grade_dict) * 0.8), int(len(grade_dict) * 0.1)
                 train_idx, val_idx, test_idx = (
@@ -85,8 +83,10 @@ class CustomDataset_class(Dataset):
             "wrinkle_Ra",
             "pore",
         ]
-        self.img_path = "dataset/img"
-        self.json_path = "dataset/label"
+        
+        self.abs_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.img_path = os.path.join(self.abs_root, "dataset/img")
+        self.json_path = os.path.join(self.abs_root, "dataset/label")
 
         sub_path_list = [
             item
@@ -104,11 +104,11 @@ class CustomDataset_class(Dataset):
                 continue
 
             for sub_fold in tqdm(
-                natsort.natsorted(os.listdir(os.path.join("dataset/label", equ_name))),
+                natsort.natsorted(os.listdir(os.path.join(self.json_path, equ_name))),
                 desc="path loading..",
             ):
                 sub_path = os.path.join(equ_name, sub_fold)
-                folder_path = os.path.join("dataset/label", sub_path)
+                folder_path = os.path.join(self.json_path, sub_path)
 
                 if sub_fold.startswith(".") or not os.path.exists(
                     os.path.join(self.json_path, sub_path)
@@ -179,8 +179,11 @@ class CustomDataset_class(Dataset):
                     )
 
     def save_dict(self, transform):
-        ori_img = cv2.imread(os.path.join("dataset/cropped_img", self.i_path + ".jpg"))
+        ori_img = cv2.imread(os.path.join(self.abs_root, "dataset/cropped_img", self.i_path + ".jpg"))
         pil_img = cv2.cvtColor(ori_img, cv2.COLOR_BGR2RGB)
+        ori_img = cv2.resize(ori_img, (224, 224))
+        
+        
 
         s_list = self.i_path.split("/")[-1].split("_")
         desc_area = (
@@ -229,13 +232,9 @@ class CustomDataset_class(Dataset):
                     in ["03", "05"]
                 )
             )
-        elif equ_name == "02":
+        else:
             return (
                 (
-                    j_name.split("_")[2] == "F"
-                    and j_name.split("_")[3].split(".")[0] in ["03", "04", "05", "06"]
-                )
-                or (
                     j_name.split("_")[2] == "L"
                     and j_name.split("_")[3].split(".")[0]
                     in ["03", "05"]
@@ -246,8 +245,6 @@ class CustomDataset_class(Dataset):
                     in ["04", "06"]
                 )
             )
-        return False
-
     def load_dataset(self, mode, dig):
         data_list = (
             self.train_list
