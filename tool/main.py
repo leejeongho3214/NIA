@@ -23,9 +23,6 @@ import argparse
 fix_seed(523)
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
-
-
-
 def parse_args():
     parser = argparse.ArgumentParser()
 
@@ -223,11 +220,7 @@ def main(args):
         for epoch in range(args.load_epoch[key], args.epoch):
             if args.load_epoch[key]:
                 resnet_model.update_e(epoch + 1, *info) 
-                        
-            # smoothed_target = np.ones(len(weight_grade)) / len(weight_grade)
-            # smooth_weight_grade = smooth_weights(weight_grade, smoothed_target, current_epoch=epoch, max_epoch = args.epoch)
-            # sampler_.update_weight([smooth_weight_grade[i[1]] for i in trainset])
-            
+ 
             resnet_model.train()
             resnet_model.valid()
 

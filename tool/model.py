@@ -181,7 +181,7 @@ class Model(object):
                     f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}]{info_m} micro Precision: {(micro_precision * 100):.2f}%, micro F1: {micro_f1:.4f}"
                 )          
                 self.logger.info(
-                f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
+                f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
                 )
                 
                 grade_ = sorted(list(all_.keys()))
@@ -198,13 +198,9 @@ class Model(object):
                     
             else:
                 self.logger.info(
-                f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] ---- >  loss: {self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
+                f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
                 )
 
-            # else:
-            #     self.logger.info(
-            #         f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}"
-            #     )
 
     def stop_early(self):
         if self.update_c > self.args.stop_early:
@@ -281,6 +277,7 @@ class Model(object):
         return result
 
     def reset_log(self):
+        self.epoch += 1
         self.train_loss = AverageMeter()
         self.val_loss = AverageMeter()
         self.pred = list()
