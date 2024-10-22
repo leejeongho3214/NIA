@@ -210,8 +210,9 @@ class Model(object):
         if self.update_c > self.args.stop_early:
             mkdir(
                 os.path.join(
-                    self.args.root_path , 
+                    self.args.root_path, 
                     "checkpoint",
+                    self.args.git_name,
                     self.args.mode,
                     self.args.name,
                     "save_model",

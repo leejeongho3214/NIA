@@ -104,6 +104,7 @@ def smooth_weights(weight_grade, smoothed_target, current_epoch, max_epoch=100):
 
 def main(args):
     args.root_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    args.git_name = git_name
     check_path = os.path.join(args.root_path , "checkpoint", git_name, args.mode, args.name)
     log_path = os.path.join(args.root_path , "tensorboard", git_name, args.mode, args.name)
     model_num_class = (
@@ -195,12 +196,7 @@ def main(args):
         model = model_list[key].cuda()
 
         trainset, grade_num = dataset.load_dataset("train", key)
-        weight_grade = [float(len(trainset)/num) for num in grade_num]
-        weight_grade = [weight / sum(weight_grade) for weight in weight_grade]
-        weight_grade = [weight_grade[i[1]] for i in trainset]
 
-        # sampler_ = data.WeightedRandomSampler(weight_grade, num_samples=len(trainset), replacement=True)
-        
         trainset_loader = data.DataLoader(
             dataset=trainset,
             batch_size=args.batch_size,
