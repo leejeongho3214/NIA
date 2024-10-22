@@ -234,10 +234,6 @@ def main(args):
             if args.load_epoch[key]:
                 resnet_model.update_e(epoch + 1, *info) 
                         
-            # smoothed_target = np.ones(len(weight_grade)) / len(weight_grade)
-            # smooth_weight_grade = smooth_weights(weight_grade, smoothed_target, current_epoch=epoch, max_epoch = args.epoch)
-            # sampler_.update_weight([smooth_weight_grade[i[1]] for i in trainset])
-            
             resnet_model.train()
             resnet_model.valid()
 

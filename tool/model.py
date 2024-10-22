@@ -282,6 +282,7 @@ class Model(object):
     def reset_log(self):
         self.train_loss = AverageMeter()
         self.val_loss = AverageMeter()
+        self.epoch += 1
         self.pred = list()
         self.gt = list()
         self.pred_t = list()
