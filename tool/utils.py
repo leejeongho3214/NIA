@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from torchvision.utils import make_grid
 from torchvision import transforms
 
+
 if torch.cuda.is_available():
     device = torch.device("cuda")
 else:
@@ -28,6 +29,8 @@ def softmax(x):
 
 
 def resume_checkpoint(args, model, path, dig, test = True):
+
+    
     state_dict = torch.load(path, map_location=device)
     if state_dict["best_loss"][dig] != np.inf and test:
         args.best_loss[dig] = state_dict["best_loss"][dig]
@@ -35,11 +38,13 @@ def resume_checkpoint(args, model, path, dig, test = True):
     if 'batch_size' in state_dict:
         args.batch_size = state_dict["batch_size"]
         if args.batch_size != state_dict['batch_size']:
-            print(f"batch_size update 128 ->> {args.batch_size}")
+            print(f"batch_size update {state_dict['batch_size']} ->> {args.batch_size}")
     model.load_state_dict(state_dict["model_state"], strict=False)
+    
+    info = state_dict["info"]
     del state_dict
 
-    return model
+    return model, info
 
 class LabelSmoothingCrossEntropy(nn.Module):
     def __init__(self, smoothing):
@@ -246,8 +251,8 @@ class CB_loss(nn.Module):
         
         return cb_loss
 
-def save_checkpoint(self):
-    checkpoint_dir = os.path.join(self.args.output_dir, self.args.mode, self.args.name, "save_model", str(self.m_dig))
+def save_checkpoint(self, correct_, all_, micro_precision, correlation):
+    checkpoint_dir = os.path.join(self.args.root_path, self.args.mode, self.args.name, "save_model", str(self.m_dig))
     mkdir(checkpoint_dir)
     model_to_save = self.model.module if hasattr(self.model, "module") else self.model
     torch.save(
@@ -255,7 +260,8 @@ def save_checkpoint(self):
             "model_state": model_to_save.state_dict(),
             "epoch": self.epoch,
             "best_loss": self.best_loss,
-            "batch_size": self.args.batch_size
+            "batch_size": self.args.batch_size,
+            "info": [correct_, all_, micro_precision, correlation],
         },
         os.path.join(checkpoint_dir, "temp_file.bin"),
     )
@@ -264,6 +270,13 @@ def save_checkpoint(self):
         os.path.join(checkpoint_dir, "temp_file.bin"),
         os.path.join(checkpoint_dir, "state_dict.bin"),
     )
+    
+    self.update_c = 0
+    self.best_epoch = self.epoch
+    self.correct_ = correct_
+    self.all_ = all_
+    self.acc_ = micro_precision
+    self.corre_ = correlation
     
     return checkpoint_dir
 

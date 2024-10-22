@@ -40,6 +40,7 @@ class Model(object):
         writer,
         dig_k,
         grade_num,
+        info,
     ):
         (
             self.args,
@@ -53,7 +54,8 @@ class Model(object):
             self.model_num_class,
             self.writer,
             self.m_dig,
-            self.grade_num
+            self.grade_num,
+            self.info
         ) = (
             args,
             model,
@@ -67,6 +69,7 @@ class Model(object):
             writer,
             dig_k,
             grade_num,
+            info,
         )
 
         self.train_loss, self.val_loss = AverageMeter(), AverageMeter()
@@ -125,7 +128,7 @@ class Model(object):
     
     def print_best(self):
         self.logger.info(
-                    f"Best Epoch: {self.best_epoch}  Acc: {(self.acc_ * 100):.2f}  Correlation: {self.corre_:.2f}"
+                    f"Best Epoch: {self.best_epoch}  Acc: {(self.acc_ * 100):.2f}%  Correlation: {self.corre_:.2f}"
                     )
         
         for grade in sorted(self.correct_):
@@ -173,7 +176,7 @@ class Model(object):
                     if i == f_pred[idx]:
                         correct_[i] += 1
 
-                info_m = f"[Lr: {self.optimizer.param_groups[0]['lr']:4f}][Gamma: {self.args.gamma}][Early Stop: {self.update_c}/{self.args.stop_early}]" if self.phase == "train" else ""
+                info_m = f"[Lr: {self.optimizer.param_groups[0]['lr']:4f}][Gamma: {self.args.gamma}][Early Stop: {self.update_c}/{self.args.stop_early}]" if self.phase == "Train" else ""
                 self.logger.info(
                     f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}]{info_m} micro Precision: {(micro_precision * 100):.2f}%, micro F1: {micro_f1:.4f}"
                 )          
@@ -189,13 +192,7 @@ class Model(object):
                 if self.phase == "Valid":
                     if self.best_loss[self.m_dig] > self.val_loss.avg:
                         self.best_loss[self.m_dig] = round(self.val_loss.avg, 4)
-                        save_checkpoint(self)
-                        self.update_c = 0
-                        self.best_epoch = self.epoch
-                        self.correct_ = correct_
-                        self.all_ = all_
-                        self.acc_ = micro_precision
-                        self.corre_ = correlation
+                        save_checkpoint(self,  correct_, all_, micro_precision, correlation)
                     else:
                         self.update_c += 1
                     
@@ -290,8 +287,12 @@ class Model(object):
         self.pred_t = list()
         self.gt_t = list()
 
-    def update_e(self, epoch):
+    def update_e(self, epoch, correct_, all_, micro_precision, correlation):
         self.epoch = epoch
+        self.correct_ = correct_
+        self.all_ = all_
+        self.acc_ = micro_precision
+        self.corre_ = correlation
         
     def train(self):
         self.model.train()
@@ -306,7 +307,7 @@ class Model(object):
 
         for self.iter, (img, label, self.img_names, _, meta_v, _) in enumerate(
             self.train_loader
-        ):
+        ): 
             img, label = img.to(device), label.to(device)
 
             pred = self.model(img)

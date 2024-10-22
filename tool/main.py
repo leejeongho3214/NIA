@@ -4,7 +4,6 @@ import sys
 
 import yaml
 
-
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import torch
@@ -23,6 +22,8 @@ import argparse
 
 fix_seed(523)
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
+
+
 
 
 def parse_args():
@@ -45,11 +46,6 @@ def parse_args():
         type=str,
     )
 
-    parser.add_argument(
-        "--output_dir",
-        default=f"checkpoint/{git_name}",
-        type=str,
-    )
 
     parser.add_argument(
         "--epoch",
@@ -107,8 +103,9 @@ def smooth_weights(weight_grade, smoothed_target, current_epoch, max_epoch=100):
     return smoothed_weights
 
 def main(args):
-    check_path = os.path.join(args.output_dir, args.mode, args.name)
-    log_path = os.path.join("tensorboard", git_name, args.mode, args.name)
+    args.root_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    check_path = os.path.join(args.root_path , "checkpoint", git_name, args.mode, args.name)
+    log_path = os.path.join(args.root_path , "tensorboard", git_name, args.mode, args.name)
     model_num_class = (
         {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
         if args.mode == "class"
@@ -244,7 +241,6 @@ def main(args):
             resnet_model.train()
             resnet_model.valid()
 
-            resnet_model.update_e(epoch + 1)
             resnet_model.reset_log()
 
             if resnet_model.stop_early():
