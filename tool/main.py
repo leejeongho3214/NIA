@@ -5,7 +5,6 @@ import sys
 import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import torch
 import gc
@@ -23,6 +22,8 @@ import argparse
 
 fix_seed(523)
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
+
+
 
 
 def parse_args():
@@ -45,11 +46,6 @@ def parse_args():
         type=str,
     )
 
-    parser.add_argument(
-        "--output_dir",
-        default=f"checkpoint/{git_name}",
-        type=str,
-    )
 
     parser.add_argument(
         "--epoch",
@@ -102,8 +98,9 @@ def parse_args():
 
 
 def main(args):
-    check_path = os.path.join(args.output_dir, args.mode, args.name)
-    log_path = os.path.join("tensorboard", git_name, args.mode, args.name)
+    args.root_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    check_path = os.path.join(args.root_path , "checkpoint", git_name, args.mode, args.name)
+    log_path = os.path.join(args.root_path , "tensorboard", git_name, args.mode, args.name)
     model_num_class = (
         {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
         if args.mode == "class"
@@ -142,20 +139,23 @@ def main(args):
         if os.path.isdir(log_path):
             shutil.rmtree(log_path)
 
+    loading = False
     if os.path.isdir(model_path):
         for path in os.listdir(model_path):
             dig_path = os.path.join(model_path, path)
             if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
                 print(f"\033[92mResuming......{dig_path}\033[0m")
-                model_list[path] = resume_checkpoint(
+                model_list[path], info = resume_checkpoint(
                     args,
                     model_list[path],
                     os.path.join(model_path, f"{path}", "state_dict.bin"),
                     path, 
                 )
+                loading = True
                 if os.path.isdir(os.path.join(dig_path, "done")):
                     print(f"\043[92mPassing......{dig_path}\043[0m")
                     pass_list.append(path)
+            
 
     mkdir(model_path)
     mkdir(log_path)
@@ -163,7 +163,7 @@ def main(args):
     mkdir(code_path)
     writer = SummaryWriter(log_path)
     
-    [shutil.copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), "tool", code_name), os.path.join(code_path, code_name.split("/")[-1])) \
+    [shutil.copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), code_name), os.path.join(code_path, code_name.split("/")[-1])) \
         for code_name in ["main.py", "data_loader.py", "model.py", "../torchvision/models/resnet.py"]]
     
     args_dict = vars(args)
@@ -216,16 +216,21 @@ def main(args):
             model_num_class,
             writer,
             key,
-            grade_num
+            grade_num,
+            info if loading else None, 
         )
 
         for epoch in range(args.load_epoch[key], args.epoch):
-            resnet_model.update_e(epoch + 1) if args.load_epoch else None
-
+            if args.load_epoch[key]:
+                resnet_model.update_e(epoch + 1, *info) 
+                        
+            # smoothed_target = np.ones(len(weight_grade)) / len(weight_grade)
+            # smooth_weight_grade = smooth_weights(weight_grade, smoothed_target, current_epoch=epoch, max_epoch = args.epoch)
+            # sampler_.update_weight([smooth_weight_grade[i[1]] for i in trainset])
+            
             resnet_model.train()
             resnet_model.valid()
 
-            resnet_model.update_e(epoch + 1)
             resnet_model.reset_log()
 
             if resnet_model.stop_early():
