@@ -387,7 +387,7 @@ class Model_test(Model):
                     self.get_test_loss(pred, label)
 
     def save_value(self):
-        pred_path = os.path.join(self.args.check_path, "prediction")
+        pred_path = os.path.join(self.args.root_path , "checkpoint", self.args.git_name, self.args.mode, self.args.name, "prediction")
         mkdir(pred_path)
         with open(os.path.join(pred_path, f"pred.txt"), "w") as p:
             with open(os.path.join(pred_path, f"gt.txt"), "w") as g:
