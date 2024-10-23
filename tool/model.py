@@ -314,6 +314,10 @@ class Model(object):
             img, label = img.to(device), label.to(device)
 
             pred = self.model(img)
+            
+            if torch.isnan(pred).any(): 
+                self.optimizer.param_groups["lr"] /= 2
+            
             if self.args.mode == "class":
                 loss = self.class_loss(pred, label)
             else:
