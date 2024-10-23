@@ -144,7 +144,6 @@ def resume_checkpoint(model, path):
 
     return model
 
-# %%
 model_num_class = (
         {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
         if args.mode == "class"

@@ -39,6 +39,7 @@ class Model(object):
         writer,
         dig_k,
         grade_num,
+        info,
     ):
         (
             self.args,
@@ -52,7 +53,8 @@ class Model(object):
             self.model_num_class,
             self.writer,
             self.m_dig,
-            self.grade_num
+            self.grade_num,
+            self.info
         ) = (
             args,
             model,
@@ -66,6 +68,7 @@ class Model(object):
             writer,
             dig_k,
             grade_num,
+            info,
         )
 
         self.train_loss, self.val_loss = AverageMeter(), AverageMeter()
@@ -121,6 +124,15 @@ class Model(object):
 
     def loss_avg(self, name):
         return round(self.test_value[name].avg, 4)
+    
+    def print_best(self):
+        self.logger.info(
+                    f"Best Epoch: {self.best_epoch}  Acc: {(self.acc_ * 100):.2f}%  Correlation: {self.corre_:.2f}"
+                    )
+        
+        for grade in sorted(self.correct_):
+            print(f"[Grade {grade}]  {self.correct_[grade]} / {self.all_[grade]} => {(self.correct_[grade] / self.all_[grade] * 100):.2f}%      ", end = "")
+        print("")
 
     def print_loss(self, dataloader_len, final_flag=False):
         print(
@@ -134,54 +146,68 @@ class Model(object):
                 self.epoch,
             )
 
-            if self.phase == "Valid":
-                if self.best_loss[self.m_dig] > self.val_loss.avg:
-                    self.best_loss[self.m_dig] = round(self.val_loss.avg, 4)
-                    save_checkpoint(self)
-                    self.update_c = 0
-                else:
-                    self.update_c += 1
+            f_pred = list()
+            f_gt = list()
+            
+            correct_ = defaultdict(int)
+            all_ = defaultdict(int)
+            (pred_, gt_) = (self.pred, self.gt) if self.phase == "Valid" else (self.pred_t, self.gt_t)
+            
+            for value, value2 in zip(pred_, gt_):
+                for v, v1 in zip(value, value2):
+                    f_pred.append(v)
+                    f_gt.append(v1)
 
-                f_pred = list()
-                f_gt = list()
-                for value, value2 in zip(self.pred, self.gt):
-                    for v, v1 in zip(value, value2):
-                        f_pred.append(v)
-                        f_gt.append(v1)
+            correlation, _ = pearsonr(f_gt, f_pred)
 
-                correlation, _ = pearsonr(f_gt, f_pred)
+            if self.args.mode == "class":
+                (
+                    micro_precision,
+                    _,
+                    micro_f1,
+                    _,
+                ) = precision_recall_fscore_support(
+                    f_gt, f_pred, average="micro", zero_division=1
+                )
+                
+                for idx, i in enumerate(f_gt):
+                    all_[i] += 1
+                    if i == f_pred[idx]:
+                        correct_[i] += 1
 
-                if self.args.mode == "class":
-                    (
-                        micro_precision,
-                        _,
-                        micro_f1,
-                        _,
-                    ) = precision_recall_fscore_support(
-                        f_gt, f_pred, average="micro", zero_division=1
-                    )
-
-                    self.logger.info(
-                        f"Epoch: {self.epoch} [{self.phase}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Gamma: {self.args.gamma}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] micro Precision: {(micro_precision * 100):.2f}%, micro F1: {micro_f1:.4f}"
-                    )
-                    self.logger.info(
-                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
-                    )
-                else:
-                    self.logger.info(
-                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] ---- >  loss: {self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
-                    )
-
+                info_m = f"[Lr: {self.optimizer.param_groups[0]['lr']:4f}][Gamma: {self.args.gamma}][Early Stop: {self.update_c}/{self.args.stop_early}]" if self.phase == "Train" else ""
+                self.logger.info(
+                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}]{info_m} micro Precision: {(micro_precision * 100):.2f}%, micro F1: {micro_f1:.4f}"
+                )          
+                self.logger.info(
+                f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
+                )
+                
+                grade_ = sorted(list(all_.keys()))
+                for grade in grade_:
+                    print(f"        [Grade {grade}]  {correct_[grade]} / {all_[grade]} => {(correct_[grade] / all_[grade] * 100):.2f}%"  , end = "")
+                print("")
+                
+                if self.phase == "Valid":
+                    if self.best_loss[self.m_dig] > self.val_loss.avg:
+                        self.best_loss[self.m_dig] = round(self.val_loss.avg, 4)
+                        save_checkpoint(self,  correct_, all_, micro_precision, correlation)
+                    else:
+                        self.update_c += 1
+                    
             else:
                 self.logger.info(
-                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}"
+                f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
                 )
+
 
     def stop_early(self):
         if self.update_c > self.args.stop_early:
             mkdir(
                 os.path.join(
-                    self.args.output_dir,
+                    self.args.root_path, 
+                    "checkpoint",
+                    self.args.git_name,
                     self.args.mode,
                     self.args.name,
                     "save_model",
@@ -251,14 +277,21 @@ class Model(object):
         return result
 
     def reset_log(self):
+        self.epoch += 1
         self.train_loss = AverageMeter()
         self.val_loss = AverageMeter()
         self.pred = list()
         self.gt = list()
+        self.pred_t = list()
+        self.gt_t = list()
 
-    def update_e(self, epoch):
+    def update_e(self, epoch, correct_, all_, micro_precision, correlation):
         self.epoch = epoch
-
+        self.correct_ = correct_
+        self.all_ = all_
+        self.acc_ = micro_precision
+        self.corre_ = correlation
+        
     def train(self):
         self.model.train()
         self.phase = "Train"
@@ -271,7 +304,7 @@ class Model(object):
 
         for self.iter, (img, label, self.img_names, _, meta_v, _) in enumerate(
             self.train_loader
-        ):
+        ): 
             img, label = img.to(device), label.to(device)
 
             pred = self.model(img, meta_v)
@@ -279,6 +312,9 @@ class Model(object):
                 loss = self.class_loss(pred, label)
             else:
                 loss = self.regression(pred, label)
+                
+            if torch.isnan(pred).any() or torch.isnan(loss).any(): 
+                self.optimizer.param_groups[0]["lr"] /= 2
 
             if self.iter == random_num:
                 save_image(self, img)
@@ -293,8 +329,10 @@ class Model(object):
 
     def valid(self):
         self.phase = "Valid"
+        
+        weight = torch.tensor([i / sum(self.grade_num) for i in self.grade_num]).cuda()
         self.criterion = (
-            nn.CrossEntropyLoss() if self.args.mode == "class" else nn.L1Loss()
+            nn.CrossEntropyLoss(weight) if self.args.mode == "class" else nn.L1Loss()
         )
         random_num = random.randrange(0, len(self.valid_loader))
         with torch.no_grad():
@@ -304,7 +342,7 @@ class Model(object):
             ):
                 img, label = img.to(device), label.to(device)
                 pred = self.model(img, meta_v)
-
+                
                 if self.args.mode == "class":
                     self.class_loss(pred, label)
                 else:
@@ -349,7 +387,7 @@ class Model_test(Model):
                     self.get_test_loss(pred, label)
 
     def save_value(self):
-        pred_path = os.path.join(self.args.check_path, "prediction")
+        pred_path = os.path.join(self.args.root_path , "checkpoint", self.args.git_name, self.args.mode, self.args.name, "prediction")
         mkdir(pred_path)
         with open(os.path.join(pred_path, f"pred.txt"), "w") as p:
             with open(os.path.join(pred_path, f"gt.txt"), "w") as g:
