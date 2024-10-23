@@ -96,6 +96,7 @@ def parse_args():
 
 def main(args):
     args.root_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    args.git_name = git_name
     check_path = os.path.join(args.root_path , "checkpoint", git_name, args.mode, args.name)
     log_path = os.path.join(args.root_path , "tensorboard", git_name, args.mode, args.name)
     model_num_class = (
