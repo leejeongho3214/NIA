@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 import numpy as np
 from scipy.stats import pearsonr
-from torch.utils import data
 
 from tqdm import tqdm
 from data_loader import mkdir
@@ -313,6 +312,9 @@ class Model(object):
                 loss = self.class_loss(pred, label)
             else:
                 loss = self.regression(pred, label)
+                
+            if torch.isnan(pred).any() or torch.isnan(loss).any(): 
+                self.optimizer.param_groups[0]["lr"] /= 2
 
             if self.iter == random_num:
                 save_image(self, img)

@@ -125,7 +125,6 @@ def main(args):
     for key, model in model_list.items(): 
         model.fc = nn.Linear(model.fc.in_features, model_num_class[key], bias = True)
         model_list.update({key: model})
-        
 
     args.save_img = os.path.join(check_path, "save_img")
     args.pred_path = os.path.join(check_path, "prediction")
@@ -186,9 +185,11 @@ def main(args):
     for key in model_list:
         if key in pass_list:
             continue
+        
         model = model_list[key].cuda()
 
         trainset, grade_num = dataset.load_dataset("train", key)
+
         trainset_loader = data.DataLoader(
             dataset=trainset,
             batch_size=args.batch_size,
@@ -221,7 +222,7 @@ def main(args):
         for epoch in range(args.load_epoch[key], args.epoch):
             if args.load_epoch[key]:
                 resnet_model.update_e(epoch + 1, *info) 
- 
+                        
             resnet_model.train()
             resnet_model.valid()
 

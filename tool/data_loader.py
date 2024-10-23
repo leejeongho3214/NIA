@@ -50,8 +50,6 @@ class CustomDataset_class(Dataset):
             for grade in sorted(class_dict.keys()):
                 grade_dict = class_dict[grade]
                 random_list = list(grade_dict.keys())
-                
-                # random.shuffle(random_list)
 
                 train_len, val_len = int(len(grade_dict) * 0.8), int(len(grade_dict) * 0.1)
                 train_idx, val_idx, test_idx = (
