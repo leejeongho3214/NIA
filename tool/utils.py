@@ -252,7 +252,7 @@ class CB_loss(nn.Module):
         return cb_loss
 
 def save_checkpoint(self, correct_, all_, micro_precision, correlation):
-    checkpoint_dir = os.path.join(self.args.root_path, self.args.mode, self.args.name, "save_model", str(self.m_dig))
+    checkpoint_dir = os.path.join(self.args.root_path, "checkpoint", self.args.git_name, self.args.mode, self.args.name, "save_model", str(self.m_dig))
     mkdir(checkpoint_dir)
     model_to_save = self.model.module if hasattr(self.model, "module") else self.model
     torch.save(

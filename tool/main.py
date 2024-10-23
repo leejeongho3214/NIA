@@ -23,9 +23,6 @@ import argparse
 fix_seed(523)
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
-
-
-
 def parse_args():
     parser = argparse.ArgumentParser()
 
@@ -192,9 +189,6 @@ def main(args):
 
     for key in model_list:
         if key in pass_list:
-            continue
-        
-        if key != "sagging":
             continue
         
         model = model_list[key].cuda()

@@ -308,20 +308,20 @@ class Model(object):
         )
         random_num = random.randrange(0, len(self.train_loader))
 
-        for self.iter, (img, label, self.img_names, _, meta_v, _) in enumerate(
+        for self.iter, (img, label, self.img_names, _, _, _) in enumerate(
             self.train_loader
         ): 
             img, label = img.to(device), label.to(device)
 
             pred = self.model(img)
             
-            if torch.isnan(pred).any(): 
-                self.optimizer.param_groups["lr"] /= 2
-            
             if self.args.mode == "class":
                 loss = self.class_loss(pred, label)
             else:
                 loss = self.regression(pred, label)
+                
+            if torch.isnan(pred).any() or torch.isnan(loss).any(): 
+                self.optimizer.param_groups[0]["lr"] /= 2
 
             if self.iter == random_num:
                 save_image(self, img)
