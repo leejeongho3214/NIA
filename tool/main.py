@@ -228,10 +228,14 @@ def main(args):
             if args.load_epoch[key]:
                 resnet_model.update_e(epoch + 1, *info) 
                         
-            resnet_model.train()
+            schedule_flag = True
+            while schedule_flag:
+                resnet_model.reset_log(False)
+                schedule_flag = resnet_model.train()
+            
             resnet_model.valid()
 
-            resnet_model.reset_log()
+            resnet_model.reset_log(True)
 
             if resnet_model.stop_early():
                 break

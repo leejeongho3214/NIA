@@ -1,4 +1,5 @@
 from collections import defaultdict
+from copy import deepcopy
 import random
 import torch
 import torch.nn as nn
@@ -178,11 +179,8 @@ class Model(object):
 
                 info_m = f"[Lr: {self.optimizer.param_groups[0]['lr']:4f}][Gamma: {self.args.gamma}][Early Stop: {self.update_c}/{self.args.stop_early}]" if self.phase == "Train" else ""
                 self.logger.info(
-                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}]{info_m} micro Precision: {(micro_precision * 100):.2f}%, micro F1: {micro_f1:.4f}"
+                    f"Epoch: {self.epoch} [{self.phase}][{self.iter}/{dataloader_len}][{self.m_dig}]{info_m} Accuracy: {(micro_precision * 100):.2f}%, loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
                 )          
-                self.logger.info(
-                f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
-                )
                 
                 grade_ = sorted(list(all_.keys()))
                 for grade in grade_:
@@ -281,10 +279,10 @@ class Model(object):
 
         return result
 
-    def reset_log(self):
+    def reset_log(self, flag):
         self.train_loss = AverageMeter()
         self.val_loss = AverageMeter()
-        self.epoch += 1
+        if flag: self.epoch += 1
         self.pred = list()
         self.gt = list()
         self.pred_t = list()
@@ -306,6 +304,7 @@ class Model(object):
             if self.args.mode == "class"
             else nn.L1Loss()
         )
+        self.prev_model = deepcopy(self.model)
         random_num = random.randrange(0, len(self.train_loader))
 
         for self.iter, (img, label, self.img_names, _, _, _) in enumerate(
@@ -320,9 +319,6 @@ class Model(object):
             else:
                 loss = self.regression(pred, label)
                 
-            if torch.isnan(pred).any() or torch.isnan(loss).any(): 
-                self.optimizer.param_groups[0]["lr"] /= 2
-
             if self.iter == random_num:
                 save_image(self, img)
 
@@ -331,8 +327,16 @@ class Model(object):
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
-
+            
+            if torch.isnan(pred).any() or torch.isnan(loss).any():
+                self.optimizer.param_groups[0]["lr"] /= 2
+                self.model = deepcopy(self.prev_model)
+                self.optimizer.param_groups[0]['params'] = self.model.parameters()
+                
+                return True
+            
         self.print_loss(len(self.train_loader), final_flag=True)
+        return False
 
     def valid(self):
         self.phase = "Valid"
