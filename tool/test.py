@@ -6,7 +6,6 @@ import torch
 import gc
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from torchvision import models
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
@@ -41,12 +40,6 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--output_dir",
-        default=f"checkpoint/{git_name}",
-        type=str,
-    )
-
-    parser.add_argument(
         "--epoch",
         default=300,
         type=int,
@@ -76,16 +69,18 @@ def parse_args():
 
 
 def main(args):
-    args.check_path = os.path.join(args.output_dir, args.mode, args.name)
+    args.root_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    args.git_name = git_name
+    check_path = os.path.join(args.root_path , "checkpoint", git_name, args.mode, args.name)
 
     args.model = "coatnet"
     
-    if os.path.isdir(os.path.join(args.check_path, "log", "eval")):
-        shutil.rmtree(os.path.join(args.check_path, "log", "eval"))
+    if os.path.isdir(os.path.join(check_path, "log", "eval")):
+        shutil.rmtree(os.path.join(check_path, "log", "eval"))
         
     logger = setup_logger(
         args.name,
-        os.path.join(args.check_path, "log", "eval"),
+        os.path.join(check_path, "log", "eval"),
         filename=args.name + ".txt",
     )
     logger.info("Command Line: " + " ".join(sys.argv))
@@ -108,15 +103,13 @@ def main(args):
     }
 
 
-    model_path = os.path.join(
-        os.path.join(args.output_dir, args.mode, args.name), "save_model"
-    )
+    model_path = os.path.join(check_path, "save_model")
     if os.path.isdir(model_path):
         for path in os.listdir(model_path):
             dig_path = os.path.join(model_path, path)
             if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
                 print(f"\033[92mResuming......{dig_path}\033[0m")
-                model_list[path] = resume_checkpoint(
+                model_list[path], _ = resume_checkpoint(
                     args,
                     model_list[path],
                     os.path.join(dig_path, "state_dict.bin"),
