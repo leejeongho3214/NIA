@@ -30,25 +30,11 @@ def parse_args():
 
     parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
 
-    parser.add_argument("--stop_early", type=int, default=30)
-
     parser.add_argument(
         "--mode",
         default="class",
         choices=["regression", "class"],
         type=str,
-    )
-
-    parser.add_argument(
-        "--epoch",
-        default=300,
-        type=int,
-    )
-
-    parser.add_argument(
-        "--res",
-        default=256,
-        type=int,
     )
 
     parser.add_argument(
@@ -73,8 +59,6 @@ def main(args):
     args.git_name = git_name
     check_path = os.path.join(args.root_path , "checkpoint", git_name, args.mode, args.name)
 
-    args.model = "coatnet"
-    
     if os.path.isdir(os.path.join(check_path, "log", "eval")):
         shutil.rmtree(os.path.join(check_path, "log", "eval"))
         
@@ -102,7 +86,6 @@ def main(args):
         for key, value in model_num_class.items()
     }
 
-
     model_path = os.path.join(check_path, "save_model")
     if os.path.isdir(model_path):
         for path in os.listdir(model_path):
@@ -116,6 +99,8 @@ def main(args):
                     path,
                     False,
                 )
+    else: 
+        assert 0, "Incorrect checkpoint path"
 
     dataset = (
         CustomDataset_class(args, logger, "test")

@@ -385,11 +385,7 @@ class Model_test(Model):
             ):
                 img, label = img.to(device), label.to(device)
 
-                pred = (
-                    self.model.to(device)(img, meta_v)
-                    if self.args.model != "coatnet"
-                    else self.model.to(device)(img)
-                )
+                pred = self.model.to(device)(img)
 
                 if self.args.mode == "class":
                     self.get_test_acc(pred, label)
