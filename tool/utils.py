@@ -34,7 +34,13 @@ def resume_checkpoint(args, model, path, dig, test = True):
     state_dict = torch.load(path, map_location=device)
     if state_dict["best_loss"][dig] != np.inf and test:
         args.best_loss[dig] = state_dict["best_loss"][dig]
-    if test: args.load_epoch[dig] = state_dict["epoch"]
+        
+    if test: 
+        args.load_epoch[dig] = state_dict["epoch"]
+        info = state_dict["info"] 
+    else:
+        info = None
+        
     if 'batch_size' in state_dict:
         args.batch_size = state_dict["batch_size"]
         if args.batch_size != state_dict['batch_size']:

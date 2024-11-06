@@ -82,8 +82,8 @@ def main(args):
     )
 
     model_list = {
-        key: models.coatnet.coatnet_4(num_classes=value)
-        for key, value in model_num_class.items()
+        key: models.resnet50(weights=models.ResNet50_Weights.DEFAULT, args=args)
+        for key, _ in model_num_class.items()
     }
 
     model_path = os.path.join(check_path, "save_model")

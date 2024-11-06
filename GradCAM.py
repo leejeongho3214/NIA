@@ -1,18 +1,9 @@
 # %%
 import argparse
-import gc
 from pytorch_grad_cam import (
     GradCAM,
-    HiResCAM,
-    ScoreCAM,
-    GradCAMPlusPlus,
-    AblationCAM,
-    XGradCAM,
-    EigenCAM,
-    FullGrad,
 )
-import GPUtil
-from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+import torch.nn as nn
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from tool.utils import fix_seed, mkdir
 from torchvision import models
@@ -20,14 +11,7 @@ import os
 import torch
 import cv2
 import numpy as np
-from torchvision import transforms
-from PIL import Image
-from matplotlib import pyplot as plt
-from torch.utils.data import random_split, ConcatDataset, Dataset
-import natsort
-from collections import defaultdict
 from tqdm import tqdm
-import json
 from torch.utils import data
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
@@ -160,12 +144,8 @@ def resume_checkpoint(model, path):
 
     return model
 
-# %%
 model_num_class = (
-        {
-            "dryness": 5, "pigmentation": 6, "pore": 6,
-         "sagging": 7, "wrinkle": 7
-         }
+        {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
         if args.mode == "class"
         else {
             "pigmentation": 1,
@@ -177,13 +157,19 @@ model_num_class = (
     )
 
 model_list = {
-        key: models.coatnet.coatnet_4(num_classes=value)
-        for key, value in model_num_class.items()
-    }
+    key: models.resnet50(args = None)
+    for key, _ in model_num_class.items()
+}
 
-
-git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
-
+for key, model in model_list.items(): 
+    model.fc = nn.Linear(model.fc.in_features, model_num_class[key], bias = True)
+    model_list.update({key: model})
+    
+    
+if len(os.popen("git branch --show-current").readlines()):
+    git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
+else:
+    git_name = os.popen("git describe --tags").readlines()[0].rstrip()
 
 ## Adjust the number of output in model for each region image
 check_path = os.path.join("checkpoint", git_name, args.mode, args.name, "save_model")
@@ -197,6 +183,7 @@ if os.path.isdir(check_path):
         print(f"success => {key}")
 
 
+# %%
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
 
 dataset = (
@@ -232,13 +219,13 @@ from torchvision.utils import make_grid
 for key in model_list:
     model = model_list[key].cuda()
     model.eval()
-    cam = GradCAM(model=model, target_layers=[model.s4[0].proj])
+    cam = GradCAM(model=model, target_layers=[model.layer4[-1]])
 
     for w_key in model_area_dict[key]:
         testset_loader, _ = dataset.load_dataset("test", w_key)
         loader_datalist = data.DataLoader(
             dataset=testset_loader,
-            batch_size=8,
+            batch_size=32,
             num_workers=8,
             shuffle=False,
         )

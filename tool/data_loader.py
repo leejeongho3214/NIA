@@ -12,7 +12,8 @@ import cv2
 import json
 from collections import defaultdict
 from tqdm import tqdm
-from torch.utils.data import ConcatDataset, Dataset
+from torch.utils.data import Dataset
+from sklearn.model_selection import KFold, train_test_split
 
 
 def mkdir(path):
@@ -240,7 +241,7 @@ class CustomDataset_class(Dataset):
                     in ["03", "05"]
                 )
                 or (
-                    j_name.split("_")[2] == "R"
+                    j_name.split("_")[2] in ["R15", "R30"]
                     and j_name.split("_")[3].split(".")[0]
                     in ["04", "06"]
                 )

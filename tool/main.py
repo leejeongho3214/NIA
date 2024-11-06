@@ -14,7 +14,7 @@ import torch.nn as nn
 import numpy as np
 from torchvision import models
 from tensorboardX import SummaryWriter
-from utils import FocalLoss, mkdir, resume_checkpoint, fix_seed, CB_loss
+from utils import mkdir, resume_checkpoint, fix_seed
 from logger import setup_logger
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
 from model import Model
@@ -70,13 +70,13 @@ def parse_args():
 
     parser.add_argument(
         "--lr",
-        default=0.0001,
+        default=0.005,
         type=float,
     )
 
     parser.add_argument(
         "--batch_size",
-        default=8,
+        default=32,
         type=int,
     )
     

@@ -5,6 +5,7 @@
 *.xlsx
 *.ipynb
 *.pyc
+*.out
 
 
 img/
@@ -33,3 +34,4 @@ cam.py
 
 
 NIA.tar
+IEC_korea_data
