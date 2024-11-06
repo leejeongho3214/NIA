@@ -410,49 +410,43 @@ class Model_test(Model):
             if gt == pred:
                 correct_[gt] += 1
         
+        correlation, p_value = pearsonr(gt_v, pred_v)
+        
         if self.args.mode == "regression":
             n_gt_v = [value[0]/value[-1] for value in self.gt[self.m_dig]]
             n_pred_v = [value[0]/value[-1] for value in self.pred[self.m_dig]]
-        
-        
-        if self.args.mode == "class":
-            for gt_value, pred_value in [(gt_v, pred_v)]:
-                (
-                    micro_precision,
-                    _,
-                    _,
-                    _,
-                ) = precision_recall_fscore_support(
-                    gt_value,
-                    pred_value,
-                    average="micro",
-                    zero_division=0
-                )
-
-                correlation, p_value = pearsonr(gt_value, pred_value)
-
-                top_3 = [
-                    False if abs(g - p) > 1 else True for g, p in zip(gt_value, pred_value)
-                ]
-                top_3_acc = sum(top_3) / len(top_3)
-
-                self.logger.info(
-                    f"[{self.m_dig}]Acc: {micro_precision:.4f} Correlation: {correlation:.2f}, P-value: {p_value:.4f}, Top-3 Acc: {top_3_acc:.4f}\n"
-                )
-                
-                for grade in all_:
-                    self.logger.info(
-                        f"          {grade} grade Acc: {correct_[grade]} / {all_[grade]} -> {(correct_[grade]/all_[grade] * 100):.2f} %\n"
-                    )
-
-        else:
-            correlation, p_value = pearsonr(gt_v, pred_v)
+            
             mae = mean_absolute_error(gt_v, pred_v)
             mape = mape_loss()(np.array(pred_v), np.array(gt_v))
             nmae = mean_absolute_error(n_gt_v, n_pred_v)
             self.logger.info(
                 f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae:.4f}, MAPE: {mape:.3f}, NMAE: {nmae:.3f}\n"
             )
+        
+        else:
+            precision, recall, f_score, _ = precision_recall_fscore_support(gt_v, pred_v, average="micro")
+            mae_ = [abs(p-g) for p, g in zip(pred_v, gt_v)]
+            mae_ = sum(mae_) / len(mae_)
+            
+            mae_0 = [True if abs(p-g) ==0 else False for p, g in zip(pred_v, gt_v)]
+            mae_0 = sum(mae_0) / len(mae_0)
+            
+            mae_1 = [True if abs(p-g) <= 1 else False for p, g in zip(pred_v, gt_v)]
+            mae_1 = sum(mae_1) / len(mae_1)
+            
+            mae_2 = [True if abs(p-g) <= 2 else False for p, g in zip(pred_v, gt_v)]
+            mae_2 = sum(mae_2) / len(mae_2)
+
+            self.logger.info(
+                f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae_:.2f}, MAE(==0): {mae_0 * 100:.2f}%,  MAE(=<1): {mae_1 * 100:.2f}%, MAE(=<2): {mae_2 * 100:.2f}%, Precision: {precision:.2f}, Recall: {recall:.2f}, F-Score: {f_score:.2f}\n"
+            )
+
+            
+            for grade in all_:
+                self.logger.info(
+                    f"          {grade} grade Acc: {correct_[grade]} / {all_[grade]} -> {(correct_[grade]/all_[grade] * 100):.2f} %\n"
+                )
+
 
 
     def get_test_loss(self, pred, gt):
