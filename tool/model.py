@@ -370,7 +370,7 @@ class Model_test(Model):
         self.m_dig = key
         with torch.no_grad():
             self.model.eval()
-            for self.iter, (img, label, self.img_names, self.digs, meta_v, _) in enumerate(
+            for self.iter, (img, label, self.img_names, self.digs, meta_v, ori_img) in enumerate(
                 tqdm(self.testset_loader, desc=self.m_dig)
             ):
                 img, label = img.to(device), label.to(device)
@@ -382,7 +382,7 @@ class Model_test(Model):
                 )
 
                 if self.args.mode == "class":
-                    self.get_test_acc(pred, label)
+                    self.get_test_acc(pred, label, ori_img)
                 else:
                     self.get_test_loss(pred, label)
 
@@ -482,9 +482,9 @@ class Model_test(Model):
                 [round(gt_item.item() * value, 3), self.img_names[idx], value]
             )
 
-    def get_test_acc(self, pred, gt):
+    def get_test_acc(self, pred, gt, ori_img):
         for idx, (pred_item, gt_item) in enumerate(zip(pred, gt)):
             self.pred[self.m_dig].append(
-                [pred_item.argmax().item(), self.img_names[idx]]
+                [pred_item.argmax().item(), self.img_names[idx], ori_img]
             )
-            self.gt[self.m_dig].append([gt_item.item(), self.img_names[idx]])
+            self.gt[self.m_dig].append([gt_item.item(), self.img_names[idx], ori_img])
