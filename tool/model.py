@@ -388,13 +388,13 @@ class Model_test(Model):
                     self.get_test_loss(pred, label)
                     
                 # for i in range(img.size(0)):  # Loop over the batch
-                #     plt.figure()
-                #     plt.imshow(ori_img[i][:, :, (2, 1, 0)].cpu().numpy())  
-                #     plt.title(f"[{self.img_names[i]}][{self.digs[i]}] \n Prediction: {pred[i].argmax().item()}, Ground Truth: {label[i].item()}")
-                #     plt.axis("off")
-                #     plt.savefig(f"{self.digs[i]}_{i}.jpg")
+                plt.figure()
+                plt.imshow(ori_img[:, :, (2, 1, 0)])  
+                plt.title(f"[{self.img_names}][{self.digs}] \n Prediction: {pred.argmax().item()}, Ground Truth: {label.item()}")
+                plt.axis("off")
+                plt.savefig(f"{self.digs}.jpg")
 
-                # break
+                break
                     
                 
 
@@ -409,6 +409,13 @@ class Model_test(Model):
                         g.write(f"{key}, {g_v[0]}, {g_v[1]} \n")
         g.close()
         p.close()
+        
+        # for i in range(img.size(0)):  # Loop over the batch
+            # plt.figure()
+            # plt.imshow(ori_img[i][:, :, (2, 1, 0)].cpu().numpy())  
+            # plt.title(f"[{self.img_names[i]}][{self.digs[i]}] \n Prediction: {pred[i].argmax().item()}, Ground Truth: {label[i].item()}")
+            # plt.axis("off")
+            # plt.savefig(f"{self.digs[i]}_{i}.jpg")
 
     def print_test(self):
         gt_v = [value[0] for value in self.gt[self.m_dig]]
@@ -494,3 +501,24 @@ class Model_test(Model):
                 [pred_item.argmax().item(), self.img_names[idx]]
             )
             self.gt[self.m_dig].append([gt_item.item(), self.img_names[idx]])
+            
+            
+            
+            
+            
+            
+            
+            
+            
+    # print("Imgae Name: 0001_01_F_01  Category: Pigmentation => Pred: 2 Gt: 1")
+    # print("                          Category: Wrinkle => Pred: 2 Gt: 3")
+    # print("Imgae Name: 0001_01_F_02  Category: Wrinkle => Pred: 3 Gt: 3")
+    # print("Imgae Name: 0001_01_F_03  Category: Wrinkle => Pred: 2 Gt: 2")
+    # print("Imgae Name: 0001_01_F_04  Category: Wrinkle => Pred: 2 Gt: 1")
+    # print("Imgae Name: 0001_01_F_05  Category: Pore => Pred: 2 Gt: 3")
+    # print("                          Category: Pigmentation => Pred: 2 Gt: 2")
+    # print("Imgae Name: 0001_01_F_06  Category: Pore => Pred: 4 Gt: 3")
+    # print("                          Category: Pigmentation => Pred: 3 Gt: 23")
+    # print("Imgae Name: 0001_01_F_07  Category: Dryness => Pred: 3 Gt: 2")
+    # print("Imgae Name: 0001_01_F_08  Category: Sagging => Pred: 2 Gt: 2")
+    
