@@ -5,20 +5,6 @@ import os
 import torch
 import gc
 
-
-            
-print("Imgae Name: 0001_01_F_01  Category: Pigmentation => Pred: 2 Gt: 1")
-print("                          Category: Wrinkle => Pred: 2 Gt: 3")
-print("Imgae Name: 0001_01_F_02  Category: Wrinkle => Pred: 3 Gt: 3")
-print("Imgae Name: 0001_01_F_03  Category: Wrinkle => Pred: 2 Gt: 2")
-print("Imgae Name: 0001_01_F_04  Category: Wrinkle => Pred: 2 Gt: 1")
-print("Imgae Name: 0001_01_F_05  Category: Pore => Pred: 2 Gt: 3")
-print("                          Category: Pigmentation => Pred: 2 Gt: 2")
-print("Imgae Name: 0001_01_F_06  Category: Pore => Pred: 4 Gt: 3")
-print("                          Category: Pigmentation => Pred: 3 Gt: 3")
-print("Imgae Name: 0001_01_F_07  Category: Dryness => Pred: 3 Gt: 2")
-print("Imgae Name: 0001_01_F_08  Category: Sagging => Pred: 2 Gt: 2")
-    
     
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
