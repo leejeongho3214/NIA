@@ -219,11 +219,12 @@ class Model(object):
             return True
 
     def class_loss(self, pred, gt):
-        loss = self.criterion(pred, gt)
+        # loss = self.criterion(pred, gt)
 
         with torch.no_grad():
             pred_v = [item.argmax().item() for item in pred]
             gt_v = [item.item() for item in gt]
+            loss = self.criterion(pred_v, gt_v)
 
             if self.phase == "Train":
                 self.pred_t.append(pred_v)
@@ -331,9 +332,11 @@ class Model(object):
     def valid(self):
         self.phase = "Valid"
         
-        weight = torch.tensor([i / sum(self.grade_num) for i in self.grade_num]).cuda()
+        # weight = torch.tensor([i / sum(self.grade_num) for i in self.grade_num]).cuda()
         self.criterion = (
-            nn.CrossEntropyLoss(weight) if self.args.mode == "class" else nn.L1Loss()
+            # nn.CrossEntropyLoss(weight) 
+            nn.L1Loss()
+            if self.args.mode == "class" else nn.L1Loss()
         )
         random_num = random.randrange(0, len(self.valid_loader))
         with torch.no_grad():
