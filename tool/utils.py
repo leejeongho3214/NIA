@@ -29,18 +29,25 @@ def softmax(x):
 
 def resume_checkpoint(args, model, path, dig, test = True):
     state_dict = torch.load(path, map_location=device)
-    if not args.transfer:
-        if state_dict["best_loss"][dig] != np.inf and test:
-            args.best_loss[dig] = state_dict["best_loss"][dig]
-        if test: args.load_epoch[dig] = state_dict["epoch"]
-        if 'batch_size' in state_dict:
-            args.batch_size = state_dict["batch_size"]
-            if args.batch_size != state_dict['batch_size']:
-                print(f"batch_size update 128 ->> {args.batch_size}")
+    if state_dict["best_loss"][dig] != np.inf and test:
+        args.best_loss[dig] = state_dict["best_loss"][dig]
+        
+    if test: 
+        args.load_epoch[dig] = state_dict["epoch"]
+        info = state_dict["info"] 
+    else:
+        info = None
+        
+    if 'batch_size' in state_dict:
+        args.batch_size = state_dict["batch_size"]
+        if args.batch_size != state_dict['batch_size']:
+            print(f"batch_size update {state_dict['batch_size']} ->> {args.batch_size}")
     model.load_state_dict(state_dict["model_state"], strict=False)
+    
+    
     del state_dict
 
-    return model
+    return model, info
 
 class LabelSmoothingCrossEntropy(nn.Module):
     def __init__(self, smoothing):
@@ -142,8 +149,7 @@ class FocalLoss(nn.Module):
         
 
     def forward(self, inputs, targets):
-        # ce_loss = F.cross_entropy(inputs, targets, reduction='none')
-        ce_loss = F.cross_entropy(inputs, targets.long(), reduction='none')
+        ce_loss = F.cross_entropy(inputs, targets, reduction='none')
         pt = torch.exp(-ce_loss)
         focal_loss = self.alpha * (1 - pt) ** self.gamma * ce_loss
 
@@ -229,7 +235,7 @@ class CB_loss(nn.Module):
         weights = (1.0 - self.beta) / np.array(effective_num)
         weights = weights / np.sum(weights) * self.no_of_classes
 
-        labels_one_hot = F.one_hot(labels.to(torch.int64), self.no_of_classes).float()
+        labels_one_hot = F.one_hot(labels, self.no_of_classes).float()
 
         weights = torch.tensor(weights).float().cuda()
         weights = weights.unsqueeze(0)
@@ -246,7 +252,36 @@ class CB_loss(nn.Module):
         # cb_loss = F.binary_cross_entropy(input = pred, target = labels_one_hot, weight = weights)
         
         return cb_loss
+
+def save_checkpoint(self, correct_, all_, micro_precision, correlation):
+    checkpoint_dir = os.path.join(self.args.root_path, "checkpoint", self.args.git_name, self.args.mode, self.args.name, "save_model", str(self.m_dig))
+    mkdir(checkpoint_dir)
+    model_to_save = self.model.module if hasattr(self.model, "module") else self.model
+    torch.save(
+        {
+            "model_state": model_to_save.state_dict(),
+            "epoch": self.epoch,
+            "best_loss": self.best_loss,
+            "batch_size": self.args.batch_size,
+            "info": [correct_, all_, micro_precision, correlation],
+        },
+        os.path.join(checkpoint_dir, "temp_file.bin"),
+    )
+
+    os.rename(
+        os.path.join(checkpoint_dir, "temp_file.bin"),
+        os.path.join(checkpoint_dir, "state_dict.bin"),
+    )
     
+    self.update_c = 0
+    self.best_epoch = self.epoch
+    self.correct_ = correct_
+    self.all_ = all_
+    self.acc_ = micro_precision
+    self.corre_ = correlation
+    
+    return checkpoint_dir
+
 class mape_loss(nn.Module):
     def __init__(self):
         super(mape_loss, self).__init__()
@@ -257,30 +292,6 @@ class mape_loss(nn.Module):
         
         return error.mean()
         
-        
-    
-
-def save_checkpoint(self):
-    checkpoint_dir = os.path.join(self.args.output_dir, self.args.mode, self.args.name, "save_model", str(self.m_dig))
-    mkdir(checkpoint_dir)
-    model_to_save = self.model.module if hasattr(self.model, "module") else self.model
-    torch.save(
-        {
-            "model_state": model_to_save.state_dict(),
-            "epoch": self.epoch,
-            "best_loss": self.best_loss,
-            "batch_size": self.args.batch_size
-        },
-        os.path.join(checkpoint_dir, "temp_file.bin"),
-    )
-
-    os.rename(
-        os.path.join(checkpoint_dir, "temp_file.bin"),
-        os.path.join(checkpoint_dir, "state_dict.bin"),
-    )
-    
-    return checkpoint_dir
-
 
 def mkdir(path):
     # if it is the current folder, skip.
@@ -312,7 +323,7 @@ def save_image(self, img):
         min_v = -min_v
     s_img = (c_img - min_v) * (255.0 / (max_v - min_v))
 
-    path = os.path.join(self.args.save_img, self.m_dig)
+    path = os.path.join(self.args.save_img, self.m_dig, self.phase)
     mkdir(path)
     img_mat = cv2.UMat(s_img)
     j = self.args.batch_size // 4
@@ -322,11 +333,7 @@ def save_image(self, img):
     cv2.imwrite(os.path.join(path, f"epoch_{self.epoch}_iter_{self.iter}_{self.m_dig}.jpg"), img_mat.get()[:, :, (2, 1, 0)])
 
 def fix_seed(random_seed):
-    
-    torch.use_deterministic_algorithms(True)
-    os.environ['PYTHONHASHSEED'] = str(random_seed)
-    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':16:8'
-    
+
     torch.manual_seed(random_seed)
     torch.cuda.manual_seed(random_seed)
     torch.cuda.manual_seed_all(random_seed)  # if use multi-GPU
