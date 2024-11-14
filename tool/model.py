@@ -218,12 +218,11 @@ class Model(object):
             return True
 
     def class_loss(self, pred, gt):
-        if self.phase == "Train": loss = self.criterion(pred, gt)
+        loss = self.criterion(pred, gt)
 
         with torch.no_grad():
             pred_v = [item.argmax().item() for item in pred]
             gt_v = [item.item() for item in gt]
-            if self.phase == "Valid": loss = self.criterion(torch.tensor(pred_v, dtype=torch.float32), torch.tensor(gt_v, dtype=torch.float32))
             
             if self.phase == "Train":
                 self.pred_t.append(pred_v)
@@ -314,9 +313,6 @@ class Model(object):
             else:
                 loss = self.regression(pred, label)
                 
-            if torch.isnan(pred).any() or torch.isnan(loss).any(): 
-                self.optimizer.param_groups[0]["lr"] /= 2
-
             if self.iter == random_num:
                 save_image(self, img)
 
