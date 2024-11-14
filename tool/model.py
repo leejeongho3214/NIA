@@ -1,4 +1,5 @@
 from collections import defaultdict
+from copy import deepcopy
 import random
 from matplotlib import pyplot as plt
 import torch
@@ -18,6 +19,7 @@ from utils import (
     CB_loss
 )
 import os
+import torch.autograd as autograd
 
 from sklearn.metrics import precision_recall_fscore_support, mean_absolute_error
 
@@ -224,7 +226,6 @@ class Model(object):
         with torch.no_grad():
             pred_v = [item.argmax().item() for item in pred]
             gt_v = [item.item() for item in gt]
-            if self.phase == "Valid": loss = self.criterion(torch.tensor(pred_v, dtype=torch.float32), torch.tensor(gt_v, dtype=torch.float32))
             
             if self.phase == "Train":
                 self.pred_t.append(pred_v)
@@ -278,10 +279,11 @@ class Model(object):
 
         return result
 
-    def reset_log(self):
+    def reset_log(self, flag):
         self.epoch += 1
         self.train_loss = AverageMeter()
         self.val_loss = AverageMeter()
+        if flag: self.epoch += 1
         self.pred = list()
         self.gt = list()
         self.pred_t = list()
@@ -302,19 +304,21 @@ class Model(object):
             if self.args.mode == "class"
             else nn.L1Loss()
         )
+        self.prev_model = deepcopy(self.model)
         random_num = random.randrange(0, len(self.train_loader))
 
-        for self.iter, (img, label, self.img_names, _, meta_v, _) in enumerate(
+        for self.iter, (img, label, self.img_names, _, _, _) in enumerate(
             self.train_loader
         ): 
             img, label = img.to(device), label.to(device)
 
-            pred = self.model(img, meta_v)
+            pred = self.model(img)
+            
             if self.args.mode == "class":
                 loss = self.class_loss(pred, label)
             else:
                 loss = self.regression(pred, label)
-
+                
             if self.iter == random_num:
                 save_image(self, img)
 
@@ -323,16 +327,21 @@ class Model(object):
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
-
+            
+            if torch.isnan(pred).any() or torch.isnan(loss).any():
+                self.optimizer.param_groups[0]["lr"] /= 2
+                self.model = deepcopy(self.prev_model)
+                self.optimizer.param_groups[0]['params'] = self.model.parameters()
+                
+                return True
+            
         self.print_loss(len(self.train_loader), final_flag=True)
+        return False
 
     def valid(self):
         self.phase = "Valid"
-        
-        # weight = torch.tensor([i / sum(self.grade_num) for i in self.grade_num]).cuda()
         self.criterion = (
-            # nn.CrossEntropyLoss() if self.args.mode == "class" else nn.L1Loss()
-            nn.L1Loss()
+            nn.CrossEntropyLoss() if self.args.mode == "class" else nn.L1Loss()
         )
         random_num = random.randrange(0, len(self.valid_loader))
         with torch.no_grad():
@@ -341,7 +350,7 @@ class Model(object):
                 self.valid_loader
             ):
                 img, label = img.to(device), label.to(device)
-                pred = self.model(img, meta_v)
+                pred = self.model(img)
                 
                 if self.args.mode == "class":
                     self.class_loss(pred, label)
@@ -370,16 +379,12 @@ class Model_test(Model):
         self.m_dig = key
         with torch.no_grad():
             self.model.eval()
-            for self.iter, (img, label, self.img_names, self.digs, meta_v, ori_img) in enumerate(
+            for self.iter, (img, label, self.img_names, self.digs, _, _) in enumerate(
                 tqdm(self.testset_loader, desc=self.m_dig)
             ):
                 img, label = img.to(device), label.to(device)
 
-                pred = (
-                    self.model.to(device)(img, meta_v)
-                    if self.args.model != "coatnet"
-                    else self.model.to(device)(img)
-                )
+                pred = self.model.to(device)(img)
 
                 if self.args.mode == "class":
                     self.get_test_acc(pred, label)
@@ -401,6 +406,7 @@ class Model_test(Model):
     def print_test(self):
         gt_v = [value[0] for value in self.gt[self.m_dig]]
         pred_v = [value[0] for value in self.pred[self.m_dig]]
+        
         
         correct_ = defaultdict(int)
         all_ = defaultdict(int)
@@ -446,6 +452,7 @@ class Model_test(Model):
                 self.logger.info(
                     f"          {grade} grade Acc: {correct_[grade]} / {all_[grade]} -> {(correct_[grade]/all_[grade] * 100):.2f} %\n"
                 )
+
 
 
 

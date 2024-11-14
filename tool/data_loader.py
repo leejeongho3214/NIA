@@ -19,7 +19,7 @@ from sklearn.model_selection import KFold, train_test_split
 def mkdir(path):
     if path == "":
         return
-    try:
+    try:    
         os.makedirs(path)
     except OSError as e:
         if e.errno != errno.EEXIST:
@@ -69,7 +69,7 @@ class CustomDataset_class(Dataset):
                         for idx in idx_list:
                             tt_list = list()
                             for each_value in grade_dict[idx]:
-                                if each_value[0].split("_")[-2] in ["F", "L30", "R30"]:
+                                if each_value[0].split("_")[-2] in ["F"]:
                                     tt_list.append(each_value)
                             in_list.append(tt_list)
                     out_list[dig][grade] = in_list
@@ -123,6 +123,7 @@ class CustomDataset_class(Dataset):
                     with open(os.path.join(folder_path, j_name), "r") as f:
                         json_meta = json.load(f)
                         
+                        # Check if img_name matches the name in the JSON file
                         if (j_name.split('.')[0][:-3] != json_meta['info']['filename'].split('.')[0]) or \
                                 (str(json_meta['images']['facepart']).zfill(2) != j_name.split('_')[-1].split('.')[0]):
                                 assert 0
@@ -237,20 +238,14 @@ class CustomDataset_class(Dataset):
                 (
                     j_name.split("_")[2] == "L"
                     and j_name.split("_")[3].split(".")[0]
-                    in ["08"]
+                    in ["03", "05"]
                 )
                 or (
                     j_name.split("_")[2] in ["R15", "R30"]
                     and j_name.split("_")[3].split(".")[0]
                     in ["04", "06"]
                 )
-                or (
-                    j_name.split("_")[2] in ["L15", "L30"]
-                    and j_name.split("_")[3].split(".")[0]
-                    in ["03", "05"]
-                )
             )
-            
     def load_dataset(self, mode, dig):
         data_list = (
             self.train_list
@@ -262,7 +257,7 @@ class CustomDataset_class(Dataset):
 
         transform = transforms.Compose(
             [
-                transforms.Resize((self.args.res, self.args.res), antialias=True),
+                transforms.Resize((256, 256), antialias=True),
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ]

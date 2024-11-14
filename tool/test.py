@@ -31,8 +31,6 @@ def parse_args():
 
     parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
 
-    parser.add_argument("--stop_early", type=int, default=30)
-
     parser.add_argument(
         "--mode",
         default="class",
@@ -41,20 +39,8 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--epoch",
-        default=300,
-        type=int,
-    )
-
-    parser.add_argument(
-        "--res",
-        default=256,
-        type=int,
-    )
-
-    parser.add_argument(
         "--batch_size",
-        default=32,
+        default=8,
         type=int,
     )
 
@@ -76,8 +62,7 @@ def main(args):
 
     if os.path.isdir(os.path.join(check_path, "log", "eval")):
         shutil.rmtree(os.path.join(check_path, "log", "eval"))
-    
-    args.model = "cnn"
+        
     logger = setup_logger(
         args.name,
         os.path.join(check_path, "log", "eval"),
@@ -96,7 +81,7 @@ def main(args):
             "pore": 1,
         }
     )
-
+    
     model_list = {
         key: models.resnet50(weights=models.ResNet50_Weights.DEFAULT, args=args)
         for key, _ in model_num_class.items()
@@ -119,6 +104,8 @@ def main(args):
                     path,
                     False,
                 )
+    else: 
+        assert 0, "Incorrect checkpoint path"
 
     dataset = (
         CustomDataset_class(args, logger, "test")
