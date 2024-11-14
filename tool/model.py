@@ -221,7 +221,7 @@ class Model(object):
             return True
 
     def class_loss(self, pred, gt):
-        if self.phase == "Train": loss = self.criterion(pred, gt)
+        loss = self.criterion(pred, gt)
 
         with torch.no_grad():
             pred_v = [item.argmax().item() for item in pred]
