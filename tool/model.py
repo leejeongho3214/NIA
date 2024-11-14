@@ -278,7 +278,7 @@ class Model(object):
 
         return result
 
-    def reset_log(self):
+    def reset_log(self, flag):
         self.epoch += 1
         self.train_loss = AverageMeter()
         self.val_loss = AverageMeter()
@@ -339,11 +339,8 @@ class Model(object):
 
     def valid(self):
         self.phase = "Valid"
-        
-        # weight = torch.tensor([i / sum(self.grade_num) for i in self.grade_num]).cuda()
         self.criterion = (
-            # nn.CrossEntropyLoss() if self.args.mode == "class" else nn.L1Loss()
-            nn.L1Loss()
+            nn.CrossEntropyLoss() if self.args.mode == "class" else nn.L1Loss()
         )
         random_num = random.randrange(0, len(self.valid_loader))
         with torch.no_grad():
@@ -352,7 +349,7 @@ class Model(object):
                 self.valid_loader
             ):
                 img, label = img.to(device), label.to(device)
-                pred = self.model(img, meta_v)
+                pred = self.model(img)
                 
                 if self.args.mode == "class":
                     self.class_loss(pred, label)
