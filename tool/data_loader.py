@@ -19,7 +19,7 @@ from sklearn.model_selection import KFold, train_test_split
 def mkdir(path):
     if path == "":
         return
-    try:
+    try:    
         os.makedirs(path)
     except OSError as e:
         if e.errno != errno.EEXIST:
@@ -123,6 +123,7 @@ class CustomDataset_class(Dataset):
                     with open(os.path.join(folder_path, j_name), "r") as f:
                         json_meta = json.load(f)
                         
+                        # Check if img_name matches the name in the JSON file
                         if (j_name.split('.')[0][:-3] != json_meta['info']['filename'].split('.')[0]) or \
                                 (str(json_meta['images']['facepart']).zfill(2) != j_name.split('_')[-1].split('.')[0]):
                                 assert 0
@@ -243,7 +244,7 @@ class CustomDataset_class(Dataset):
                     in ["03", "05"]
                 )
                 or (
-                    j_name.split("_")[2] == "R"
+                    j_name.split("_")[2] in ["R15", "R30"]
                     and j_name.split("_")[3].split(".")[0]
                     in ["04", "06"]
                 )
@@ -259,7 +260,7 @@ class CustomDataset_class(Dataset):
 
         transform = transforms.Compose(
             [
-                transforms.Resize((self.args.res, self.args.res), antialias=True),
+                transforms.Resize((256, 256), antialias=True),
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ]
@@ -316,7 +317,6 @@ class CustomDataset_class(Dataset):
 
         else:
             assert 0, "dig_v is not here"
-
 
 class CustomDataset_regress(CustomDataset_class):
     def __init__(self, args, logger):

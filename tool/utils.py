@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from torchvision.utils import make_grid
 from torchvision import transforms
 
+
 if torch.cuda.is_available():
     device = torch.device("cuda")
 else:
@@ -28,6 +29,8 @@ def softmax(x):
 
 
 def resume_checkpoint(args, model, path, dig, test = True):
+
+    
     state_dict = torch.load(path, map_location=device)
     if state_dict["best_loss"][dig] != np.inf and test:
         args.best_loss[dig] = state_dict["best_loss"][dig]
@@ -44,7 +47,7 @@ def resume_checkpoint(args, model, path, dig, test = True):
             print(f"batch_size update {state_dict['batch_size']} ->> {args.batch_size}")
     model.load_state_dict(state_dict["model_state"], strict=False)
     
-    
+    info = state_dict["info"]
     del state_dict
 
     return model, info
@@ -161,7 +164,7 @@ class FocalLoss(nn.Module):
             return focal_loss
 
 
-
+import torch.nn.functional as F
 class CB_loss(nn.Module):
     def __init__(self, samples_per_cls, no_of_classes,  beta = 0.999, gamma = 2):
         super(CB_loss, self).__init__()
@@ -208,6 +211,7 @@ class CB_loss(nn.Module):
         focal_loss = torch.sum(weighted_loss)
 
         focal_loss /= torch.sum(labels)
+        
         return focal_loss
         
 

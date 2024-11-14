@@ -14,7 +14,7 @@ import torch.nn as nn
 import numpy as np
 from torchvision import models
 from tensorboardX import SummaryWriter
-from utils import FocalLoss, mkdir, resume_checkpoint, fix_seed, CB_loss
+from utils import mkdir, resume_checkpoint, fix_seed
 from logger import setup_logger
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
 from model import Model
@@ -223,10 +223,14 @@ def main(args):
             if args.load_epoch[key]:
                 resnet_model.update_e(epoch + 1, *info) 
                         
-            resnet_model.train()
+            schedule_flag = True
+            while schedule_flag:
+                resnet_model.reset_log(False)
+                schedule_flag = resnet_model.train()
+            
             resnet_model.valid()
 
-            resnet_model.reset_log()
+            resnet_model.reset_log(True)
 
             if resnet_model.stop_early():
                 break
