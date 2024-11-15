@@ -280,7 +280,6 @@ class Model(object):
         return result
 
     def reset_log(self, flag):
-        self.epoch += 1
         self.train_loss = AverageMeter()
         self.val_loss = AverageMeter()
         if flag: self.epoch += 1
