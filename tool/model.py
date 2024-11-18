@@ -1,5 +1,6 @@
 from collections import defaultdict
 from copy import deepcopy
+from datetime import datetime
 import random
 from matplotlib import pyplot as plt
 import torch
@@ -180,12 +181,9 @@ class Model(object):
 
                 info_m = f"[Lr: {self.optimizer.param_groups[0]['lr']:4f}][Gamma: {self.args.gamma}][Early Stop: {self.update_c}/{self.args.stop_early}]" if self.phase == "Train" else ""
                 self.logger.info(
-                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}]{info_m} micro Precision: {(micro_precision * 100):.2f}%, micro F1: {micro_f1:.4f}"
+                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}]{info_m}[{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}, Correlation: {correlation:.2f} micro Precision: {(micro_precision * 100):.2f}%"
                 )          
-                self.logger.info(
-                f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
-                )
-                
+
                 grade_ = sorted(list(all_.keys()))
                 for grade in grade_:
                     print(f"        [Grade {grade}]  {correct_[grade]} / {all_[grade]} => {(correct_[grade] / all_[grade] * 100):.2f}%"  , end = "")
@@ -429,7 +427,6 @@ class Model_test(Model):
             )
         
         else:
-            precision, recall, f_score, _ = precision_recall_fscore_support(gt_v, pred_v, average="macro")
             mae_ = [abs(p-g) for p, g in zip(pred_v, gt_v)]
             mae_ = sum(mae_) / len(mae_)
             
@@ -443,17 +440,18 @@ class Model_test(Model):
             mae_2 = sum(mae_2) / len(mae_2)
 
             self.logger.info(
-                f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae_:.2f}, MAE(==0): {mae_0 * 100:.2f}%,  MAE(=<1): {mae_1 * 100:.2f}%, MAE(=<2): {mae_2 * 100:.2f}%, Precision: {precision:.2f}, Recall: {recall:.2f}, F-Score: {f_score:.2f}\n"
+                f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae_:.2f}, MAE(==0): {mae_0 * 100:.2f}%,  MAE(=<1): {mae_1 * 100:.2f}%, MAE(=<2): {mae_2 * 100:.2f}%"
             )
 
             
             for grade in all_:
                 self.logger.info(
-                    f"          {grade} grade Acc: {correct_[grade]} / {all_[grade]} -> {(correct_[grade]/all_[grade] * 100):.2f} %\n"
+                    f"          {grade} grade Acc: {correct_[grade]} / {all_[grade]} -> {(correct_[grade]/all_[grade] * 100):.2f} %"
                 )
-
-
-
+            
+            with open(f"{self.args.log_path}/print.txt", "a") as f:
+                if self.m_dig == "dryness": f.write(f"Area, Correlation, P-value, MAE, MAE(==0), MAE(=<1), MAE(=<2)\n")                
+                f.write(f"{self.m_dig}, {correlation:.2f}, {p_value:.4f}, {mae_:.2f}, {mae_0 * 100:.2f}, {mae_1 * 100:.2f}, {mae_2 * 100:.2f}\n")                
 
     def get_test_loss(self, pred, gt):
         if "elasticity_R2" in self.m_dig:
@@ -492,20 +490,3 @@ class Model_test(Model):
             
             
             
-            
-            
-            
-            
-            
-    # print("Imgae Name: 0001_01_F_01  Category: Pigmentation => Pred: 2 Gt: 1")
-    # print("                          Category: Wrinkle => Pred: 2 Gt: 3")
-    # print("Imgae Name: 0001_01_F_02  Category: Wrinkle => Pred: 3 Gt: 3")
-    # print("Imgae Name: 0001_01_F_03  Category: Wrinkle => Pred: 2 Gt: 2")
-    # print("Imgae Name: 0001_01_F_04  Category: Wrinkle => Pred: 2 Gt: 1")
-    # print("Imgae Name: 0001_01_F_05  Category: Pore => Pred: 2 Gt: 3")
-    # print("                          Category: Pigmentation => Pred: 2 Gt: 2")
-    # print("Imgae Name: 0001_01_F_06  Category: Pore => Pred: 4 Gt: 3")
-    # print("                          Category: Pigmentation => Pred: 3 Gt: 23")
-    # print("Imgae Name: 0001_01_F_07  Category: Dryness => Pred: 3 Gt: 2")
-    # print("Imgae Name: 0001_01_F_08  Category: Sagging => Pred: 2 Gt: 2")
-    

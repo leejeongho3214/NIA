@@ -20,7 +20,7 @@ from tool.data_loader import CustomDataset_class, CustomDataset_regress
 from model import Model
 import argparse
 
-fix_seed(523)
+
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
 def parse_args():
@@ -85,6 +85,12 @@ def parse_args():
         default=8,
         type=int,
     )
+    
+    parser.add_argument(
+        "--seed",
+        default=1,
+        type=int,
+    )
 
 
     parser.add_argument("--reset", action="store_true")
@@ -95,6 +101,7 @@ def parse_args():
 
 
 def main(args):
+    fix_seed(args.seed)
     args.root_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     args.git_name = git_name
     check_path = os.path.join(args.root_path , "checkpoint", git_name, args.mode, args.name)

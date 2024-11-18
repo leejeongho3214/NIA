@@ -4,7 +4,6 @@ import os
 
 import torch
 import gc
-
     
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -17,7 +16,7 @@ import torch.nn as nn
 from tool.model import Model_test
 from tool.utils import resume_checkpoint, fix_seed
 
-fix_seed(523)
+
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
 def parse_args():
@@ -43,6 +42,12 @@ def parse_args():
         default=8,
         type=int,
     )
+    
+    parser.add_argument(
+        "--seed",
+        default=1,
+        type=int,
+    )
 
     parser.add_argument(
         "--num_workers",
@@ -56,6 +61,7 @@ def parse_args():
 
 
 def main(args):
+    fix_seed(args.seed)
     args.root_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     args.git_name = git_name
     check_path = os.path.join(args.root_path , "checkpoint", git_name, args.mode, args.name)
@@ -63,10 +69,11 @@ def main(args):
     if os.path.isdir(os.path.join(check_path, "log", "eval")):
         shutil.rmtree(os.path.join(check_path, "log", "eval"))
         
+        
+    args.log_path = os.path.join(check_path, "log")
     logger = setup_logger(
         args.name,
-        os.path.join(check_path, "log", "eval"),
-        filename=args.name + ".txt",
+        os.path.join(args.log_path, "eval")
     )
     logger.info("Command Line: " + " ".join(sys.argv))
 
