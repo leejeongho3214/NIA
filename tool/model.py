@@ -366,8 +366,8 @@ class Model(object):
 class Model_test(Model):
     def __init__(self, args, logger):
         self.args = args
-        self.pred = defaultdict(list)
-        self.gt = defaultdict(list)
+        self.pred = defaultdict(lambda: defaultdict(list))
+        self.gt = defaultdict(lambda: defaultdict(list))
         self.logger = logger
 
     def test(self, model, testset_loader, key):
@@ -401,57 +401,56 @@ class Model_test(Model):
         p.close()
 
     def print_test(self):
-        gt_v = [value[0] for value in self.gt[self.m_dig]]
-        pred_v = [value[0] for value in self.pred[self.m_dig]]
-        
-        
-        correct_ = defaultdict(int)
-        all_ = defaultdict(int)
-        
-        for gt, pred in zip(gt_v, pred_v):
-            all_[gt] += 1
-            if gt == pred:
-                correct_[gt] += 1
-        
-        correlation, p_value = pearsonr(gt_v, pred_v)
-        
-        if self.args.mode == "regression":
-            n_gt_v = [value[0]/value[-1] for value in self.gt[self.m_dig]]
-            n_pred_v = [value[0]/value[-1] for value in self.pred[self.m_dig]]
+        for angle, value_list in zip(self.pred[self.m_dig].items(), self.gt[self.m_dig].items()):
+            gt_v = [value[0] for value in self.gt[self.m_dig]]
+            pred_v = [value[0] for value in self.pred[self.m_dig]]
             
-            mae = mean_absolute_error(gt_v, pred_v)
-            mape = mape_loss()(np.array(pred_v), np.array(gt_v))
-            nmae = mean_absolute_error(n_gt_v, n_pred_v)
-            self.logger.info(
-                f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae:.4f}, MAPE: {mape:.3f}, NMAE: {nmae:.3f}\n"
-            )
-        
-        else:
-            mae_ = [abs(p-g) for p, g in zip(pred_v, gt_v)]
-            mae_ = sum(mae_) / len(mae_)
+            correct_ = defaultdict(int)
+            all_ = defaultdict(int)
             
-            mae_0 = [True if abs(p-g) ==0 else False for p, g in zip(pred_v, gt_v)]
-            mae_0 = sum(mae_0) / len(mae_0)
+            for gt, pred in zip(gt_v, pred_v):
+                all_[gt] += 1
+                if gt == pred:
+                    correct_[gt] += 1
             
-            mae_1 = [True if abs(p-g) <= 1 else False for p, g in zip(pred_v, gt_v)]
-            mae_1 = sum(mae_1) / len(mae_1)
+            correlation, p_value = pearsonr(gt_v, pred_v)
             
-            mae_2 = [True if abs(p-g) <= 2 else False for p, g in zip(pred_v, gt_v)]
-            mae_2 = sum(mae_2) / len(mae_2)
-
-            self.logger.info(
-                f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae_:.2f}, MAE(==0): {mae_0 * 100:.2f}%,  MAE(=<1): {mae_1 * 100:.2f}%, MAE(=<2): {mae_2 * 100:.2f}%"
-            )
-
-            
-            for grade in all_:
+            if self.args.mode == "regression":
+                n_gt_v = [value[0]/value[-1] for value in self.gt[self.m_dig]]
+                n_pred_v = [value[0]/value[-1] for value in self.pred[self.m_dig]]
+                
+                mae = mean_absolute_error(gt_v, pred_v)
+                mape = mape_loss()(np.array(pred_v), np.array(gt_v))
+                nmae = mean_absolute_error(n_gt_v, n_pred_v)
                 self.logger.info(
-                    f"          {grade} grade Acc: {correct_[grade]} / {all_[grade]} -> {(correct_[grade]/all_[grade] * 100):.2f} %"
+                    f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae:.4f}, MAPE: {mape:.3f}, NMAE: {nmae:.3f}\n"
                 )
             
-            with open(f"{self.args.log_path}/print.txt", "a") as f:
-                if self.m_dig == "dryness": f.write(f"Area, Correlation, P-value, MAE, MAE(==0), MAE(=<1), MAE(=<2)\n")                
-                f.write(f"{self.m_dig}, {correlation:.2f}, {p_value:.4f}, {mae_:.2f}, {mae_0 * 100:.2f}, {mae_1 * 100:.2f}, {mae_2 * 100:.2f}\n")                
+            else:
+                mae_ = [abs(p-g) for p, g in zip(pred_v, gt_v)]
+                mae_ = sum(mae_) / len(mae_)
+                
+                mae_0 = [True if abs(p-g) ==0 else False for p, g in zip(pred_v, gt_v)]
+                mae_0 = sum(mae_0) / len(mae_0)
+                
+                mae_1 = [True if abs(p-g) <= 1 else False for p, g in zip(pred_v, gt_v)]
+                mae_1 = sum(mae_1) / len(mae_1)
+                
+                mae_2 = [True if abs(p-g) <= 2 else False for p, g in zip(pred_v, gt_v)]
+                mae_2 = sum(mae_2) / len(mae_2)
+
+                self.logger.info(
+                    f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae_:.2f}, MAE(==0): {mae_0 * 100:.2f}%,  MAE(=<1): {mae_1 * 100:.2f}%, MAE(=<2): {mae_2 * 100:.2f}%"
+                )
+                
+                for grade in all_:
+                    self.logger.info(
+                        f"          {grade} grade Acc: {correct_[grade]} / {all_[grade]} -> {(correct_[grade]/all_[grade] * 100):.2f} %"
+                    )
+                
+                with open(f"{self.args.log_path}/print.txt", "a") as f:
+                    if self.m_dig == "dryness": f.write(f"Area, Correlation, P-value, MAE, MAE(==0), MAE(=<1), MAE(=<2)\n")                
+                    f.write(f"{self.m_dig}, {correlation:.2f}, {p_value:.4f}, {mae_:.2f}, {mae_0 * 100:.2f}, {mae_1 * 100:.2f}, {mae_2 * 100:.2f}\n")                
 
     def get_test_loss(self, pred, gt):
         if "elasticity_R2" in self.m_dig:
@@ -482,10 +481,10 @@ class Model_test(Model):
 
     def get_test_acc(self, pred, gt):
         for idx, (pred_item, gt_item) in enumerate(zip(pred, gt)):
-            self.pred[self.m_dig].append(
+            self.pred[self.m_dig][self.img_names[0].split("_")[-3]].append(
                 [pred_item.argmax().item(), self.img_names[idx]]
             )
-            self.gt[self.m_dig].append([gt_item.item(), self.img_names[idx]])
+            self.gt[self.m_dig][self.img_names[0].split("_")[-3]].append([gt_item.item(), self.img_names[idx]])
             
             
             

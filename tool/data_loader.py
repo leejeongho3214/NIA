@@ -71,7 +71,7 @@ class CustomDataset_class(Dataset):
                         for idx in idx_list:
                             tt_list = list()
                             for each_value in grade_dict[idx]:
-                                if each_value[0].split("_")[-2] in ["F"]:
+                                if each_value[0].split("_")[-2] in ["F", "L30", "R30"]:
                                     tt_list.append(each_value)
                             in_list.append(tt_list)
                     out_list[dig][grade] = in_list
@@ -185,8 +185,6 @@ class CustomDataset_class(Dataset):
         ori_img = cv2.imread(os.path.join(self.abs_root, "dataset/cropped_img", self.i_path + ".jpg"))
         pil_img = cv2.cvtColor(ori_img, cv2.COLOR_BGR2RGB)
         ori_img = cv2.resize(ori_img, (224, 224))
-        
-        
 
         s_list = self.i_path.split("/")[-1].split("_")
         desc_area = (
