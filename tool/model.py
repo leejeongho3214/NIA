@@ -394,16 +394,17 @@ class Model_test(Model):
         with open(os.path.join(pred_path, f"pred.txt"), "w") as p:
             with open(os.path.join(pred_path, f"gt.txt"), "w") as g:
                 for key in list(self.pred.keys()):
-                    for (angle, p_v), g_v in zip(self.pred[key].items(), self.gt[key]):
-                        p.write(f"{angle}, {key}, {p_v[0]}, {p_v[1]} \n")
-                        g.write(f"{angle}, {key}, {g_v[0]}, {g_v[1]} \n")
+                    for angle in self.pred[key].keys():
+                        for p_v, g_v in zip(self.pred[key][angle], self.gt[key][angle]):
+                            p.write(f"{angle}, {key}, {p_v[0]}, {p_v[1]} \n")
+                            g.write(f"{angle}, {key}, {g_v[0]}, {g_v[1]} \n")
         g.close()
         p.close()
 
     def print_test(self):
-        for (angle, pred_list), gt_list in zip(self.pred[self.m_dig].items(), self.gt[self.m_dig].values()):
-            gt_v = [value[0] for value in gt_list]
-            pred_v = [value[0] for value in pred_list]
+        for angle in self.pred[self.m_dig].keys():
+            gt_v = [value[0] for value in self.gt[self.m_dig][angle]]
+            pred_v = [value[0] for value in self.pred[self.m_dig][angle]]
             
             correct_ = defaultdict(int)
             all_ = defaultdict(int)
@@ -448,7 +449,7 @@ class Model_test(Model):
                         f"          {grade} grade Acc: {correct_[grade]} / {all_[grade]} -> {(correct_[grade]/all_[grade] * 100):.2f} %"
                     )
                 
-                with open(f"{self.args.log_path}/print.txt", "a") as f:
+                with open(f"{self.args.log_path}/print_{angle}.txt", "a") as f:
                     if self.m_dig == "dryness": f.write(f"Angle, Area, Correlation, P-value, MAE, MAE(==0), MAE(=<1), MAE(=<2)\n")                
                     f.write(f"{angle}, {self.m_dig}, {correlation:.2f}, {p_value:.4f}, {mae_:.2f}, {mae_0 * 100:.2f}, {mae_1 * 100:.2f}, {mae_2 * 100:.2f}\n")                
 
@@ -481,10 +482,10 @@ class Model_test(Model):
 
     def get_test_acc(self, pred, gt):
         for idx, (pred_item, gt_item) in enumerate(zip(pred, gt)):
-            self.pred[self.m_dig][self.img_names[0].split("_")[-3]].append(
+            self.pred[self.m_dig][self.img_names[idx].split("_")[-3]].append(
                 [pred_item.argmax().item(), self.img_names[idx]]
             )
-            self.gt[self.m_dig][self.img_names[0].split("_")[-3]].append([gt_item.item(), self.img_names[idx]])
+            self.gt[self.m_dig][self.img_names[idx].split("_")[-3]].append([gt_item.item(), self.img_names[idx]])
             
             
             
