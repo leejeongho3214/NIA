@@ -130,7 +130,6 @@ class CustomDataset_class(Dataset):
                                 (str(json_meta['images']['facepart']).zfill(2) != j_name.split('_')[-1].split('.')[0]):
                                 assert 0
                         
-                            # (str(json_meta['images']['angle']).zfill(2) != j_name.split('_')[-1].split('.')[0]) or \
                         
                         self.process_json_meta(
                             json_meta, j_name, sub_path, target_list, sub_fold
@@ -158,6 +157,11 @@ class CustomDataset_class(Dataset):
 
         if self.args.mode == "class":
             for dig_n, grade in json_meta["annotations"].items():
+                if (dig_n == "forehead_pigmentation" and grade in [4, 5]):
+                    continue
+                elif (dig_n == "chin_sagging" and grade == 6):
+                    continue
+                
                 dig, area = dig_n.split("_")[-1], dig_n.split("_")[-2]
 
                 if dig in ["wrinkle", "pigmentation"] and self.mode == "test":
