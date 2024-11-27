@@ -69,7 +69,6 @@ def main(args):
     if os.path.isdir(os.path.join(check_path, "log", "eval")):
         shutil.rmtree(os.path.join(check_path, "log", "eval"))
         
-        
     args.log_path = os.path.join(check_path, "log")
     logger = setup_logger(
         args.name,
@@ -78,7 +77,7 @@ def main(args):
     logger.info("Command Line: " + " ".join(sys.argv))
 
     model_num_class = (
-        {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
+        {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 6, "wrinkle": 7}
         if args.mode == "class"
         else {
             "pigmentation": 1,
@@ -112,6 +111,7 @@ def main(args):
                     False,
                 )
     else: 
+        shutil.rmtree(check_path)
         assert 0, "Incorrect checkpoint path"
 
     dataset = (

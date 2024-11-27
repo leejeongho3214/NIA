@@ -107,7 +107,7 @@ def main(args):
     check_path = os.path.join(args.root_path , "checkpoint", git_name, args.mode, args.name)
     log_path = os.path.join(args.root_path , "tensorboard", git_name, args.mode, args.name)
     model_num_class = (
-        {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 6, "wrinkle": 7}
+        {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
         if args.mode == "class"
         else {
             "pigmentation": 1,

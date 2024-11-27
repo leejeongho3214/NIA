@@ -157,9 +157,7 @@ class CustomDataset_class(Dataset):
 
         if self.args.mode == "class":
             for dig_n, grade in json_meta["annotations"].items():
-                if (dig_n == "forehead_pigmentation" and grade in [4, 5]):
-                    continue
-                elif (dig_n == "chin_sagging" and grade == 6):
+                if (dig_n == "chin_sagging" and grade == 6):
                     continue
                 
                 dig, area = dig_n.split("_")[-1], dig_n.split("_")[-2]
