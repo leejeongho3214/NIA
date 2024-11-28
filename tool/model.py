@@ -484,22 +484,22 @@ class Model_test(Model):
             
             mae_2 = [True if abs(p-g) <= 2 else False for p, g in zip(pred_v, gt_v)]
             mae_2 = sum(mae_2) / len(mae_2)
-
             
+            mkdir(f"{self.args.log_path}/save-log")
+
             if angle:
                 self.logger.info(
                     f"[{self.angle}][{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae_:.2f}, MAE(==0): {mae_0 * 100:.2f}%,  MAE(=<1): {mae_1 * 100:.2f}%, MAE(=<2): {mae_2 * 100:.2f}%"
                 )
-                
                 for grade in all_:
                     self.logger.info(
                         f"          {grade} grade Acc: {correct_[grade]} / {all_[grade]} -> {(correct_[grade]/all_[grade] * 100):.2f} %"
                     )
-                
-                with open(f"{self.args.log_path}/print_{self.angle}.txt", "a") as f:
+                with open(f"{self.args.log_path}/save-log/print_{self.angle}.txt", "a") as f:
                     if self.m_dig == "dryness": f.write(f"Angle, Area, Correlation, P-value, MAE, MAE(==0), MAE(=<1), MAE(=<2)\n")                
                     f.write(f"{self.angle}, {self.m_dig}, {correlation:.2f}, {p_value:.4f}, {mae_:.2f}, {mae_0 * 100:.2f}, {mae_1 * 100:.2f}, {mae_2 * 100:.2f}\n")     
+                    
             else:
-                with open(f"{self.args.log_path}/print_total.txt", "a") as f:
+                with open(f"{self.args.log_path}/save-log/print_total.txt", "a") as f:
                     if self.m_dig == "dryness": f.write(f"Area, Correlation, P-value, MAE, MAE(==0), MAE(=<1), MAE(=<2)\n")                
                     f.write(f"{self.m_dig}, {correlation:.2f}, {p_value:.4f}, {mae_:.2f}, {mae_0 * 100:.2f}, {mae_1 * 100:.2f}, {mae_2 * 100:.2f}\n")   

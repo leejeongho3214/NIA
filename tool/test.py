@@ -155,8 +155,6 @@ def main(args):
             )
             resnet_model.test(model, testset_loader, w_key)
             resnet_model.print_test()
-        torch.cuda.empty_cache()
-        gc.collect()
     resnet_model.save_value()
 
 
