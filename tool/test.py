@@ -1,3 +1,5 @@
+from collections import defaultdict
+import json
 import shutil
 import sys
 import os
@@ -142,11 +144,15 @@ def main(args):
             "pore": ["cheek_pore"],
         }
     )
-
+    
+ 
+        
+    print_dict = defaultdict(list)
     for key in model_list:
         model = model_list[key].cuda()
         for w_key in model_area_dict[key]:
             testset, _ = dataset.load_dataset("test", w_key)
+            print_dict[w_key] = [i[2] for i in testset]
             testset_loader = data.DataLoader(
                 dataset=testset,
                 batch_size=args.batch_size,
@@ -156,6 +162,8 @@ def main(args):
             resnet_model.test(model, testset_loader, w_key)
             resnet_model.print_test()
     resnet_model.save_value()
+    with open(f"{args.log_path}/save-log/dataset_info.txt", "a") as f:
+        json.dump(print_dict, f)
 
 
 if __name__ == "__main__":
