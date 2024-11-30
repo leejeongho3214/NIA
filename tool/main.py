@@ -1,4 +1,6 @@
+from collections import defaultdict
 import inspect
+import json
 import os
 import sys
 
@@ -225,6 +227,8 @@ def main(args):
             grade_num,
             info if loading else None, 
         )
+        
+        train_dict = val_dict = defaultdict(list)
 
         for epoch in range(args.load_epoch[key], args.epoch):
             if args.load_epoch[key]:
@@ -241,6 +245,9 @@ def main(args):
 
             if resnet_model.stop_early():
                 break
+        
+        with open(f"{args.log_path}/train/trainset_info.txt", "a") as f:
+            json.dump(train_dict, )
         
         resnet_model.print_best()
         del trainset_loader, valset_loader

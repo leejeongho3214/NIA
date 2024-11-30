@@ -162,7 +162,7 @@ def main(args):
             resnet_model.test(model, testset_loader, w_key)
             resnet_model.print_test()
     resnet_model.save_value()
-    with open(f"{args.log_path}/save-log/dataset_info.txt", "a") as f:
+    with open(f"{args.log_path}/eval/testset_info.txt", "a") as f:
         json.dump(print_dict, f)
 
 
