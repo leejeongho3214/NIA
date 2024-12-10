@@ -168,7 +168,7 @@ class Model(object):
                 (
                     micro_precision,
                     _,
-                    micro_f1,
+                    _,
                     _,
                 ) = precision_recall_fscore_support(
                     f_gt, f_pred, average="micro", zero_division=1
@@ -200,10 +200,16 @@ class Model(object):
                 self.logger.info(
                 f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
                 )
+                if self.phase == "Valid":
+                    if self.best_loss[self.m_dig] > self.val_loss.avg:
+                        self.best_loss[self.m_dig] = round(self.val_loss.avg, 4)
+                        save_checkpoint(self, correlation = correlation)
+                    else:
+                        self.update_c += 1
 
 
     def stop_early(self):
-        if self.update_c > self.args.stop_early:
+        if (self.update_c > self.args.stop_early) or (self.epoch == self.args.epoch - 1):
             mkdir(
                 os.path.join(
                     self.args.root_path, 
@@ -343,7 +349,7 @@ class Model(object):
         random_num = random.randrange(0, len(self.valid_loader))
         with torch.no_grad():
             self.model.eval()
-            for self.iter, (img, label, self.img_names, _, meta_v, _) in enumerate(
+            for self.iter, (img, label, self.img_names, _, _, _) in enumerate(
                 self.valid_loader
             ):
                 img, label = img.to(device), label.to(device)

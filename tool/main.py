@@ -190,7 +190,9 @@ def main(args):
         if args.mode == "class"
         else CustomDataset_regress(args, logger)
     )
-
+    train_dict = defaultdict(list)
+    val_dict = defaultdict(list)
+    
     for key in model_list:
         if key in pass_list:
             continue
@@ -228,32 +230,36 @@ def main(args):
             info if loading else None, 
         )
         
-        train_dict = val_dict = defaultdict(list)
-
-        for epoch in range(args.load_epoch[key], args.epoch):
-            if args.load_epoch[key]:
-                resnet_model.update_e(epoch + 1, *info) 
-                        
-            schedule_flag = True
-            while schedule_flag:
-                resnet_model.reset_log(False)
-                schedule_flag = resnet_model.train()
-            
-            resnet_model.valid()
-
-            resnet_model.reset_log(True)
-
-            if resnet_model.stop_early():
-                break
+        train_dict[key] = [i[2] for i in trainset]
+        val_dict[key] = [i[2] for i in valset]
         
-        with open(f"{args.log_path}/train/trainset_info.txt", "a") as f:
-            json.dump(train_dict, )
-        
-        resnet_model.print_best()
+        if args.load_epoch[key] < 50:
+            for epoch in range(args.load_epoch[key], args.epoch):
+                if args.load_epoch[key]:
+                    resnet_model.update_e(epoch + 1, *info) 
+                
+                schedule_flag = True
+                
+                while schedule_flag:
+                    resnet_model.reset_log(False)
+                    schedule_flag = resnet_model.train()
+                
+                resnet_model.valid()
+
+                resnet_model.reset_log(True)
+
+                if resnet_model.stop_early():
+                    break
+                   
+            resnet_model.print_best()
         del trainset_loader, valset_loader
-
-        torch.cuda.empty_cache()
-        gc.collect()
+        
+        mode = "w" if os.path.isfile(f"{check_path}/log/train/trainset_info.txt") else "a"
+        
+        with open(f"{check_path}/log/train/trainset_info.txt", mode) as f:
+            json.dump(train_dict, f)
+        with open(f"{check_path}/log/train/valset_info.txt", mode) as f:
+            json.dump(val_dict, f)
 
 
 if __name__ == "__main__":
