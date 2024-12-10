@@ -250,7 +250,7 @@ def main(args):
 
                 if resnet_model.stop_early():
                     break
-                   
+                
             resnet_model.print_best()
         del trainset_loader, valset_loader
         

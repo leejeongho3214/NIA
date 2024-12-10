@@ -130,13 +130,19 @@ class Model(object):
         return round(self.test_value[name].avg, 4)
     
     def print_best(self):
-        self.logger.info(
-                    f"Best Epoch: {self.best_epoch}  Acc: {(self.acc_ * 100):.2f}%  Correlation: {self.corre_:.2f}"
-                    )
-        
-        for grade in sorted(self.correct_):
-            print(f"[Grade {grade}]  {self.correct_[grade]} / {self.all_[grade]} => {(self.correct_[grade] / self.all_[grade] * 100):.2f}%      ", end = "")
-        print("")
+        if self.args.mode == "class":
+            self.logger.info(
+                        f"Best Epoch: {self.best_epoch}  Acc: {(self.acc_ * 100):.2f}%  Correlation: {self.corre_:.2f}"
+                        )
+            
+            for grade in sorted(self.correct_):
+                print(f"[Grade {grade}]  {self.correct_[grade]} / {self.all_[grade]} => {(self.correct_[grade] / self.all_[grade] * 100):.2f}%      ", end = "")
+            print("")
+            
+        else:
+            self.logger.info(
+                f"Best Epoch: {self.best_epoch}  MAE: {self.best_loss[self.m_dig]:.2f}  Correlation: {self.corre_:.2f}"
+                )
 
     def print_loss(self, dataloader_len, final_flag=False):
         print(
@@ -364,7 +370,7 @@ class Model(object):
                     save_image(self, img)
                     
                 self.print_loss(len(self.valid_loader))
-
+                
             self.scheduler.step(self.val_loss.avg)
             self.print_loss(len(self.valid_loader), final_flag=True)
 
