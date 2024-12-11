@@ -447,10 +447,10 @@ class Model_test(Model):
             assert 0, "error"
 
         for idx, (pred_item, gt_item) in enumerate(zip(pred, gt)):
-            self.pred[self.m_dig].append(
+            self.pred[self.m_dig][self.img_names[idx].split("_")[-3]].append(
                 [round(pred_item.item() * value, 3), self.img_names[idx], value]
             )
-            self.gt[self.m_dig].append(
+            self.gt[self.m_dig][self.img_names[idx].split("_")[-3]].append(
                 [round(gt_item.item() * value, 3), self.img_names[idx], value]
             )
 
@@ -472,17 +472,29 @@ class Model_test(Model):
                 correct_[gt] += 1
         
         correlation, p_value = pearsonr(gt_v, pred_v)
+        mkdir(f"{self.args.log_path}/save-log")
         
         if self.args.mode == "regression":
-            n_gt_v = [value[0]/value[-1] for value in self.gt[self.m_dig]]
-            n_pred_v = [value[0]/value[-1] for value in self.pred[self.m_dig]]
+            n_gt_v = [value/ max(gt_v) for value in gt_v]
+            n_pred_v = [value/ max(pred_v) for value in pred_v]
             
             mae = mean_absolute_error(gt_v, pred_v)
             mape = mape_loss()(np.array(pred_v), np.array(gt_v))
             nmae = mean_absolute_error(n_gt_v, n_pred_v)
-            self.logger.info(
-                f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae:.4f}, MAPE: {mape:.3f}, NMAE: {nmae:.3f}\n"
-            )
+
+            if angle:
+                self.logger.info(
+                    f"[{self.angle}][{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae:.4f}, MAPE: {mape:.3f}, NMAE: {nmae:.3f}"
+                )
+
+                with open(f"{self.args.log_path}/save-log/print_{self.angle}.txt", "a") as f:
+                    if self.m_dig == "pigmentation": f.write(f"Angle, Area, Correlation, P-value, MAE, MAPE, NMAE\n")                
+                    f.write(f"{self.angle}, {self.m_dig}, {correlation:.2f}, {p_value:.4f}, {mae:.2f}, {mape:.2f}, {nmae:.2f}\n")     
+                    
+            else:
+                with open(f"{self.args.log_path}/save-log/print_total.txt", "a") as f:
+                    if self.m_dig == "pigmentation": f.write(f"Area, Correlation, P-value, MAE, MAPE, NMAE\n")                
+                    f.write(f"{self.m_dig}, {correlation:.2f}, {p_value:.4f}, {mae:.2f}, {mape:.2f}, {nmae:.2f}\n")   
         
         else:
             mae_ = [abs(p-g) for p, g in zip(pred_v, gt_v)]
@@ -496,8 +508,6 @@ class Model_test(Model):
             
             mae_2 = [True if abs(p-g) <= 2 else False for p, g in zip(pred_v, gt_v)]
             mae_2 = sum(mae_2) / len(mae_2)
-            
-            mkdir(f"{self.args.log_path}/save-log")
 
             if angle:
                 self.logger.info(
