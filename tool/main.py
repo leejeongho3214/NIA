@@ -233,6 +233,13 @@ def main(args):
         train_dict[key] = [i[2] for i in trainset]
         val_dict[key] = [i[2] for i in valset]
         
+        mode = "w" if os.path.isfile(f"{check_path}/log/train/trainset_info.txt") else "a"
+        
+        with open(f"{check_path}/log/train/trainset_info.txt", mode) as f:
+            json.dump(train_dict, f)
+        with open(f"{check_path}/log/train/valset_info.txt", mode) as f:
+            json.dump(val_dict, f)
+            
         if args.load_epoch[key] < 50:
             for epoch in range(args.load_epoch[key], args.epoch):
                 if args.load_epoch[key]:
