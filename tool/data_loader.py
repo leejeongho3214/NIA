@@ -50,6 +50,8 @@ class CustomDataset_class(Dataset):
             for grade in sorted(class_dict.keys()):
                 grade_dict = class_dict[grade]
                 random_list = list(grade_dict.keys())
+                
+                random.shuffle(random_list)
 
                 train_len, val_len = int(len(grade_dict) * 0.8), int(len(grade_dict) * 0.1)
                 train_idx, val_idx, test_idx = (
@@ -128,7 +130,6 @@ class CustomDataset_class(Dataset):
                                 (str(json_meta['images']['facepart']).zfill(2) != j_name.split('_')[-1].split('.')[0]):
                                 assert 0
                         
-                            # (str(json_meta['images']['angle']).zfill(2) != j_name.split('_')[-1].split('.')[0]) or \
                         
                         self.process_json_meta(
                             json_meta, j_name, sub_path, target_list, sub_fold
@@ -156,6 +157,9 @@ class CustomDataset_class(Dataset):
 
         if self.args.mode == "class":
             for dig_n, grade in json_meta["annotations"].items():
+                if (dig_n == "chin_sagging" and grade == 6):
+                    continue
+                
                 dig, area = dig_n.split("_")[-1], dig_n.split("_")[-2]
 
                 if dig in ["wrinkle", "pigmentation"] and self.mode == "test":
@@ -183,8 +187,6 @@ class CustomDataset_class(Dataset):
         ori_img = cv2.imread(os.path.join(self.abs_root, "dataset/cropped_img", self.i_path + ".jpg"))
         pil_img = cv2.cvtColor(ori_img, cv2.COLOR_BGR2RGB)
         ori_img = cv2.resize(ori_img, (224, 224))
-        
-        
 
         s_list = self.i_path.split("/")[-1].split("_")
         desc_area = (
@@ -269,7 +271,6 @@ class CustomDataset_class(Dataset):
             grade_num.update(
                 {key: len(value) for key, value in data_list[self.dig].items()}
             )
-
             num_grade = [grade_num[num] for num in sorted(grade_num)]
 
             for self.grade, class_dict in tqdm(
@@ -280,7 +281,6 @@ class CustomDataset_class(Dataset):
                 ):
                     for self.i_path, self.meta_v in sub_folder:
                         self.save_dict(transform)
-
         else:
             for full_dig in list(data_list.keys()):
                 if dig in full_dig:

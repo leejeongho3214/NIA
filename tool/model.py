@@ -101,6 +101,7 @@ class Model(object):
             "8": {"moisture": 1, "elasticity": 1},
         }
         self.epoch = 0
+        self.nan = 0
 
         (
             self.phase,
@@ -110,7 +111,7 @@ class Model(object):
         ) = (None, 0, np.inf, device)
         self.pred, self.gt = list(), list()
         self.pred_t, self.gt_t = list(), list()
-
+        
         self.optimizer = torch.optim.Adam(
             params=self.model.parameters(),
             lr=self.args.lr,
@@ -128,13 +129,19 @@ class Model(object):
         return round(self.test_value[name].avg, 4)
     
     def print_best(self):
-        self.logger.info(
-                    f"Best Epoch: {self.best_epoch}  Acc: {(self.acc_ * 100):.2f}%  Correlation: {self.corre_:.2f}"
-                    )
-        
-        for grade in sorted(self.correct_):
-            print(f"[Grade {grade}]  {self.correct_[grade]} / {self.all_[grade]} => {(self.correct_[grade] / self.all_[grade] * 100):.2f}%      ", end = "")
-        print("")
+        if self.args.mode == "class":
+            self.logger.info(
+                        f"Best Epoch: {self.best_epoch}  Acc: {(self.acc_ * 100):.2f}%  Correlation: {self.corre_:.2f}"
+                        )
+            
+            for grade in sorted(self.correct_):
+                print(f"[Grade {grade}]  {self.correct_[grade]} / {self.all_[grade]} => {(self.correct_[grade] / self.all_[grade] * 100):.2f}%      ", end = "")
+            print("")
+            
+        else:
+            self.logger.info(
+                f"Best Epoch: {self.best_epoch}  MAE: {self.best_loss[self.m_dig]:.2f}  Correlation: {self.corre_:.2f}"
+                )
 
     def print_loss(self, dataloader_len, final_flag=False):
         print(
@@ -177,14 +184,11 @@ class Model(object):
                     if i == f_pred[idx]:
                         correct_[i] += 1
 
-                info_m = f"[Lr: {self.optimizer.param_groups[0]['lr']:4f}][Gamma: {self.args.gamma}][Early Stop: {self.update_c}/{self.args.stop_early}]" if self.phase == "Train" else ""
+                info_m = f"[Lr: {self.optimizer.param_groups[0]['lr']:4f}][Gamma: {self.args.gamma}][Early Stop: {self.update_c}/{self.args.stop_early}][NaN count: {self.nan}]" if self.phase == "Train" else ""
                 self.logger.info(
-                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}]{info_m} micro Precision: {(micro_precision * 100):.2f}%, micro F1: {micro_f1:.4f}"
+                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}]{info_m}[{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}, Correlation: {correlation:.2f} micro Precision: {(micro_precision * 100):.2f}%"
                 )          
-                self.logger.info(
-                f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
-                )
-                
+
                 grade_ = sorted(list(all_.keys()))
                 for grade in grade_:
                     print(f"        [Grade {grade}]  {correct_[grade]} / {all_[grade]} => {(correct_[grade] / all_[grade] * 100):.2f}%"  , end = "")
@@ -201,10 +205,16 @@ class Model(object):
                 self.logger.info(
                 f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
                 )
+                if self.phase == "Valid":
+                    if self.best_loss[self.m_dig] > self.val_loss.avg:
+                        self.best_loss[self.m_dig] = round(self.val_loss.avg, 4)
+                        save_checkpoint(self, correlation = correlation)
+                    else:
+                        self.update_c += 1
 
 
     def stop_early(self):
-        if self.update_c > self.args.stop_early:
+        if (self.update_c > self.args.stop_early) or (self.epoch == self.args.epoch - 1):
             mkdir(
                 os.path.join(
                     self.args.root_path, 
@@ -279,7 +289,6 @@ class Model(object):
         return result
 
     def reset_log(self, flag):
-        self.epoch += 1
         self.train_loss = AverageMeter()
         self.val_loss = AverageMeter()
         if flag: self.epoch += 1
@@ -331,6 +340,7 @@ class Model(object):
                 self.optimizer.param_groups[0]["lr"] /= 2
                 self.model = deepcopy(self.prev_model)
                 self.optimizer.param_groups[0]['params'] = self.model.parameters()
+                self.nan += 1
                 
                 return True
             
@@ -339,19 +349,17 @@ class Model(object):
 
     def valid(self):
         self.phase = "Valid"
-        
-        weight = torch.tensor([i / sum(self.grade_num) for i in self.grade_num]).cuda()
         self.criterion = (
-            nn.CrossEntropyLoss(weight) if self.args.mode == "class" else nn.L1Loss()
+            nn.CrossEntropyLoss() if self.args.mode == "class" else nn.L1Loss()
         )
         random_num = random.randrange(0, len(self.valid_loader))
         with torch.no_grad():
             self.model.eval()
-            for self.iter, (img, label, self.img_names, _, meta_v, _) in enumerate(
+            for self.iter, (img, label, self.img_names, _, _, _) in enumerate(
                 self.valid_loader
             ):
                 img, label = img.to(device), label.to(device)
-                pred = self.model(img, meta_v)
+                pred = self.model(img)
                 
                 if self.args.mode == "class":
                     self.class_loss(pred, label)
@@ -362,7 +370,7 @@ class Model(object):
                     save_image(self, img)
                     
                 self.print_loss(len(self.valid_loader))
-
+                
             self.scheduler.step(self.val_loss.avg)
             self.print_loss(len(self.valid_loader), final_flag=True)
 
@@ -370,8 +378,8 @@ class Model(object):
 class Model_test(Model):
     def __init__(self, args, logger):
         self.args = args
-        self.pred = defaultdict(list)
-        self.gt = defaultdict(list)
+        self.pred = defaultdict(lambda: defaultdict(list))
+        self.gt = defaultdict(lambda: defaultdict(list))
         self.logger = logger
 
     def test(self, model, testset_loader, key):
@@ -398,64 +406,26 @@ class Model_test(Model):
         with open(os.path.join(pred_path, f"pred.txt"), "w") as p:
             with open(os.path.join(pred_path, f"gt.txt"), "w") as g:
                 for key in list(self.pred.keys()):
-                    for p_v, g_v in zip(self.pred[key], self.gt[key]):
-                        p.write(f"{key}, {p_v[0]}, {p_v[1]} \n")
-                        g.write(f"{key}, {g_v[0]}, {g_v[1]} \n")
+                    for angle in self.pred[key].keys():
+                        for p_v, g_v in zip(self.pred[key][angle], self.gt[key][angle]):
+                            p.write(f"{angle}, {key}, {p_v[0]}, {p_v[1]} \n")
+                            g.write(f"{angle}, {key}, {g_v[0]}, {g_v[1]} \n")
         g.close()
         p.close()
 
     def print_test(self):
-        gt_v = [value[0] for value in self.gt[self.m_dig]]
-        pred_v = [value[0] for value in self.pred[self.m_dig]]
-        
-        
-        correct_ = defaultdict(int)
-        all_ = defaultdict(int)
-        
-        for gt, pred in zip(gt_v, pred_v):
-            all_[gt] += 1
-            if gt == pred:
-                correct_[gt] += 1
-        
-        correlation, p_value = pearsonr(gt_v, pred_v)
-        
-        if self.args.mode == "regression":
-            n_gt_v = [value[0]/value[-1] for value in self.gt[self.m_dig]]
-            n_pred_v = [value[0]/value[-1] for value in self.pred[self.m_dig]]
+        pred_total, gt_total = list(), list()
+        for self.angle in self.pred[self.m_dig].keys():
+            gt_v = [value[0] for value in self.gt[self.m_dig][self.angle]]
+            pred_v = [value[0] for value in self.pred[self.m_dig][self.angle]]
             
-            mae = mean_absolute_error(gt_v, pred_v)
-            mape = mape_loss()(np.array(pred_v), np.array(gt_v))
-            nmae = mean_absolute_error(n_gt_v, n_pred_v)
-            self.logger.info(
-                f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae:.4f}, MAPE: {mape:.3f}, NMAE: {nmae:.3f}\n"
-            )
-        
-        else:
-            precision, recall, f_score, _ = precision_recall_fscore_support(gt_v, pred_v, average="micro")
-            mae_ = [abs(p-g) for p, g in zip(pred_v, gt_v)]
-            mae_ = sum(mae_) / len(mae_)
+            pred_total.append(pred_v); gt_total.append(gt_v)
+            self.print_maes(gt_v, pred_v, True)
             
-            mae_0 = [True if abs(p-g) ==0 else False for p, g in zip(pred_v, gt_v)]
-            mae_0 = sum(mae_0) / len(mae_0)
-            
-            mae_1 = [True if abs(p-g) <= 1 else False for p, g in zip(pred_v, gt_v)]
-            mae_1 = sum(mae_1) / len(mae_1)
-            
-            mae_2 = [True if abs(p-g) <= 2 else False for p, g in zip(pred_v, gt_v)]
-            mae_2 = sum(mae_2) / len(mae_2)
-
-            self.logger.info(
-                f"[{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae_:.2f}, MAE(==0): {mae_0 * 100:.2f}%,  MAE(=<1): {mae_1 * 100:.2f}%, MAE(=<2): {mae_2 * 100:.2f}%, Precision: {precision:.2f}, Recall: {recall:.2f}, F-Score: {f_score:.2f}\n"
-            )
-
-            
-            for grade in all_:
-                self.logger.info(
-                    f"          {grade} grade Acc: {correct_[grade]} / {all_[grade]} -> {(correct_[grade]/all_[grade] * 100):.2f} %\n"
-                )
-
-
-
+        gt_v = [j for i in gt_total for j in i]
+        pred_v = [j for i in pred_total for j in i]
+        self.print_maes(gt_v, pred_v, False)
+                    
 
     def get_test_loss(self, pred, gt):
         if "elasticity_R2" in self.m_dig:
@@ -477,16 +447,81 @@ class Model_test(Model):
             assert 0, "error"
 
         for idx, (pred_item, gt_item) in enumerate(zip(pred, gt)):
-            self.pred[self.m_dig].append(
+            self.pred[self.m_dig][self.img_names[idx].split("_")[-3]].append(
                 [round(pred_item.item() * value, 3), self.img_names[idx], value]
             )
-            self.gt[self.m_dig].append(
+            self.gt[self.m_dig][self.img_names[idx].split("_")[-3]].append(
                 [round(gt_item.item() * value, 3), self.img_names[idx], value]
             )
 
     def get_test_acc(self, pred, gt):
         for idx, (pred_item, gt_item) in enumerate(zip(pred, gt)):
-            self.pred[self.m_dig].append(
+            self.pred[self.m_dig][self.img_names[idx].split("_")[-3]].append(
                 [pred_item.argmax().item(), self.img_names[idx]]
             )
-            self.gt[self.m_dig].append([gt_item.item(), self.img_names[idx]])
+            self.gt[self.m_dig][self.img_names[idx].split("_")[-3]].append([gt_item.item(), self.img_names[idx]])
+            
+            
+    def print_maes(self, gt_v, pred_v, angle):
+        correct_ = defaultdict(int)
+        all_ = defaultdict(int)
+        
+        for gt, pred in zip(gt_v, pred_v):
+            all_[gt] += 1
+            if gt == pred:
+                correct_[gt] += 1
+        
+        correlation, p_value = pearsonr(gt_v, pred_v)
+        mkdir(f"{self.args.log_path}/save-log")
+        
+        if self.args.mode == "regression":
+            n_gt_v = [value/ max(gt_v) for value in gt_v]
+            n_pred_v = [value/ max(pred_v) for value in pred_v]
+            
+            mae = mean_absolute_error(gt_v, pred_v)
+            mape = mape_loss()(np.array(pred_v), np.array(gt_v))
+            nmae = mean_absolute_error(n_gt_v, n_pred_v)
+
+            if angle:
+                self.logger.info(
+                    f"[{self.angle}][{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae:.4f}, MAPE: {mape:.3f}, NMAE: {nmae:.3f}"
+                )
+
+                with open(f"{self.args.log_path}/save-log/print_{self.angle}.txt", "a") as f:
+                    if self.m_dig == "pigmentation": f.write(f"Angle, Area, Correlation, P-value, MAE, MAPE, NMAE\n")                
+                    f.write(f"{self.angle}, {self.m_dig}, {correlation:.2f}, {p_value:.4f}, {mae:.2f}, {mape:.2f}, {nmae:.2f}\n")     
+                    
+            else:
+                with open(f"{self.args.log_path}/save-log/print_total.txt", "a") as f:
+                    if self.m_dig == "pigmentation": f.write(f"Area, Correlation, P-value, MAE, MAPE, NMAE\n")                
+                    f.write(f"{self.m_dig}, {correlation:.2f}, {p_value:.4f}, {mae:.2f}, {mape:.2f}, {nmae:.2f}\n")   
+        
+        else:
+            mae_ = [abs(p-g) for p, g in zip(pred_v, gt_v)]
+            mae_ = sum(mae_) / len(mae_)
+            
+            mae_0 = [True if abs(p-g) ==0 else False for p, g in zip(pred_v, gt_v)]
+            mae_0 = sum(mae_0) / len(mae_0)
+            
+            mae_1 = [True if abs(p-g) <= 1 else False for p, g in zip(pred_v, gt_v)]
+            mae_1 = sum(mae_1) / len(mae_1)
+            
+            mae_2 = [True if abs(p-g) <= 2 else False for p, g in zip(pred_v, gt_v)]
+            mae_2 = sum(mae_2) / len(mae_2)
+
+            if angle:
+                self.logger.info(
+                    f"[{self.angle}][{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae_:.2f}, MAE(==0): {mae_0 * 100:.2f}%,  MAE(=<1): {mae_1 * 100:.2f}%, MAE(=<2): {mae_2 * 100:.2f}%"
+                )
+                for grade in all_:
+                    self.logger.info(
+                        f"          {grade} grade Acc: {correct_[grade]} / {all_[grade]} -> {(correct_[grade]/all_[grade] * 100):.2f} %"
+                    )
+                with open(f"{self.args.log_path}/save-log/print_{self.angle}.txt", "a") as f:
+                    if self.m_dig == "dryness": f.write(f"Angle, Area, Correlation, P-value, MAE, MAE(==0), MAE(=<1), MAE(=<2)\n")                
+                    f.write(f"{self.angle}, {self.m_dig}, {correlation:.2f}, {p_value:.4f}, {mae_:.2f}, {mae_0 * 100:.2f}, {mae_1 * 100:.2f}, {mae_2 * 100:.2f}\n")     
+                    
+            else:
+                with open(f"{self.args.log_path}/save-log/print_total.txt", "a") as f:
+                    if self.m_dig == "dryness": f.write(f"Area, Correlation, P-value, MAE, MAE(==0), MAE(=<1), MAE(=<2)\n")                
+                    f.write(f"{self.m_dig}, {correlation:.2f}, {p_value:.4f}, {mae_:.2f}, {mae_0 * 100:.2f}, {mae_1 * 100:.2f}, {mae_2 * 100:.2f}\n")   

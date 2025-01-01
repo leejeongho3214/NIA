@@ -1,3 +1,5 @@
+from collections import defaultdict
+import json
 import shutil
 import sys
 import os
@@ -16,7 +18,7 @@ import torch.nn as nn
 from tool.model import Model_test
 from tool.utils import resume_checkpoint, fix_seed
 
-fix_seed(523)
+
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
 def parse_args():
@@ -42,6 +44,12 @@ def parse_args():
         default=8,
         type=int,
     )
+    
+    parser.add_argument(
+        "--seed",
+        default=1,
+        type=int,
+    )
 
     parser.add_argument(
         "--num_workers",
@@ -62,10 +70,10 @@ def main(args):
     if os.path.isdir(os.path.join(check_path, "log", "eval")):
         shutil.rmtree(os.path.join(check_path, "log", "eval"))
         
+    args.log_path = os.path.join(check_path, "log")
     logger = setup_logger(
         args.name,
-        os.path.join(check_path, "log", "eval"),
-        filename=args.name + ".txt",
+        os.path.join(args.log_path, "eval")
     )
     logger.info("Command Line: " + " ".join(sys.argv))
 
@@ -100,6 +108,7 @@ def main(args):
                     False,
                 )
     else: 
+        shutil.rmtree(check_path)
         assert 0, "Incorrect checkpoint path"
 
     dataset = (
@@ -130,11 +139,15 @@ def main(args):
             "pore": ["cheek_pore"],
         }
     )
-
+    
+ 
+        
+    print_dict = defaultdict(list)
     for key in model_list:
         model = model_list[key].cuda()
         for w_key in model_area_dict[key]:
             testset, _ = dataset.load_dataset("test", w_key)
+            print_dict[w_key] = [i[2] for i in testset]
             testset_loader = data.DataLoader(
                 dataset=testset,
                 batch_size=args.batch_size,
@@ -143,9 +156,9 @@ def main(args):
             )
             resnet_model.test(model, testset_loader, w_key)
             resnet_model.print_test()
-        torch.cuda.empty_cache()
-        gc.collect()
     resnet_model.save_value()
+    with open(f"{args.log_path}/eval/testset_info.txt", "a") as f:
+        json.dump(print_dict, f)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,6 @@
+from collections import defaultdict
 import inspect
+import json
 import os
 import sys
 
@@ -20,7 +22,7 @@ from tool.data_loader import CustomDataset_class, CustomDataset_regress
 from model import Model
 import argparse
 
-fix_seed(523)
+
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
 def parse_args():
@@ -70,19 +72,25 @@ def parse_args():
 
     parser.add_argument(
         "--lr",
-        default=0.005,
+        default=0.0005,
         type=float,
     )
 
     parser.add_argument(
         "--batch_size",
-        default=32,
+        default=8,
         type=int,
     )
     
     parser.add_argument(
         "--num_workers",
         default=8,
+        type=int,
+    )
+    
+    parser.add_argument(
+        "--seed",
+        default=1,
         type=int,
     )
 
@@ -93,19 +101,15 @@ def parse_args():
 
     return args
 
-def smooth_weights(weight_grade, smoothed_target, current_epoch, max_epoch=100):
-    # 선형 보간: (1 - t) * 시작 값 + t * 목표 값
-    t = current_epoch / max_epoch  # 현재 epoch에 따른 스무딩 정도
-    smoothed_weights = (1 - t) * np.array(weight_grade) + t * smoothed_target
-    return smoothed_weights
 
 def main(args):
+    fix_seed(args.seed)
     args.root_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     args.git_name = git_name
     check_path = os.path.join(args.root_path , "checkpoint", git_name, args.mode, args.name)
     log_path = os.path.join(args.root_path , "tensorboard", git_name, args.mode, args.name)
     model_num_class = (
-        {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
+        {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 6, "wrinkle": 7}
         if args.mode == "class"
         else {
             "pigmentation": 1,
@@ -127,9 +131,9 @@ def main(args):
     
     model_path = os.path.join(check_path, "save_model")
         
-    for key, model in model_list.items(): 
-        model.fc = nn.Linear(model.fc.in_features, model_num_class[key], bias = True)
-        model_list.update({key: model})
+    # for key, model in model_list.items(): 
+    #     model.fc = nn.Linear(model.fc.in_features, model_num_class[key])
+    #     model_list.update({key: model})
 
     args.save_img = os.path.join(check_path, "save_img")
     args.pred_path = os.path.join(check_path, "prediction")
@@ -186,7 +190,9 @@ def main(args):
         if args.mode == "class"
         else CustomDataset_regress(args, logger)
     )
-
+    train_dict = defaultdict(list)
+    val_dict = defaultdict(list)
+    
     for key in model_list:
         if key in pass_list:
             continue
@@ -223,28 +229,34 @@ def main(args):
             grade_num,
             info if loading else None, 
         )
-
-        for epoch in range(args.load_epoch[key], args.epoch):
-            if args.load_epoch[key]:
-                resnet_model.update_e(epoch + 1, *info) 
-                        
-            schedule_flag = True
-            while schedule_flag:
-                resnet_model.reset_log(False)
-                schedule_flag = resnet_model.train()
-            
-            resnet_model.valid()
-
-            resnet_model.reset_log(True)
-
-            if resnet_model.stop_early():
-                break
         
-        resnet_model.print_best()
-        del trainset_loader, valset_loader
+        train_dict[key] = [i[2] for i in trainset]
+        val_dict[key] = [i[2] for i in valset]
+        
+        if args.load_epoch[key] < 50:
+            for epoch in range(args.load_epoch[key], args.epoch):
+                if args.load_epoch[key]:
+                    resnet_model.update_e(epoch + 1, *info) 
+                
+                schedule_flag = True
+                while schedule_flag:
+                    resnet_model.reset_log(False)
+                    schedule_flag = resnet_model.train()
+                
+                resnet_model.valid()
+                resnet_model.reset_log(True)
 
-        torch.cuda.empty_cache()
-        gc.collect()
+                if resnet_model.stop_early():
+                    break
+            resnet_model.print_best()
+            
+        del trainset_loader, valset_loader
+        mode = "w" if os.path.isfile(f"{check_path}/log/train/trainset_info.txt") else "a"
+        
+        with open(f"{check_path}/log/train/trainset_info.txt", mode) as f:
+            json.dump(train_dict, f)
+        with open(f"{check_path}/log/train/valset_info.txt", mode) as f:
+            json.dump(val_dict, f)
 
 
 if __name__ == "__main__":

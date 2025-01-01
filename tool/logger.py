@@ -81,7 +81,7 @@ class FileHandler(StreamHandler):
         return '<%s %s (%s)>' % (self.__class__.__name__, self.baseFilename, level)
 
 
-def setup_logger(name, path, filename="Evaluation.txt"):
+def setup_logger(name, path):
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
 
