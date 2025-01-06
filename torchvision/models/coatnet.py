@@ -179,7 +179,7 @@ class Transformer(nn.Module):
 
         self.attn = nn.Sequential(
             Rearrange('b c ih iw -> b (ih iw) c'),
-            PreNorm(inp, self.attn, nn.LayerNorm),
+            PreNorm(inp, self.attn, nn.LayerNorm),      # LayerLorm based on feature dim, not batch dim like BatchNorm
             Rearrange('b (ih iw) c -> b c ih iw', ih=self.ih, iw=self.iw)
         )
 
@@ -216,8 +216,7 @@ class CoAtNet(nn.Module):
             block[block_types[3]], channels[3], channels[4], num_blocks[4], (ih // 32, iw // 32))
 
         self.pool = nn.AvgPool2d(ih // 32, 1)
-        # self.fc = nn.Linear(channels[-1], num_classes, bias=False)
-        self.fc = nn.Linear(channels[-1], num_classes, bias=True)
+        self.fc = nn.Linear(channels[-1], num_classes, bias=False)
 
     def forward(self, x):
         x = self.s0(x)
@@ -269,7 +268,30 @@ def coatnet_4(num_classes):
     channels = [192, 192, 384, 768, 1536]   # D
     return CoAtNet((256, 256), 3, num_blocks, channels, num_classes)
 
+
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
+if __name__ == '__main__':
+    img = torch.randn(1, 3, 224, 224)
+
+    net = coatnet_0()
+    out = net(img)
+    print(out.shape, count_parameters(net))
+
+    net = coatnet_1()
+    out = net(img)
+    print(out.shape, count_parameters(net))
+
+    net = coatnet_2()
+    out = net(img)
+    print(out.shape, count_parameters(net))
+
+    net = coatnet_3()
+    out = net(img)
+    print(out.shape, count_parameters(net))
+
+    net = coatnet_4()
+    out = net(img)
+    print(out.shape, count_parameters(net))

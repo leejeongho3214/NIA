@@ -8,11 +8,12 @@ import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import torch
-import gc
+# 스크립트 디렉토리 강제 설정
+script_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+os.chdir(script_dir)
+
 from torch.utils import data
 import shutil
-import torch.nn as nn
 import numpy as np
 from torchvision import models
 from tensorboardX import SummaryWriter
@@ -104,10 +105,9 @@ def parse_args():
 
 def main(args):
     fix_seed(args.seed)
-    args.root_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     args.git_name = git_name
-    check_path = os.path.join(args.root_path , "checkpoint", git_name, args.mode, args.name)
-    log_path = os.path.join(args.root_path , "tensorboard", git_name, args.mode, args.name)
+    check_path = os.path.join("checkpoint", git_name, args.mode, args.name)
+    log_path = os.path.join("tensorboard", git_name, args.mode, args.name)
     model_num_class = (
         {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 6, "wrinkle": 7}
         if args.mode == "class"
@@ -131,10 +131,6 @@ def main(args):
     
     model_path = os.path.join(check_path, "save_model")
         
-    # for key, model in model_list.items(): 
-    #     model.fc = nn.Linear(model.fc.in_features, model_num_class[key])
-    #     model_list.update({key: model})
-
     args.save_img = os.path.join(check_path, "save_img")
     args.pred_path = os.path.join(check_path, "prediction")
 
@@ -168,9 +164,9 @@ def main(args):
     code_path = os.path.join(check_path, "code")
     mkdir(code_path)
     writer = SummaryWriter(log_path)
-    
-    [shutil.copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), code_name), os.path.join(code_path, code_name.split("/")[-1])) \
-        for code_name in ["main.py", "data_loader.py", "model.py", "../torchvision/models/resnet.py"]]
+ 
+    [shutil.copy(os.path.join(os.getcwd(), code_name), os.path.join(code_path, code_name.split("/")[-1])) \
+        for code_name in ["tool/main.py", "tool/data_loader.py", "tool/model.py", "torchvision/models/resnet.py"]]
     
     args_dict = vars(args)
 
@@ -190,25 +186,20 @@ def main(args):
         if args.mode == "class"
         else CustomDataset_regress(args, logger)
     )
-    train_dict = defaultdict(list)
-    val_dict = defaultdict(list)
-    
+
     for key in model_list:
         if key in pass_list:
             continue
         
         model = model_list[key].cuda()
-
         trainset, grade_num = dataset.load_dataset("train", key)
-
         trainset_loader = data.DataLoader(
             dataset=trainset,
             batch_size=args.batch_size,
             num_workers=args.num_workers,
             shuffle=True,
         )
-
-        valset, _ = dataset.load_dataset("valid", key)
+        valset, _ = dataset.load_dataset("val", key)
         valset_loader = data.DataLoader(
             dataset=valset,
             batch_size=args.batch_size,
@@ -230,9 +221,6 @@ def main(args):
             info if loading else None, 
         )
         
-        train_dict[key] = [i[2] for i in trainset]
-        val_dict[key] = [i[2] for i in valset]
-        
         if args.load_epoch[key] < 50:
             for epoch in range(args.load_epoch[key], args.epoch):
                 if args.load_epoch[key]:
@@ -249,18 +237,8 @@ def main(args):
                 if resnet_model.stop_early():
                     break
             resnet_model.print_best()
-            
-        del trainset_loader, valset_loader
-        mode = "w" if os.path.isfile(f"{check_path}/log/train/trainset_info.txt") else "a"
-        
-        with open(f"{check_path}/log/train/trainset_info.txt", mode) as f:
-            json.dump(train_dict, f)
-        with open(f"{check_path}/log/train/valset_info.txt", mode) as f:
-            json.dump(val_dict, f)
 
 
 if __name__ == "__main__":
     args = parse_args()
     main(args)
-
-    

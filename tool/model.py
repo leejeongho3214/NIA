@@ -217,7 +217,6 @@ class Model(object):
         if (self.update_c > self.args.stop_early) or (self.epoch == self.args.epoch - 1):
             mkdir(
                 os.path.join(
-                    self.args.root_path, 
                     "checkpoint",
                     self.args.git_name,
                     self.args.mode,
@@ -335,6 +334,7 @@ class Model(object):
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+            
             
             if torch.isnan(pred).any() or torch.isnan(loss).any():
                 self.optimizer.param_groups[0]["lr"] /= 2
