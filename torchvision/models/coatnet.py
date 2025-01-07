@@ -132,7 +132,7 @@ class Attention(nn.Module):
         self.register_buffer("relative_index", relative_index)
 
         self.attend = nn.Softmax(dim=-1)
-        self.to_qkv = nn.Linear(inp, inner_dim * 3, bias=False)
+        self.to_qkv = nn.Linear(inp, inner_dim * 3, bias=True) # change bias=False to True
 
         self.to_out = nn.Sequential(
             nn.Linear(inner_dim, oup),
@@ -215,8 +215,7 @@ class CoAtNet(nn.Module):
             block[block_types[3]], channels[3], channels[4], num_blocks[4], (ih // 32, iw // 32))
 
         self.pool = nn.AvgPool2d(ih // 32, 1)
-        # self.fc = nn.Linear(channels[-1], num_classes, bias=False)
-        self.fc = nn.Linear(channels[-1], num_classes, bias=True)
+        self.fc = nn.Linear(channels[-1], num_classes, bias=True)   # change bias=False to True
 
     def forward(self, x):
         x = self.s0(x)

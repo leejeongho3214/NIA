@@ -1,6 +1,3 @@
-from collections import defaultdict
-import inspect
-import json
 import os
 import sys
 
@@ -22,7 +19,6 @@ from logger import setup_logger
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
 from model import Model
 import argparse
-
 
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
