@@ -1,6 +1,4 @@
 from collections import defaultdict
-import inspect
-import json
 import os
 import sys
 
@@ -8,8 +6,6 @@ import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import torch
-import gc
 from torch.utils import data
 import shutil
 import torch.nn as nn
@@ -93,7 +89,6 @@ def parse_args():
         default=1,
         type=int,
     )
-
 
     parser.add_argument("--reset", action="store_true")
 
@@ -229,6 +224,9 @@ def main(args):
             grade_num,
             info if loading else None, 
         )
+        
+        train_dict[key] = [i[2] for i in trainset]
+        val_dict[key] = [i[2] for i in valset]
 
         if args.load_epoch[key] < 50:
             for epoch in range(args.load_epoch[key], args.epoch):
@@ -250,6 +248,8 @@ def main(args):
                 
             resnet_model.print_best()
         del trainset_loader, valset_loader
+        
+
 
 if __name__ == "__main__":
     args = parse_args()
