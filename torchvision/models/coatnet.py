@@ -8,7 +8,7 @@ from einops.layers.torch import Rearrange
 def conv_3x3_bn(inp, oup, image_size, downsample=False):
     stride = 1 if downsample == False else 2
     return nn.Sequential(
-        nn.Conv2d(inp, oup, 3, stride, 1, bias=False),
+        nn.Conv2d(inp, oup, 3, stride, 1, bias=True),
         nn.BatchNorm2d(oup),
         nn.GELU()
     )
@@ -28,9 +28,9 @@ class SE(nn.Module):
         super().__init__()
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Sequential(
-            nn.Linear(oup, int(inp * expansion), bias=False),
+            nn.Linear(oup, int(inp * expansion), bias=True),
             nn.GELU(),
-            nn.Linear(int(inp * expansion), oup, bias=False),
+            nn.Linear(int(inp * expansion), oup, bias=True),
             nn.Sigmoid()
         )
 
@@ -65,34 +65,34 @@ class MBConv(nn.Module):
 
         if self.downsample:
             self.pool = nn.MaxPool2d(3, 2, 1)
-            self.proj = nn.Conv2d(inp, oup, 1, 1, 0, bias=False)
+            self.proj = nn.Conv2d(inp, oup, 1, 1, 0, bias=True)
 
         if expansion == 1:
             self.conv = nn.Sequential(
                 # dw
                 nn.Conv2d(hidden_dim, hidden_dim, 3, stride,
-                          1, groups=hidden_dim, bias=False),
+                          1, groups=hidden_dim, bias=True),
                 nn.BatchNorm2d(hidden_dim),
                 nn.GELU(),
                 # pw-linear
-                nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=False),
+                nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=True),
                 nn.BatchNorm2d(oup),
             )
         else:
             self.conv = nn.Sequential(
                 # pw
                 # down-sample in the first conv
-                nn.Conv2d(inp, hidden_dim, 1, stride, 0, bias=False),
+                nn.Conv2d(inp, hidden_dim, 1, stride, 0, bias=True),
                 nn.BatchNorm2d(hidden_dim),
                 nn.GELU(),
                 # dw
                 nn.Conv2d(hidden_dim, hidden_dim, 3, 1, 1,
-                          groups=hidden_dim, bias=False),
+                          groups=hidden_dim, bias=True),
                 nn.BatchNorm2d(hidden_dim),
                 nn.GELU(),
                 SE(inp, hidden_dim),
                 # pw-linear
-                nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=False),
+                nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=True),
                 nn.BatchNorm2d(oup),
             )
         
@@ -132,7 +132,7 @@ class Attention(nn.Module):
         self.register_buffer("relative_index", relative_index)
 
         self.attend = nn.Softmax(dim=-1)
-        self.to_qkv = nn.Linear(inp, inner_dim * 3, bias=True) # change bias=False to True
+        self.to_qkv = nn.Linear(inp, inner_dim * 3, bias=True) 
 
         self.to_out = nn.Sequential(
             nn.Linear(inner_dim, oup),
@@ -171,7 +171,7 @@ class Transformer(nn.Module):
         if self.downsample:
             self.pool1 = nn.MaxPool2d(3, 2, 1)
             self.pool2 = nn.MaxPool2d(3, 2, 1)
-            self.proj = nn.Conv2d(inp, oup, 1, 1, 0, bias=False)
+            self.proj = nn.Conv2d(inp, oup, 1, 1, 0, bias=True)
 
         self.attn = Attention(inp, oup, image_size, heads, dim_head, dropout)
         self.ff = FeedForward(oup, hidden_dim, dropout)
@@ -215,7 +215,7 @@ class CoAtNet(nn.Module):
             block[block_types[3]], channels[3], channels[4], num_blocks[4], (ih // 32, iw // 32))
 
         self.pool = nn.AvgPool2d(ih // 32, 1)
-        self.fc = nn.Linear(channels[-1], num_classes, bias=True)   # change bias=False to True
+        self.fc = nn.Linear(channels[-1], num_classes, bias=True)   
 
     def forward(self, x):
         x = self.s0(x)
