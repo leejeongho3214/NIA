@@ -29,8 +29,6 @@ class CustomDataset_class(Dataset):
     def __init__(self, args, logger, mode):
         self.args = args
         self.logger = logger
-        # self.load_list(mode)
-        # self.generate_datasets()
 
     def __len__(self):
         return len(self.sub_path)
@@ -79,27 +77,10 @@ class CustomDataset_class(Dataset):
 
     def load_list(self, mode="train"):
         self.mode = mode
-        target_list = [
-            "pigmentation",
-            "moisture",
-            "elasticity_R2",
-            "wrinkle_Ra",
-            "pore",
-        ]
         
         self.img_path = "dataset/img"
         self.json_path = "dataset/label"
 
-        # sub_path_list = [
-        #     item
-        #     for item in natsort.natsorted(os.listdir(self.img_path))
-        #     if not item.startswith(".")
-        # ]
-
-        # self.json_dict = (
-        #     defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-        # )
-        # self.json_dict_train = copy.deepcopy(self.json_dict)
         
         with open(f"checkpoint/v1.4/class/none/{self.args.seed}_trainset_info.txt", "r") as f:
             dataset_list = json.load(f)
@@ -118,38 +99,6 @@ class CustomDataset_class(Dataset):
                         self.dataset_dict[class_name].append([f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value])
                         self.grade_num[class_name][value] += 1
 
-        # for equ_name in sub_path_list:
-        #     if equ_name.startswith(".") or int(equ_name) not in self.args.equ:
-        #         continue
-
-        #     for sub_fold in tqdm(
-        #         natsort.natsorted(os.listdir(os.path.join(self.json_path, equ_name))),
-        #         desc="path loading..",
-        #     ):
-        #         sub_path = os.path.join(equ_name, sub_fold)
-        #         folder_path = os.path.join(self.json_path, sub_path)
-
-        #         if sub_fold.startswith(".") or not os.path.exists(
-        #             os.path.join(self.json_path, sub_path)
-        #         ):
-        #             continue
-
-        #         for j_name in os.listdir(folder_path):
-        #             if self.should_skip_image(j_name, equ_name):
-        #                 continue
-
-        #             with open(os.path.join(folder_path, j_name), "r") as f:
-        #                 json_meta = json.load(f)
-                        
-        #                 # Check if img_name matches the name in the JSON file
-        #                 if (j_name.split('.')[0][:-3] != json_meta['info']['filename'].split('.')[0]) or \
-        #                         (str(json_meta['images']['facepart']).zfill(2) != j_name.split('_')[-1].split('.')[0]):
-        #                         assert 0
-                        
-                        
-        #                 self.process_json_meta(
-        #                     json_meta, j_name, sub_path, target_list, sub_fold
-        #                 )
 
     def process_json_meta(
         self, json_meta, j_name, sub_path, target_list, sub_fold
@@ -265,12 +214,7 @@ class CustomDataset_class(Dataset):
                 )
             )
     def load_dataset(self, mode, dig):
-        # data_list = (
-        #     self.train_list
-        #     if mode == "train"
-        #     else self.val_list if mode == "val" else self.test_list
-        # )
-        
+
         self.img_path = "dataset/img"
         self.json_path = "dataset/label"
 

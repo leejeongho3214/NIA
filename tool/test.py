@@ -4,10 +4,12 @@ import shutil
 import sys
 import os
 
-import torch
-import gc
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# 스크립트 디렉토리 강제 설정
+script_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+os.chdir(script_dir)
 
 from torchvision import models
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
@@ -63,14 +65,14 @@ def parse_args():
 
 
 def main(args):
-    args.root_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     args.git_name = git_name
-    check_path = os.path.join(args.root_path , "checkpoint", git_name, args.mode, args.name)
+    check_path = os.path.join("checkpoint", git_name, args.mode, args.name)
 
     if os.path.isdir(os.path.join(check_path, "log", "eval")):
         shutil.rmtree(os.path.join(check_path, "log", "eval"))
         
     args.log_path = os.path.join(check_path, "log")
+    
     logger = setup_logger(
         args.name,
         os.path.join(args.log_path, "eval")
@@ -78,7 +80,7 @@ def main(args):
     logger.info("Command Line: " + " ".join(sys.argv))
 
     model_num_class = (
-        {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
+        {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 6, "wrinkle": 7}
         if args.mode == "class"
         else {
             "pigmentation": 1,
@@ -139,7 +141,6 @@ def main(args):
             "pore": ["cheek_pore"],
         }
     )
-    
  
         
     print_dict = defaultdict(list)
@@ -157,8 +158,7 @@ def main(args):
             resnet_model.test(model, testset_loader, w_key)
             resnet_model.print_test()
     resnet_model.save_value()
-    with open(f"{args.log_path}/eval/testset_info.txt", "a") as f:
-        json.dump(print_dict, f)
+
 
 
 if __name__ == "__main__":
