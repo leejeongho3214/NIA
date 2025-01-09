@@ -69,7 +69,7 @@ def parse_args():
 
     parser.add_argument(
         "--lr",
-        default=0.0005,
+        default=0.0001,
         type=float,
     )
 
@@ -171,7 +171,6 @@ def main(args):
     with open(yaml_file_path, 'w') as yaml_file:
         yaml.dump(args_dict, yaml_file, default_flow_style=False)
     
-
     logger = setup_logger(
         args.name + args.mode, os.path.join(check_path, "log", "train")
     )
@@ -221,17 +220,15 @@ def main(args):
             for epoch in range(args.load_epoch[key], args.epoch):
                 if args.load_epoch[key]:
                     resnet_model.update_e(epoch + 1, *info) 
-                
-                schedule_flag = True
-                while schedule_flag:
-                    resnet_model.reset_log(False)
-                    schedule_flag = resnet_model.train()
+                    
+                _ = resnet_model.train()
                 
                 resnet_model.valid()
                 resnet_model.reset_log(True)
 
                 if resnet_model.stop_early():
                     break
+                
             resnet_model.print_best()
 
 

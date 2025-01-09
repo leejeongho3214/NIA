@@ -335,15 +335,6 @@ class Model(object):
             loss.backward()
             self.optimizer.step()
             
-            
-            if torch.isnan(pred).any() or torch.isnan(loss).any():
-                self.optimizer.param_groups[0]["lr"] /= 2
-                self.model = deepcopy(self.prev_model)
-                self.optimizer.param_groups[0]['params'] = self.model.parameters()
-                self.nan += 1
-                
-                return True
-            
         self.print_loss(len(self.train_loader), final_flag=True)
         return False
 
