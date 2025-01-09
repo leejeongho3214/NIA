@@ -218,17 +218,6 @@ class CustomDataset_class(Dataset):
         self.img_path = "dataset/img"
         self.json_path = "dataset/label"
 
-        # sub_path_list = [
-        #     item
-        #     for item in natsort.natsorted(os.listdir(self.img_path))
-        #     if not item.startswith(".")
-        # ]
-
-        # self.json_dict = (
-        #     defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-        # )
-        # self.json_dict_train = copy.deepcopy(self.json_dict)
-        
         with open(f"checkpoint/v1.4/class/none/{self.args.seed}_{mode}set_info.txt", "r") as f:
             dataset_list = json.load(f)
         
@@ -260,31 +249,6 @@ class CustomDataset_class(Dataset):
         
         for self.i_path, self.grade in tqdm(self.dataset_dict[dig], desc = f"{self.dig}"):
             self.save_dict(transform)
-        
-        # self.data = dict(self.data)
-        # if self.args.mode == "class":
-        #     grade_num = dict()
-        #     grade_num.update(
-        #         {key: len(value) for key, value in self.data[self.dig].items()}
-        #     )
-        #     num_grade = [grade_num[num] for num in sorted(grade_num)]
-
-        #     for self.grade, class_dict in tqdm(
-        #         self.data[self.dig].items(), desc=f"{mode}_class"
-        #     ):
-        #         for self.idx, sub_folder in enumerate(
-        #             tqdm(sorted(class_dict), desc=f"{self.dig}_{self.grade}")
-        #         ):
-        #             for self.i_path, self.meta_v in sub_folder:
-        #                 self.save_dict(transform)
-                        
-        # else:
-        #     for full_dig in list(self.data.keys()):
-        #         if dig in full_dig:
-        #             for self.i_path, self.value, self.meta_v in tqdm(
-        #                 self.data[full_dig], desc=f"{self.dig}"
-        #             ):
-        #                 self.save_dict(transform)
 
         if self.args.mode == "class":
             return self.area_list, grade_num

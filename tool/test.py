@@ -123,10 +123,10 @@ def main(args):
     model_area_dict = (
         {
             "dryness": ["dryness"],
-            "pigmentation": ["pigmentation_forehead", "pigmentation_cheek"],
+            "pigmentation": ["forehead_pigmentation", "cheek_pigmentation"],
             "pore": ["pore"],
             "sagging": ["sagging"],
-            "wrinkle": ["wrinkle_forehead", "wrinkle_glabellus", "wrinkle_perocular"],
+            "wrinkle": ["forehead_wrinkle", "glabellus_wrinkle", "perocular_wrinkle"],
         }
         if args.mode == "class"
         else {
