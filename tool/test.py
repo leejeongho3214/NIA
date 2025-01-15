@@ -159,8 +159,6 @@ def main(args):
             resnet_model.print_test()
     resnet_model.save_value()
 
-
-
 if __name__ == "__main__":
     args = parse_args()
     main(args)

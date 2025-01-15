@@ -1,3 +1,6 @@
+from collections import defaultdict
+import inspect
+import json
 import os
 import sys
 
@@ -181,7 +184,9 @@ def main(args):
         if args.mode == "class"
         else CustomDataset_regress(args, logger)
     )
-
+    train_dict = defaultdict(list)
+    val_dict = defaultdict(list)
+    
     for key in model_list:
         if key in pass_list:
             continue
@@ -216,6 +221,10 @@ def main(args):
             info if loading else None, 
         )
         
+        train_dict[key] = [i[2] for i in trainset]
+        val_dict[key] = [i[2] for i in valset]
+        
+
         if args.load_epoch[key] < 50:
             for epoch in range(args.load_epoch[key], args.epoch):
                 if args.load_epoch[key]:
@@ -230,6 +239,14 @@ def main(args):
                     break
                 
             resnet_model.print_best()
+        del trainset_loader, valset_loader
+        
+        mode = "w" if os.path.isfile(f"{check_path}/log/train/trainset_info.txt") else "a"
+        
+        with open(f"{check_path}/log/train/trainset_info.txt", mode) as f:
+            json.dump(train_dict, f)
+        with open(f"{check_path}/log/train/valset_info.txt", mode) as f:
+            json.dump(val_dict, f)
 
 
 if __name__ == "__main__":

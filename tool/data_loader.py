@@ -13,7 +13,6 @@ import json
 from collections import defaultdict
 from tqdm import tqdm
 from torch.utils.data import Dataset
-from sklearn.model_selection import KFold, train_test_split
 
 
 def mkdir(path):
@@ -80,7 +79,6 @@ class CustomDataset_class(Dataset):
         
         self.img_path = "dataset/img"
         self.json_path = "dataset/label"
-
         
         with open(f"checkpoint/v1.4/class/none/{self.args.seed}_trainset_info.txt", "r") as f:
             dataset_list = json.load(f)
@@ -214,7 +212,6 @@ class CustomDataset_class(Dataset):
                 )
             )
     def load_dataset(self, mode, dig):
-
         self.img_path = "dataset/img"
         self.json_path = "dataset/label"
 
