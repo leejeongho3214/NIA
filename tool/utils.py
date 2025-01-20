@@ -268,6 +268,7 @@ def save_checkpoint(self, correct_ = None, all_ = None, micro_precision = None, 
             "best_loss": self.best_loss,
             "batch_size": self.args.batch_size,
             "info": [correct_, all_, micro_precision, correlation],
+            "lr": self.optimizer.param_groups[0]['lr'],
         },
         os.path.join(checkpoint_dir, "temp_file.bin"),
     )

@@ -36,7 +36,7 @@ def parse_args():
 
     parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
 
-    parser.add_argument("--stop_early", type=int, default=50)
+    parser.add_argument("--stop_early", type=int, default=10)
 
     parser.add_argument(
         "--mode",
@@ -48,7 +48,7 @@ def parse_args():
 
     parser.add_argument(
         "--epoch",
-        default=100,
+        default=50,
         type=int,
     )
 
