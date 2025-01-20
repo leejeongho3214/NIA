@@ -36,68 +36,6 @@ class CustomDataset_class(Dataset):
         idx_list = list(self.sub_path.keys())
         return idx_list[idx], self.sub_path[idx_list[idx]], self.train_num
 
-    def generate_datasets(self):
-        self.train_list, self.val_list, self.test_list = (
-            defaultdict(lambda: defaultdict()),
-            defaultdict(lambda: defaultdict()),
-            defaultdict(lambda: defaultdict()),
-        )
-        for dig in sorted(self.json_dict.keys()):
-            class_dict = self.json_dict[dig]
-            for grade in sorted(class_dict.keys()):
-                grade_dict = class_dict[grade]
-                random_list = list(grade_dict.keys())
-                
-                random.shuffle(random_list)
-
-                train_len, val_len = int(len(grade_dict) * 0.8), int(len(grade_dict) * 0.1)
-                train_idx, val_idx, test_idx = (
-                    random_list[:train_len],
-                    random_list[train_len : train_len + val_len],
-                    random_list[train_len + val_len :],
-                )
-                grade_dict = dict(grade_dict)
-
-                for dataset_idx, (idx_list, out_list) in enumerate(
-                    zip([train_idx, val_idx, test_idx], [self.train_list, self.val_list, self.test_list])
-                ):
-                    if dataset_idx == 0:
-                        in_list = [grade_dict[idx] for idx in idx_list]
-                    else:
-                        in_list = list()
-                        for idx in idx_list:
-                            tt_list = list()
-                            for each_value in grade_dict[idx]:
-                                if each_value[0].split("_")[-2] in ["F", "L30", "R30"]:
-                                    tt_list.append(each_value)
-                            in_list.append(tt_list)
-                    out_list[dig][grade] = in_list
-
-
-    def load_list(self, mode="train"):
-        self.mode = mode
-        
-        self.img_path = "dataset/img"
-        self.json_path = "dataset/label"
-        
-        with open(f"checkpoint/v1.4/class/none/{self.args.seed}_trainset_info.txt", "r") as f:
-            dataset_list = json.load(f)
-        
-        self.dataset_dict = defaultdict(list)
-        self.grade_num = defaultdict(lambda: defaultdict(int))
-        for class_name, file_list in dataset_list.items():
-            for file_name in file_list:            
-                sub, equ, angle, area = [file_name.split("_")[i] for i in [1, 3, 5, 7]]
-                
-                with open(f"{self.json_path}/{equ}/{sub}/{sub}_{equ}_{angle}_{area}.json", "r") as f:
-                    json_value = json.load(f)
-                
-                for class_item, value in json_value["annotations"].items():
-                    if class_name in class_item:
-                        self.dataset_dict[class_name].append([f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value])
-                        self.grade_num[class_name][value] += 1
-
-
     def process_json_meta(
         self, json_meta, j_name, sub_path, target_list, sub_fold
     ):
@@ -166,7 +104,7 @@ class CustomDataset_class(Dataset):
         if self.args.mode == "class":
             label_data = int(self.grade)
         else:
-            norm_v = self.norm_reg(self.value)
+            norm_v = self.norm_reg(self.grade)
             label_data = norm_v
 
         pil = Image.fromarray(pil_img.astype(np.uint8))
@@ -174,48 +112,14 @@ class CustomDataset_class(Dataset):
 
         self.area_list.append([patch_img, label_data, desc_area, self.dig, 0, ori_img])
 
-    def should_skip_image(self, j_name, equ_name):
-        
-        # 왼쪽 눈가/볼 ->  좌 15 & 30도
-        # 오른쪽 눈가/볼 -> 우 15 & 30도
-        # 턱선 -> 위, 아래
-        
-        if equ_name == "01":
-            return (
-                (
-                    j_name.split("_")[2] in ["Ft", "Fb"]
-                    and j_name.split("_")[3].split(".")[0]
-                    in ["08"]
-                )
-                or (
-                    j_name.split("_")[2] in ["R15", "R30"]
-                    and j_name.split("_")[3].split(".")[0]
-                    in ["04", "06"]
-                )
-                or (
-                    j_name.split("_")[2] in ["L15", "L30"]
-                    and j_name.split("_")[3].split(".")[0]
-                    in ["03", "05"]
-                )
-            )
-        else:
-            return (
-                (
-                    j_name.split("_")[2] == "L"
-                    and j_name.split("_")[3].split(".")[0]
-                    in ["03", "05"]
-                )
-                or (
-                    j_name.split("_")[2] in ["R15", "R30"]
-                    and j_name.split("_")[3].split(".")[0]
-                    in ["04", "06"]
-                )
-            )
+                            
+                            
     def load_dataset(self, mode, dig):
+        self.mode = mode
         self.img_path = "dataset/img"
         self.json_path = "dataset/label"
 
-        with open(f"checkpoint/v1.4/class/none/{self.args.seed}_{mode}set_info.txt", "r") as f:
+        with open(f"checkpoint/v1.4/{self.args.mode}/none/{self.args.seed}_{mode}set_info.txt", "r") as f:
             dataset_list = json.load(f)
         
         self.dataset_dict = defaultdict(list)
@@ -227,10 +131,15 @@ class CustomDataset_class(Dataset):
                 with open(f"{self.json_path}/{equ}/{sub}/{sub}_{equ}_{angle}_{area}.json", "r") as f:
                     json_value = json.load(f)
                 
-                for class_item, value in json_value["annotations"].items():
-                    if class_name in class_item:
-                        self.dataset_dict[class_name].append([f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value])
-                        self.grade_num[class_name][value] += 1
+                if self.args.mode == "class":
+                    for class_item, value in json_value["annotations"].items():
+                        if class_name in class_item:
+                            self.dataset_dict[class_name].append([f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value])
+                            self.grade_num[class_name][value] += 1
+                else:
+                    for class_item, value in json_value["equipment"].items():
+                        if class_name in class_item:
+                            self.dataset_dict[class_name].append([f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value])
         
         grade_num = [self.grade_num[dig][key] for key in sorted(self.grade_num[dig].keys())] 
         self.area_list = list()
@@ -277,25 +186,4 @@ class CustomDataset_regress(CustomDataset_class):
     def __init__(self, args, logger):
         self.args = args
         self.logger = logger
-        self.load_list(args)
-        self.generate_datasets()
 
-    def generate_datasets(self):
-        self.train_list, self.val_list, self.test_list = dict(), dict(), dict()
-        for dig in sorted(self.json_dict):
-            train_sub, val_sub, test_sub = list(), list(), list()
-            key_index = sorted(self.json_dict[dig])
-            i = 0
-            for idx in key_index:
-                for _, value_list in self.json_dict[dig][idx].items():
-                    for value in value_list:
-                        if i % 10 == 8:
-                            if value[0].split("_")[-2] in ["F", "L30", "R30"]:
-                                val_sub.append(value)
-                        elif i % 10 == 9:
-                            if value[0].split("_")[-2] in ["F", "L30", "R30"]:
-                                test_sub.append(value)
-                        else:
-                            train_sub.append(value)
-                    i += 1
-            self.train_list[dig], self.val_list[dig], self.test_list[dig]  = train_sub, val_sub, test_sub
