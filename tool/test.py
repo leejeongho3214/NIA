@@ -52,6 +52,12 @@ def parse_args():
         default=1,
         type=int,
     )
+    
+    parser.add_argument(
+        "--res",
+        default=256,
+        type=int,
+    )
 
     parser.add_argument(
         "--num_workers",
@@ -142,15 +148,12 @@ def main(args):
         }
     )
  
-        
-    print_dict = defaultdict(list)
     for key in model_list:
         model = model_list[key].cuda()
         for w_key in model_area_dict[key]:
-            testset, _ = dataset.load_dataset("test", w_key)
-            print_dict[w_key] = [i[2] for i in testset]
+            testset, _ = dataset.load_dataset("test")
             testset_loader = data.DataLoader(
-                dataset=testset,
+                dataset=testset[w_key],
                 batch_size=args.batch_size,
                 num_workers=args.num_workers,
                 shuffle=False,
