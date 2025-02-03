@@ -110,11 +110,11 @@ class CustomDataset_class(Dataset):
         pil = Image.fromarray(pil_img.astype(np.uint8))
         patch_img = transform(pil)
 
-        self.area_list[self.dig_name].append([patch_img, label_data, desc_area, self.dig_name, 0, ori_img])
+        self.area_list.append([patch_img, label_data, desc_area, self.dig, 0, ori_img])
 
                             
                             
-    def load_dataset(self, mode):
+    def load_dataset(self, mode, dig):
         self.mode = mode
         self.img_path = "dataset/img"
         self.json_path = "dataset/label"
@@ -141,11 +141,9 @@ class CustomDataset_class(Dataset):
                         if class_name in class_item:
                             self.dataset_dict[class_name].append([f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value])
         
-        
-        for key, value in self.grade_num.items():
-            self.grade_num[key] = [value[i] for i in sorted(value.keys())]
-            
-        self.area_list = defaultdict(list)
+        grade_num = [self.grade_num[dig][key] for key in sorted(self.grade_num[dig].keys())] 
+        self.area_list = list()
+        self.dig = dig
 
         transform = transforms.Compose(
             [
@@ -155,12 +153,11 @@ class CustomDataset_class(Dataset):
             ]
         )
         
-        for idx, (self.dig_name, data_list) in enumerate(tqdm(self.dataset_dict.items())):
-            for (self.i_path, self.grade) in data_list:
-                self.save_dict(transform)
+        for self.i_path, self.grade in tqdm(self.dataset_dict[dig], desc = f"{self.dig}"):
+            self.save_dict(transform)
 
         if self.args.mode == "class":
-            return self.area_list, self.grade_num
+            return self.area_list, grade_num
         else:
             return self.area_list, 0 
 

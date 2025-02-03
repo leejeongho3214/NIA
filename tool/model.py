@@ -336,7 +336,6 @@ class Model(object):
             self.optimizer.step()
             
         self.print_loss(len(self.train_loader), final_flag=True)
-        return False
 
     def valid(self):
         self.phase = "Valid"

@@ -4,6 +4,7 @@ import json
 import os
 import sys
 
+import torch
 import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -83,8 +84,8 @@ def parse_args():
     )
     
     parser.add_argument(
-        "--num_workers",
-        default=8,
+        "--num_gpu",
+        default=1,
         type=int,
     )
     
@@ -98,6 +99,8 @@ def parse_args():
     parser.add_argument("--reset", action="store_true")
 
     args = parser.parse_args()
+    
+    args.num_workers = int(8 / args.num_gpu)
 
     return args
 
@@ -184,27 +187,42 @@ def main(args):
         if args.mode == "class"
         else CustomDataset_regress(args, logger)
     )
-    train_dict = defaultdict(list)
-    val_dict = defaultdict(list)
     
+    if "LOCAL_RANK" in os.environ:
+        args.local_rank = int(os.environ["LOCAL_RANK"])
+    else:
+        args.local_rank = 0  # 기본값 설정
+    
+    torch.cuda.set_device(args.local_rank)
+     
     for key in model_list:
         if key in pass_list:
             continue
         
+        torch.distributed.init_process_group(backend="nccl", init_method="env://", world_size=args.num_gpu, rank=args.local_rank)
+
         model = model_list[key].cuda()
+        model = torch.nn.parallel.DistributedDataParallel(
+            model, device_ids=[args.local_rank]
+        )
+
         trainset, grade_num = dataset.load_dataset("train", key)
+        train_sampler = torch.utils.data.distributed.DistributedSampler(trainset, num_replicas=args.num_gpu, rank=args.local_rank, shuffle=True)
         trainset_loader = data.DataLoader(
             dataset=trainset,
-            batch_size=args.batch_size,
-            num_workers=args.num_workers,
-            shuffle=True,
-        )
-        valset, _ = dataset.load_dataset("val", key)
-        valset_loader = data.DataLoader(
-            dataset=valset,
-            batch_size=args.batch_size,
+            batch_size=args.batch_size // args.num_gpu,
             num_workers=args.num_workers,
             shuffle=False,
+            sampler=train_sampler,
+        )
+        valset, _ = dataset.load_dataset("val", key)
+        val_sampler = torch.utils.data.distributed.DistributedSampler(valset, num_replicas=args.num_gpu, rank=args.local_rank, shuffle=False)
+        valset_loader = data.DataLoader(
+            dataset=valset,
+            batch_size=args.batch_size // args.num_gpu,
+            num_workers=args.num_workers,
+            shuffle=False,
+            sampler=val_sampler,
         )
 
         resnet_model = Model(
@@ -220,17 +238,13 @@ def main(args):
             grade_num,
             info if loading else None, 
         )
-        
-        train_dict[key] = [i[2] for i in trainset]
-        val_dict[key] = [i[2] for i in valset]
-        
 
         if args.load_epoch[key] < 50:
             for epoch in range(args.load_epoch[key], args.epoch):
                 if args.load_epoch[key]:
                     resnet_model.update_e(epoch + 1, *info) 
                     
-                _ = resnet_model.train()
+                resnet_model.train()
                 
                 resnet_model.valid()
                 resnet_model.reset_log(True)
@@ -239,14 +253,7 @@ def main(args):
                     break
                 
             resnet_model.print_best()
-        del trainset_loader, valset_loader
-        
-        mode = "w" if os.path.isfile(f"{check_path}/log/train/trainset_info.txt") else "a"
-        
-        with open(f"{check_path}/log/train/trainset_info.txt", mode) as f:
-            json.dump(train_dict, f)
-        with open(f"{check_path}/log/train/valset_info.txt", mode) as f:
-            json.dump(val_dict, f)
+
 
 
 if __name__ == "__main__":
