@@ -112,16 +112,22 @@ class Model(object):
         self.pred, self.gt = list(), list()
         self.pred_t, self.gt_t = list(), list()
         
-        self.optimizer = torch.optim.Adam(
+        self.optimizer = torch.optim.AdamW(
             params=self.model.parameters(),
             lr=self.args.lr,
-            betas=(0.9, 0.999),
-            weight_decay=0,
+            weight_decay=0.05,
         )
-        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer, "min", patience=20
-        )
+        
+        self.warmup = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=self.warmup_scheduler)
+        self.cosine_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.args.epoch)
 
+        self.scheduler = torch.optim.lr_scheduler.SequentialLR(self.optimizer, schedulers=[self.warmup, self.cosine_scheduler], milestones=[20])
+
+    def warmup_scheduler(self, epoch):
+        if (epoch + 1) < 20:
+            return (epoch + 1) / 20 
+        return 1.0 
+        
     def acc_avg(self, name):
         return round(self.test_value[name].avg * 100, 2)
 
@@ -173,7 +179,7 @@ class Model(object):
                 (
                     micro_precision,
                     _,
-                    micro_f1,
+                    _,
                     _,
                 ) = precision_recall_fscore_support(
                     f_gt, f_pred, average="micro", zero_division=1
@@ -184,7 +190,7 @@ class Model(object):
                     if i == f_pred[idx]:
                         correct_[i] += 1
 
-                info_m = f"[Lr: {self.optimizer.param_groups[0]['lr']:4f}][Gamma: {self.args.gamma}][Early Stop: {self.update_c}/{self.args.stop_early}][NaN count: {self.nan}]" if self.phase == "Train" else ""
+                info_m = f"[Lr: {self.optimizer.param_groups[0]['lr']:4f}][Gamma: {self.args.gamma}][NaN count: {self.nan}]" if self.phase == "Train" else ""
                 self.logger.info(
                     f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}]{info_m}[{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}, Correlation: {correlation:.2f} micro Precision: {(micro_precision * 100):.2f}%"
                 )          
@@ -361,7 +367,7 @@ class Model(object):
                     
                 self.print_loss(len(self.valid_loader))
                 
-            self.scheduler.step(self.val_loss.avg)
+            self.scheduler.step()
             self.print_loss(len(self.valid_loader), final_flag=True)
 
 

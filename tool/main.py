@@ -37,8 +37,6 @@ def parse_args():
 
     parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
 
-    parser.add_argument("--stop_early", type=int, default=10)
-
     parser.add_argument(
         "--mode",
         default="class",
@@ -73,7 +71,7 @@ def parse_args():
 
     parser.add_argument(
         "--lr",
-        default=0.0001,
+        default=1e-4,
         type=float,
     )
 
@@ -97,6 +95,7 @@ def parse_args():
 
 
     parser.add_argument("--reset", action="store_true")
+    parser.add_argument("--ddp", action="store_true")
 
     args = parser.parse_args()
     
@@ -199,24 +198,24 @@ def main(args):
         if key in pass_list:
             continue
         
-        torch.distributed.init_process_group(backend="nccl", init_method="env://", world_size=args.num_gpu, rank=args.local_rank)
+        if args.ddp: torch.distributed.init_process_group(backend="nccl", init_method="env://", world_size=args.num_gpu, rank=args.local_rank)
 
         model = model_list[key].cuda()
-        model = torch.nn.parallel.DistributedDataParallel(
+        if args.ddp: model = torch.nn.parallel.DistributedDataParallel(
             model, device_ids=[args.local_rank]
-        )
+        ) 
 
         trainset, grade_num = dataset.load_dataset("train", key)
-        train_sampler = torch.utils.data.distributed.DistributedSampler(trainset, num_replicas=args.num_gpu, rank=args.local_rank, shuffle=True)
+        train_sampler = torch.utils.data.distributed.DistributedSampler(trainset, num_replicas=args.num_gpu, rank=args.local_rank, shuffle=True) if args.ddp else None
         trainset_loader = data.DataLoader(
             dataset=trainset,
             batch_size=args.batch_size // args.num_gpu,
             num_workers=args.num_workers,
-            shuffle=False,
+            shuffle=False if args.ddp else True,
             sampler=train_sampler,
         )
         valset, _ = dataset.load_dataset("val", key)
-        val_sampler = torch.utils.data.distributed.DistributedSampler(valset, num_replicas=args.num_gpu, rank=args.local_rank, shuffle=False)
+        val_sampler = torch.utils.data.distributed.DistributedSampler(valset, num_replicas=args.num_gpu, rank=args.local_rank, shuffle=False)  if args.ddp else None
         valset_loader = data.DataLoader(
             dataset=valset,
             batch_size=args.batch_size // args.num_gpu,
@@ -249,9 +248,6 @@ def main(args):
                 resnet_model.valid()
                 resnet_model.reset_log(True)
 
-                if resnet_model.stop_early():
-                    break
-                
             resnet_model.print_best()
 
 
