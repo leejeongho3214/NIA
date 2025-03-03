@@ -31,7 +31,7 @@
 
 ### 관련 논문
 - [우수발표논문 수상] 이정호 외 5명, "다중뷰 안면 영역열 이미지를 이용한 피부평가 AI", [2024년 한국컴퓨터종합학술대회(KCC)](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE11862094)
-- [우수논문 수상] 이정호 외 5명, "Transformer-CNN 기반 하이브리드 딥러닝 모델을 활용한 안면 피부 평가", [2024년 한국소프트웨어종합학술대회(KSC)]([https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE11862094](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE12041791))
+- [우수논문 수상] 이정호 외 5명, "Transformer-CNN 기반 하이브리드 딥러닝 모델을 활용한 안면 피부 평가", [2024년 한국소프트웨어종합학술대회(KSC)](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE11862094](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE12041791))
 - 해외 저널 논문 준비중...
 
 ## 피부진단 AI 모델
