@@ -148,6 +148,18 @@ class Model(object):
             self.logger.info(
                 f"Best Epoch: {self.best_epoch}  MAE: {self.best_loss[self.m_dig]:.2f}  Correlation: {self.corre_:.2f}"
                 )
+            
+        mkdir(
+                os.path.join(
+                    "checkpoint",
+                    self.args.git_name,
+                    self.args.mode,
+                    self.args.name,
+                    "save_model",
+                    str(self.m_dig),
+                    "done",
+                )
+            )
 
     def print_loss(self, dataloader_len, final_flag=False):
         print(
