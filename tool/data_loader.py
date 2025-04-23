@@ -119,7 +119,7 @@ class CustomDataset_class(Dataset):
         self.img_path = "dataset/img"
         self.json_path = "dataset/label"
 
-        with open(f"checkpoint/v1.4/{self.args.mode}/none/{self.args.seed}_{mode}set_info.txt", "r") as f:
+        with open(f"checkpoint/resnet/{self.args.mode}/none/{self.args.seed}_{mode}set_info.txt", "r") as f:
             dataset_list = json.load(f)
         
         self.dataset_dict = defaultdict(list)
