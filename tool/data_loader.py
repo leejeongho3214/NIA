@@ -119,7 +119,14 @@ class CustomDataset_class(Dataset):
         self.img_path = "dataset/img"
         self.json_path = "dataset/label"
 
-        with open(f"checkpoint/resnet/{self.args.mode}/none/{self.args.seed}_{mode}set_info.txt", "r") as f:
+        if self.args.equ == 1:
+            device = "digital_camera"
+        elif self.args.equ == 2:
+            device = "smart_pad"
+        else:
+            device = "smart_phone"
+        
+        with open(f"dataset/split/{device}/{self.args.seed}_{mode}set_info.txt", "r") as f:
             dataset_list = json.load(f)
         
         self.dataset_dict = defaultdict(list)
