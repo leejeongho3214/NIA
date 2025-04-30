@@ -179,7 +179,7 @@ def main(args):
     logger = setup_logger(
         args.name + args.mode, os.path.join(check_path, "log", "train")
     )
-    logger.info("Command Line: " + " ".join(sys.argv))
+    logger.info(f"[{git_name}]Command Line: " + " ".join(sys.argv))
 
     dataset = (
         CustomDataset_class(args, logger, "train")
