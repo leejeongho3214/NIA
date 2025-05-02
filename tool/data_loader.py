@@ -141,11 +141,13 @@ class CustomDataset_class(Dataset):
                 if self.args.mode == "class":
                     for class_item, value in json_value["annotations"].items():
                         if class_name in class_item:
+                            area = "00"
                             self.dataset_dict[class_name].append([f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value])
                             self.grade_num[class_name][value] += 1
                 else:
                     for class_item, value in json_value["equipment"].items():
                         if class_name in class_item:
+                            area = "00"
                             self.dataset_dict[class_name].append([f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value])
         
         grade_num = [self.grade_num[dig][key] for key in sorted(self.grade_num[dig].keys())] 

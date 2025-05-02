@@ -315,7 +315,7 @@ class Model(object):
         self.gt_t = list()
 
     def update_e(self, epoch, correct_, all_, micro_precision, correlation):
-        self.epoch = epoch
+        self.epoch = self.best_epoch = epoch
         self.correct_ = correct_
         self.all_ = all_
         self.acc_ = micro_precision
