@@ -2,6 +2,7 @@
 [![Dataset in AI-Hub](https://img.shields.io/badge/Dataset%20in-AI--Hub-blue)](https://www.aihub.or.kr/aihubdata/data/view.do?currMenu=&topMenu=&aihubDataSe=data&dataSetSn=71645)
 [![2024 KCC](https://img.shields.io/badge/Paper%201-2024_KCC-red)](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE11862094)
 [![2024 KSC](https://img.shields.io/badge/Paper%202-2024_KSC-orange)](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE12041791)
+[![Contact](https://img.shields.io/badge/Contact-Me-informational?logo=gmail)](mailto:72210297@dankook.ac.kr)
 
 ## 소개
 - 최초로 한국인을 대상으로 수집한 피부상태 측정 데이터
