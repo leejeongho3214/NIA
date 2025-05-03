@@ -1,4 +1,8 @@
 # 한국인 피부상태 측정 데이터
+[![Dataset in AI-Hub]([https](https://www.aihub.or.kr/aihubdata/data/view.do?currMenu=&topMenu=&aihubDataSe=data&dataSetSn=71645))]([https://github.com/lapis42/srtgo/actions/workflows/python-publish.yml](https://www.aihub.or.kr/aihubdata/data/view.do?currMenu=&topMenu=&aihubDataSe=data&dataSetSn=71645))
+[![Downloads](https://static.pepy.tech/badge/srtgo)](https://pepy.tech/project/srtgo)
+[![Downloads](https://static.pepy.tech/badge/srtgo/month)](https://pepy.tech/project/srtgo)
+[![Python version](https://img.shields.io/pypi/pyversions/srtgo)](https://pypistats.org/packages/srtgo)
 ## 소개
 - 최초로 한국인을 대상으로 수집한 피부상태 측정 데이터
 - 10~60대 이상의 남/여를 일정한 비율로 총 1,100명으로 구성
