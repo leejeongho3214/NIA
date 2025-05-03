@@ -4,7 +4,7 @@
 [![Paper 1 (2024 KCC)](https://img.shields.io/badge/Paper-2024_KCC-red)](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE11862094)
 [![Paper 2 (2024 KSC)](https://img.shields.io/badge/Paper-2024_KSC-orange)](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE12041791)
 [![Contact](https://img.shields.io/badge/Contact-Email-informational?logo=gmail)](mailto:72210297@dankook.ac.kr)
-
+[![Project Page](https://img.shields.io/badge/Project-Homepage-brightgreen)](https://leejeongho3214.github.io/NIA)
 ---
 
 ## 📌 소개
