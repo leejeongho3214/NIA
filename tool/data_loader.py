@@ -18,11 +18,12 @@ from torch.utils.data import Dataset
 def mkdir(path):
     if path == "":
         return
-    try:    
+    try:
         os.makedirs(path)
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise
+
 
 class CustomDataset_class(Dataset):
     def __init__(self, args, logger, mode):
@@ -36,9 +37,7 @@ class CustomDataset_class(Dataset):
         idx_list = list(self.sub_path.keys())
         return idx_list[idx], self.sub_path[idx_list[idx]], self.train_num
 
-    def process_json_meta(
-        self, json_meta, j_name, sub_path, target_list, sub_fold
-    ):
+    def process_json_meta(self, json_meta, j_name, sub_path, target_list, sub_fold):
         if (
             (
                 list(json_meta["annotations"].keys())[0] == "acne"
@@ -58,9 +57,9 @@ class CustomDataset_class(Dataset):
 
         if self.args.mode == "class":
             for dig_n, grade in json_meta["annotations"].items():
-                if (dig_n == "chin_sagging" and grade == 6):
+                if dig_n == "chin_sagging" and grade == 6:
                     continue
-                
+
                 dig, area = dig_n.split("_")[-1], dig_n.split("_")[-2]
 
                 if dig in ["wrinkle", "pigmentation"] and self.mode == "test":
@@ -85,8 +84,10 @@ class CustomDataset_class(Dataset):
                     )
 
     def save_dict(self, transform):
-        ori_img = cv2.imread(os.path.join("dataset/cropped_img", self.i_path + ".jpg"))     ## Be careful the path of the dataset whether it is 0-padding or not
-        pil_img = cv2.cvtColor(ori_img, cv2.COLOR_BGR2RGB)  
+        ori_img = cv2.imread(
+            os.path.join("dataset/cropped_img", self.i_path + ".jpg")
+        )  ## Be careful the path of the dataset whether it is 0-padding or not
+        pil_img = cv2.cvtColor(ori_img, cv2.COLOR_BGR2GRAY)  ## change
         ori_img = cv2.resize(ori_img, (self.args.res, self.args.res))
 
         s_list = self.i_path.split("/")[-1].split("_")
@@ -112,8 +113,6 @@ class CustomDataset_class(Dataset):
 
         self.area_list.append([patch_img, label_data, desc_area, self.dig, 0, ori_img])
 
-                            
-                            
     def load_dataset(self, mode, dig):
         self.mode = mode
         self.img_path = "dataset/img"
@@ -125,48 +124,59 @@ class CustomDataset_class(Dataset):
             device = "smart_pad"
         else:
             device = "smart_phone"
-        
-        with open(f"dataset/split/{device}/{self.args.seed}_{mode}set_info.txt", "r") as f:
+
+        with open(
+            f"dataset/split/{device}/{self.args.seed}_{mode}set_info.txt", "r"
+        ) as f:
             dataset_list = json.load(f)
-        
+
         self.dataset_dict = defaultdict(list)
         self.grade_num = defaultdict(lambda: defaultdict(int))
         for class_name, file_list in dataset_list.items():
-            for file_name in file_list:            
+            for file_name in file_list:
                 sub, equ, angle, area = [file_name.split("_")[i] for i in [1, 3, 5, 7]]
-                
-                with open(f"{self.json_path}/{equ}/{sub}/{sub}_{equ}_{angle}_{area}.json", "r") as f:
+
+                with open(
+                    f"{self.json_path}/{equ}/{sub}/{sub}_{equ}_{angle}_{area}.json", "r"
+                ) as f:
                     json_value = json.load(f)
-                
+
                 if self.args.mode == "class":
                     for class_item, value in json_value["annotations"].items():
                         if class_name in class_item:
-                            self.dataset_dict[class_name].append([f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value])
+                            self.dataset_dict[class_name].append(
+                                [f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value]
+                            )
                             self.grade_num[class_name][value] += 1
                 else:
                     for class_item, value in json_value["equipment"].items():
                         if class_name in class_item:
-                            self.dataset_dict[class_name].append([f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value])
-        
-        grade_num = [self.grade_num[dig][key] for key in sorted(self.grade_num[dig].keys())] 
+                            self.dataset_dict[class_name].append(
+                                [f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value]
+                            )
+
+        grade_num = [
+            self.grade_num[dig][key] for key in sorted(self.grade_num[dig].keys())
+        ]
         self.area_list = list()
         self.dig = dig
 
         transform = transforms.Compose(
             [
                 transforms.Resize((256, 256), antialias=True),
-                transforms.ToTensor(),
-                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+                transforms.Grayscale(num_output_channels=1),  # 확실히 1채널로 맞춰줌
+                transforms.ToTensor(),                        # shape: [1, H, W]
+                transforms.Normalize([0.5], [0.5]),           # for gray
             ]
         )
-        
-        for self.i_path, self.grade in tqdm(self.dataset_dict[dig], desc = f"{self.dig}"):
+
+        for self.i_path, self.grade in tqdm(self.dataset_dict[dig], desc=f"{self.dig}"):
             self.save_dict(transform)
 
         if self.args.mode == "class":
             return self.area_list, grade_num
         else:
-            return self.area_list, 0 
+            return self.area_list, 0
 
     def norm_reg(self, value):
         dig_v = self.dig.split("_")[-1]
@@ -189,8 +199,8 @@ class CustomDataset_class(Dataset):
         else:
             assert 0, "dig_v is not here"
 
+
 class CustomDataset_regress(CustomDataset_class):
     def __init__(self, args, logger):
         self.args = args
         self.logger = logger
-
