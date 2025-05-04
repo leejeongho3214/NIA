@@ -6,7 +6,7 @@
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
   <img src="assets/iec.jpg" height="150" width="150">  
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="assets/kairos.png" height="150" width="150">
+  <img src="assets/kairos.png" height="150" width="250">
 </p>
 
 <h1 align="center">🇰🇷 한국인 피부상태 AI 데이터셋</h1>
