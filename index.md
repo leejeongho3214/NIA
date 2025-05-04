@@ -1,4 +1,10 @@
-# 👋 한국인 피부상태 AI 데이터셋
+<p align="center">
+  <img src="https://commons.wikimedia.org/wiki/File:Dankook_emblem.png" height="60">
+  <img src="https://upload.wikimedia.org/wikipedia/en/3/3f/Columbia_University_shield.svg" height="60">
+  <img src="https://upload.wikimedia.org/wikipedia/commons/5/5d/Toyota_Research_Institute_logo.svg" height="60">
+</p>
+
+<h1 align="center">👋 한국인 피부상태 AI 데이터셋</h1>
 
 이 프로젝트는 한국인을 대상으로 한 피부 이미지 데이터셋과 안면 피부 상태 평가를 위한 AI 모델을 제공합니다.  
 10~60대 이상의 남녀 1,100명을 대상으로 수집한 다각도 이미지와 함께, 피부과 전문의의 육안 평가와 정밀 기기 측정값이 포함되어 있습니다.
