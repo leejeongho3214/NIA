@@ -14,9 +14,9 @@
 
 ## 📂 주요 링크
 
-- 📊 [AI-Hub 데이터 다운로드](https://www.aihub.or.kr/aihubdata/data/view.do?currMenu=&topMenu=&aihubDataSe=data&dataSetSn=71645)
-- 📄 [논문 1 - 2024 KCC (DBpia)](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE11862094)
-- 📄 [논문 2 - 2024 KSC (DBpia)](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE12041791)
+- 📊 [AI-Hub 데이터셋](https://www.aihub.or.kr/aihubdata/data/view.do?currMenu=&topMenu=&aihubDataSe=data&dataSetSn=71645)
+- 📄 [정보과학회 2024 KCC 🏅 우수발표논문상](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE11862094)
+- 📄 [정보과학회 2024 KSC 🏆 우수논문상](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE12041791)
 - 📬 [이메일 문의](mailto:72210297@dankook.ac.kr)
 
 ---
