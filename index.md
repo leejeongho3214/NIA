@@ -1,7 +1,10 @@
 <p align="center">
   <img src="assets/dku.png" height="200" width="200">
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
   <img src="assets/dku_hos.svg" height="200" width="200">
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
   <img src="assets/iec.jpg" height="200" width="200">
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
   <img src="assets/kairos.png" height="200" width="200">
 </p>
 
