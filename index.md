@@ -1,7 +1,8 @@
 <p align="center">
-  <img src="https://commons.wikimedia.org/wiki/File:Dankook_emblem.png" height="60">
-  <img src="https://upload.wikimedia.org/wikipedia/en/3/3f/Columbia_University_shield.svg" height="60">
-  <img src="https://upload.wikimedia.org/wikipedia/commons/5/5d/Toyota_Research_Institute_logo.svg" height="60">
+  <img src="assets/dku.png" height="200", width = "200">
+  <img src="assets/dku_hos.svg" height="200", width = "200">
+  <img src="assets/iec.jpg" height="200", width = "200">
+  <img src="assets/kairos.png" height="200", width = "200">
 </p>
 
 <h1 align="center">👋 한국인 피부상태 AI 데이터셋</h1>
