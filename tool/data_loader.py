@@ -88,6 +88,7 @@ class CustomDataset_class(Dataset):
             os.path.join("dataset/cropped_img", self.i_path + ".jpg")
         )  ## Be careful the path of the dataset whether it is 0-padding or not
         pil_img = cv2.cvtColor(ori_img, cv2.COLOR_BGR2GRAY)  ## change
+        pil_img = cv2.equalizeHist(pil_img)
         ori_img = cv2.resize(ori_img, (self.args.res, self.args.res))
 
         s_list = self.i_path.split("/")[-1].split("_")
