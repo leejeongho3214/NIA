@@ -18,8 +18,8 @@
 ## 📂 주요 링크
 
 - 📊 [AI-Hub 데이터셋](https://www.aihub.or.kr/aihubdata/data/view.do?currMenu=&topMenu=&aihubDataSe=data&dataSetSn=71645)
-- 📄 [정보과학회 2024 KCC 🏅 우수발표논문상](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE11862094)
-- 📄 [정보과학회 2024 KSC 🏆 우수논문상](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE12041791)
+- 📄 [정보과학회 2024 KCC (🏅 우수발표논문상)](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE11862094)
+- 📄 [정보과학회 2024 KSC (🏆 우수논문상)](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE12041791)
 - 📬 [이메일 문의](mailto:72210297@dankook.ac.kr)
 
 ---
@@ -74,7 +74,7 @@ project_root/
 
 ---
 
-## 👤 Maintainer
+## 👤 담당자
 
 - **이정호 (Jeongho Lee)**  
   단국대학교 컴퓨터학과 박사과정  
