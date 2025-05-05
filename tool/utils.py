@@ -29,14 +29,12 @@ def softmax(x):
 
 
 def resume_checkpoint(args, model, path, dig, test = True):
-
-    
     state_dict = torch.load(path, map_location=device)
     if state_dict["best_loss"][dig] != np.inf and test:
         args.best_loss[dig] = state_dict["best_loss"][dig]
         
     if test: 
-        args.load_epoch[dig] = state_dict["epoch"]
+        args.load_epoch[dig] = state_dict["epoch"] + 1
         info = state_dict["info"] 
     else:
         info = None
@@ -47,10 +45,11 @@ def resume_checkpoint(args, model, path, dig, test = True):
             print(f"batch_size update {state_dict['batch_size']} ->> {args.batch_size}")
     model.load_state_dict(state_dict["model_state"], strict=False)
     
-    info = state_dict["info"]
+    info, step, id = state_dict["info"], state_dict["global_step"], state_dict["run_id"]
+    
     del state_dict
 
-    return model, info
+    return model, info, step, id
 
 class LabelSmoothingCrossEntropy(nn.Module):
     def __init__(self, smoothing):
@@ -269,6 +268,8 @@ def save_checkpoint(self, correct_ = None, all_ = None, micro_precision = None, 
             "batch_size": self.args.batch_size,
             "info": [correct_, all_, micro_precision, correlation],
             "lr": self.optimizer.param_groups[0]['lr'],
+            "global_step": self.global_step,
+            "run_id": self.args.run_id
         },
         os.path.join(checkpoint_dir, "temp_file.bin"),
     )
@@ -335,7 +336,9 @@ def save_image(self, img):
     for i, name in enumerate(self.img_names):
         x, y = (i % j * (256 + 2) + 2, i // j * (256 + 2) + 20)  # 위치 조절
         cv2.putText(img_mat, name, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.41, (255, 255, 255), 1, cv2.LINE_AA)
-    cv2.imwrite(os.path.join(path, f"epoch_{self.epoch}_iter_{self.iter}_{self.m_dig}.jpg"), img_mat.get()[:, :, (2, 1, 0)])
+        
+    saved_image = cv2.cvtColor(img_mat.get(), cv2.COLOR_RGB2BGR).astype(np.uint8)
+    cv2.imwrite(os.path.join(path, f"epoch_{self.epoch}_iter_{self.iter}_{self.m_dig}.jpg"), saved_image)
 
 def fix_seed(random_seed):
 
