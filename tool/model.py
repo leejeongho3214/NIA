@@ -31,47 +31,10 @@ else:
 class Model(object):
     def __init__(
         self,
-        args,
-        model,
-        train_loader,
-        valid_loader,
-        logger,
-        check_path,
-        model_num_class,
-        writer,
-        dig_k,
-        grade_num,
-        info,
+        **kwargs
     ):
-        (
-            self.args,
-            self.model,
-            self.temp_model,
-            self.train_loader,
-            self.valid_loader,
-            self.best_loss,
-            self.logger,
-            self.check_path,
-            self.model_num_class,
-            self.writer,
-            self.m_dig,
-            self.grade_num,
-            self.info
-        ) = (
-            args,
-            model,
-            None,
-            train_loader,
-            valid_loader,
-            args.best_loss,
-            logger,
-            check_path,
-            model_num_class,
-            writer,
-            dig_k,
-            grade_num,
-            info,
-        )
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
         self.train_loss, self.val_loss = AverageMeter(), AverageMeter()
         self.keep_acc = {
@@ -102,7 +65,7 @@ class Model(object):
         }
         self.epoch = 0
         self.nan = 0
-
+        self.global_step = 0
         (
             self.phase,
             self.update_c,
@@ -166,13 +129,10 @@ class Model(object):
             f"\r[{self.args.git_name}] Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}",
             end="",
         )
+        loss_phase, loss_avg = ('train_loss', self.train_loss.avg) if self.phase == 'Train' else ('valid_loss', self.val_loss.avg)
+        self.wandb.log({loss_phase: loss_avg, 'lr': round(self.optimizer.param_groups[0]['lr'], 4)}, step = self.global_step)
+        
         if final_flag:
-            self.writer.add_scalar(
-                f"{self.phase}/{self.m_dig}",
-                self.train_loss.avg if self.phase == "Train" else self.val_loss.avg,
-                self.epoch,
-            )
-
             f_pred = list()
             f_gt = list()
             
@@ -305,21 +265,18 @@ class Model(object):
 
         return result
 
-    def reset_log(self, flag):
+    def reset_log(self):
         self.train_loss = AverageMeter()
         self.val_loss = AverageMeter()
-        if flag: self.epoch += 1
+        self.epoch += 1
         self.pred = list()
         self.gt = list()
         self.pred_t = list()
         self.gt_t = list()
 
-    def update_e(self, epoch, correct_, all_, micro_precision, correlation):
-        self.epoch = epoch
-        self.correct_ = correct_
-        self.all_ = all_
-        self.acc_ = micro_precision
-        self.corre_ = correlation
+    def update_e(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
         
     def train(self):
         self.model.train()
@@ -352,6 +309,8 @@ class Model(object):
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+            
+            self.global_step += 1
             
         self.print_loss(len(self.train_loader), final_flag=True)
 

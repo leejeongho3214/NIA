@@ -1,4 +1,5 @@
 from collections import defaultdict
+from datetime import datetime
 import inspect
 import json
 import os
@@ -9,6 +10,10 @@ import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# use line-buffering for both stdout and stderr
+sys.stdout = open(sys.stdout.fileno(), mode='w', buffering=1)
+sys.stderr = open(sys.stderr.fileno(), mode='w', buffering=1)
+
 # 스크립트 디렉토리 강제 설정
 script_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 os.chdir(script_dir)
@@ -17,12 +22,13 @@ from torch.utils import data
 import shutil
 import numpy as np
 from torchvision import models
-from tensorboardX import SummaryWriter
 from utils import mkdir, resume_checkpoint, fix_seed
 from logger import setup_logger
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
 from model import Model
 import argparse
+
+import wandb  # 상단에 추가
 
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
@@ -104,11 +110,24 @@ def parse_args():
     return args
 
 
+
 def main(args):
+    now = datetime.now()
     fix_seed(args.seed)
     args.git_name = git_name
+    
+    
+    # args.name으로 프로젝트 식별
+    wandb_run = wandb.init(
+        project = "NIA-Korean-Facial-Assessment",
+        name = f"{now:%Y.%m.%d}/{now:%H.%M.%S}/{args.git_name}/{args.name}",
+        config = vars(args),
+        dir = "wandb",
+        resume = True
+    )
+
+
     check_path = os.path.join("checkpoint", git_name, args.mode, args.name)
-    log_path = os.path.join("tensorboard", git_name, args.mode, args.name)
     model_num_class = (
         {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 6, "wrinkle": 7}
         if args.mode == "class"
@@ -139,8 +158,6 @@ def main(args):
         print(f"\033[90mReseting......{check_path}\033[0m")
         if os.path.isdir(check_path):
             shutil.rmtree(check_path)
-        if os.path.isdir(log_path):
-            shutil.rmtree(log_path)
 
     loading = False
     if os.path.isdir(model_path):
@@ -158,13 +175,10 @@ def main(args):
                 if os.path.isdir(os.path.join(dig_path, "done")):
                     print(f"\043[92mPassing......{dig_path}\043[0m")
                     pass_list.append(path)
-            
 
     mkdir(model_path)
-    mkdir(log_path)
     code_path = os.path.join(check_path, "code")
     mkdir(code_path)
-    writer = SummaryWriter(log_path)
  
     [shutil.copy(os.path.join(os.getcwd(), code_name), os.path.join(code_path, code_name.split("/")[-1])) \
         for code_name in ["tool/main.py", "tool/data_loader.py", "tool/model.py", "torchvision/models/resnet.py"]]
@@ -232,23 +246,21 @@ def main(args):
             logger,
             check_path,
             model_num_class,
-            writer,
+            wandb_run,
             key,
             grade_num,
             info if loading else None, 
         )
 
-        if args.load_epoch[key] < 50:
-            for epoch in range(args.load_epoch[key], args.epoch):
-                if args.load_epoch[key]:
-                    resnet_model.update_e(epoch + 1, *info) 
-                    
-                resnet_model.train()
+        for epoch in range(args.load_epoch[key], args.epoch):
+            if args.load_epoch[key]:
+                resnet_model.update_e(epoch + 1, *info) 
                 
-                resnet_model.valid()
-                resnet_model.reset_log(True)
+            resnet_model.train()
+            resnet_model.valid()
+            resnet_model.reset_log()
 
-            resnet_model.print_best()
+        resnet_model.print_best()
 
 
 

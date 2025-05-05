@@ -269,6 +269,7 @@ def save_checkpoint(self, correct_ = None, all_ = None, micro_precision = None, 
             "batch_size": self.args.batch_size,
             "info": [correct_, all_, micro_precision, correlation],
             "lr": self.optimizer.param_groups[0]['lr'],
+            "global_step": self.global_step
         },
         os.path.join(checkpoint_dir, "temp_file.bin"),
     )

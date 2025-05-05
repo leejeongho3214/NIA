@@ -1,0 +1,15 @@
+/home/jeongho/miniconda3/envs/NIA/lib/python3.8/site-packages/torch/functional.py:513: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at ../aten/src/ATen/native/TensorShape.cpp:3609.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+[92mResuming......checkpoint/coatnet/class/4st/save_model/pore[0m
+/home/jeongho/dir/NIA/tool/utils.py:34: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  state_dict = torch.load(path, map_location=device)
+#[92mPassing......checkpoint/coatnet/class/4st/save_model/pore#[0m
+[92mResuming......checkpoint/coatnet/class/4st/save_model/sagging[0m
+#[92mPassing......checkpoint/coatnet/class/4st/save_model/sagging#[0m
+[92mResuming......checkpoint/coatnet/class/4st/save_model/dryness[0m
+#[92mPassing......checkpoint/coatnet/class/4st/save_model/dryness#[0m
+[92mResuming......checkpoint/coatnet/class/4st/save_model/wrinkle[0m
+#[92mPassing......checkpoint/coatnet/class/4st/save_model/wrinkle#[0m
+[92mResuming......checkpoint/coatnet/class/4st/save_model/pigmentation[0m
+#[92mPassing......checkpoint/coatnet/class/4st/save_model/pigmentation#[0m
+[95m2025-05-05 20:17:43,464[0m  Command Line: tool/main.py --name 4st --seed 4
