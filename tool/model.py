@@ -6,6 +6,8 @@ import torch.nn as nn
 import numpy as np
 from scipy.stats import pearsonr
 
+import wandb
+
 from tqdm import tqdm
 from data_loader import mkdir
 import torch.optim as optim
@@ -102,7 +104,6 @@ class Model(object):
         }
         self.epoch = 0
         self.nan = 0
-
         (
             self.phase,
             self.update_c,
@@ -166,6 +167,9 @@ class Model(object):
             f"\r[{self.args.git_name}] Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}",
             end="",
         )
+        loss_phase, loss_avg = ('train_loss', self.train_loss.avg) if self.phase == 'Train' else ('valid_loss', self.val_loss.avg)
+        self.wandb_run.log({loss_phase: loss_avg, 'lr': self.optimizer.param_groups[0]['lr'], 'epoch': self.epoch, 'global_step': self.global_step}, step = self.global_step)
+        
         if final_flag:
             self.writer.add_scalar(
                 f"{self.phase}/{self.m_dig}",
@@ -313,7 +317,6 @@ class Model(object):
         self.gt = list()
         self.pred_t = list()
         self.gt_t = list()
-
     def update_e(self, epoch, correct_, all_, micro_precision, correlation):
         self.epoch = self.best_epoch = epoch
         self.correct_ = correct_
@@ -330,7 +333,6 @@ class Model(object):
             else nn.L1Loss()
         )
         self.prev_model = deepcopy(self.model)
-        random_num = random.randrange(0, len(self.train_loader))
 
         for self.iter, (img, label, self.img_names, _, _, _) in enumerate(
             self.train_loader
@@ -342,10 +344,15 @@ class Model(object):
             if self.args.mode == "class":
                 loss = self.class_loss(pred, label)
             else:
-                loss = self.regression(pred, label)
-                
-            if self.iter == random_num:
-                save_image(self, img)
+                loss = self.regression(pred, label)  
+            
+            if not self.iter:
+                self.wandb_run.log({
+                    "train/image": [
+                        wandb.Image(img[i], caption=f"GT: {label[i]}, Pred: {pred[i].argmax().item()}, Name: {self.img_names[i]}")
+                        for i in range(4)
+                    ]
+                }, step=self.global_step)
 
             self.print_loss(len(self.train_loader))
 
@@ -360,7 +367,6 @@ class Model(object):
         self.criterion = (
             nn.CrossEntropyLoss() if self.args.mode == "class" else nn.L1Loss()
         )
-        random_num = random.randrange(0, len(self.valid_loader))
         with torch.no_grad():
             self.model.eval()
             for self.iter, (img, label, self.img_names, _, _, _) in enumerate(
@@ -374,8 +380,13 @@ class Model(object):
                 else:
                     self.regression(pred, label)
                     
-                if self.iter == random_num:
-                    save_image(self, img)
+                if not self.iter:
+                    self.wandb_run.log({
+                        "valid/image": [
+                            wandb.Image(img[i], caption=f"GT: {label[i]}, Pred: {pred[i].argmax().item()}, Name: {self.img_names[i]}")
+                            for i in range(4)
+                        ]
+                    }, step=self.global_step)
                     
                 self.print_loss(len(self.valid_loader))
                 
