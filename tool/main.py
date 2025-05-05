@@ -1,11 +1,7 @@
-from collections import defaultdict
-import inspect
-import json
+from datetime import datetime
 import os
 import sys
-
-import torch
-import yaml
+import uuid
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -13,16 +9,19 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 script_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 os.chdir(script_dir)
 
+import torch
+import yaml
+
 from torch.utils import data
 import shutil
 import numpy as np
-from torchvision import models
-from tensorboardX import SummaryWriter
+
+from custom_model.coatnet import coatnet_4
 from utils import mkdir, resume_checkpoint, fix_seed
 from logger import setup_logger
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
-from model import Model
 import argparse
+from tool.model import Model
 
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
@@ -35,7 +34,7 @@ def parse_args():
         type=str,
     )
 
-    parser.add_argument("--equ", type=int, default=[2], choices=[1, 2, 3], nargs="+")
+    parser.add_argument("--equ", type=int, default=1, choices=[1, 2, 3])
 
     parser.add_argument(
         "--mode",
@@ -61,12 +60,6 @@ def parse_args():
         "--gamma",
         default=2,
         type=float,
-    )
-
-    parser.add_argument(
-        "--load_epoch",
-        default=0,
-        type=int,
     )
 
     parser.add_argument(
@@ -107,6 +100,7 @@ def parse_args():
 def main(args):
     fix_seed(args.seed)
     args.git_name = git_name
+    
     check_path = os.path.join("checkpoint", git_name, args.mode, args.name)
     log_path = os.path.join("tensorboard", git_name, args.mode, args.name)
     model_num_class = (
@@ -126,7 +120,7 @@ def main(args):
     args.load_epoch = {item: 0 for item in model_num_class}
 
     model_list = {
-            key: models.coatnet.coatnet_4(num_classes=value)
+            key: coatnet_4(num_classes=value)
             for key, value in model_num_class.items()
         }
     
@@ -148,7 +142,7 @@ def main(args):
             dig_path = os.path.join(model_path, path)
             if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
                 print(f"\033[92mResuming......{dig_path}\033[0m")
-                model_list[path], info = resume_checkpoint(
+                model_list[path], info, global_step, args.run_id = resume_checkpoint(
                     args,
                     model_list[path],
                     os.path.join(model_path, f"{path}", "state_dict.bin"),
@@ -167,7 +161,7 @@ def main(args):
     writer = SummaryWriter(log_path)
  
     [shutil.copy(os.path.join(os.getcwd(), code_name), os.path.join(code_path, code_name.split("/")[-1])) \
-        for code_name in ["tool/main.py", "tool/data_loader.py", "tool/model.py", "torchvision/models/resnet.py"]]
+        for code_name in ["tool/main.py", "tool/data_loader.py", "tool/model.py", "custom_model/resnet.py", "custom_model/coatnet.py"]]
     
     args_dict = vars(args)
 
@@ -199,6 +193,16 @@ def main(args):
             continue
         
         if args.ddp: torch.distributed.init_process_group(backend="nccl", init_method="env://", world_size=args.num_gpu, rank=args.local_rank)
+        
+        if not loading: args.run_id = str(uuid.uuid4())  # 고유한 run id 생성
+        # args.name으로 프로젝트 식별
+        wandb_run = wandb.init(
+            project = "NIA-Korean-Facial-Assessment",
+            name = f"{now:%Y.%m.%d}/{args.git_name}/{args.name}_{key}",
+            config = vars(args),
+            resume = True if loading else False,
+            id = args.run_id,
+        )
 
         model = model_list[key].cuda()
         if args.ddp: model = torch.nn.parallel.DistributedDataParallel(
@@ -225,17 +229,20 @@ def main(args):
         )
 
         resnet_model = Model(
-            args,
-            model,
-            trainset_loader,
-            valset_loader,
-            logger,
-            check_path,
-            model_num_class,
-            writer,
-            key,
-            grade_num,
-            info if loading else None, 
+            args = args,
+            model = model,
+            temp_model = None,
+            train_loader = trainset_loader,
+            valid_loader = valset_loader,
+            logger = logger,
+            best_loss = args.best_loss,
+            check_path = check_path,
+            model_num_class = model_num_class,
+            wandb_run = wandb_run,
+            m_dig = key,
+            grade_num = grade_num,
+            info = info if loading else None, 
+            global_step = global_step if loading else 0
         )
 
         if args.load_epoch[key] < 50:
@@ -248,7 +255,8 @@ def main(args):
                 resnet_model.valid()
                 resnet_model.reset_log(True)
 
-            resnet_model.print_best()
+        resnet_model.print_best()
+        wandb.finish()
 
 
 
