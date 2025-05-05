@@ -249,7 +249,7 @@ def main(args):
 
         for epoch in range(args.load_epoch[key], args.epoch):
             if args.load_epoch[key]:
-                resnet_model.update_e(epoch + 1, *info) 
+                resnet_model.update_e(epoch + 1, **info) 
                 
             resnet_model.train()
             resnet_model.valid()
