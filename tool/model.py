@@ -220,7 +220,7 @@ class Model(object):
                 if self.phase == "Valid":
                     if self.best_loss[self.m_dig] > self.val_loss.avg:
                         self.best_loss[self.m_dig] = round(self.val_loss.avg, 4)
-                        save_checkpoint(self, correlation=correlation)
+                        save_checkpoint(self, None, None, None, correlation)
                     else:
                         self.update_c += 1
 
