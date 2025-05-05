@@ -125,10 +125,8 @@ class CustomDataset_class(Dataset):
             device = "smart_pad"
         else:
             device = "smart_phone"
-
-        with open(
-            f"dataset/split/{device}/{self.args.seed}_{mode}set_info.txt", "r"
-        ) as f:
+            
+        with open(f"dataset/split/{device}/{self.args.seed}_{mode}set_info.txt", "r") as f:
             dataset_list = json.load(f)
 
         self.dataset_dict = defaultdict(list)

@@ -7,7 +7,7 @@
 *.pyc
 *.out
 
-
+wandb
 img/
 label/
 vis/
