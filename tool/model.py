@@ -303,7 +303,7 @@ class Model(object):
             else:
                 loss = self.regression(pred, label)  
             
-            if not self.iter:
+            if not self.iter and not self.epoch:
                 self.wandb_run.log({
                     "train/image": [
                         wandb.Image(img[i], caption=f"GT: {label[i]}, Pred: {pred[i].argmax().item()}, Name: {self.img_names[i]}")
@@ -339,7 +339,7 @@ class Model(object):
                 else:
                     self.regression(pred, label)
                     
-                if not self.iter:
+                if not self.iter and not self.epoch:
                     self.wandb_run.log({
                         "valid/image": [
                             wandb.Image(img[i], caption=f"GT: {label[i]}, Pred: {pred[i].argmax().item()}, Name: {self.img_names[i]}")
