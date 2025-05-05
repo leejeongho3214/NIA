@@ -89,8 +89,7 @@ project_root/
 
 ## 🗣️ Future work
 
-- 데이터셋 특성 상, 특정 등급에 대부분 분포돼 있는 long-tailed distribution의 모습을 보입니다.  
-  모델의 over-fitting을 방지하기 위해 loss function을 focal loss나 class-balanced loss로 사용하여 어느 정도 방어했지만, 여전히 over-fitting이 남아있습니다.
+- 데이터셋 특성 상, 특정 등급에 대부분 분포돼 있는 long-tailed distribution의 모습을 보입니다. 모델의 over-fitting을 방지하기 위해 loss function을 focal loss나 class-balanced loss로 사용하여 어느 정도 방어했지만, 여전히 over-fitting이 남아있습니다.
 - 위 문제를 해결하기 위해 다음 시도들을 고려해볼 수 있습니다:
   - 디지털 카메라 외에 스마트폰/패드 이미지를 함께 학습
   - 최신 Classification SOTA 모델 도입
