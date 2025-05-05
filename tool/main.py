@@ -34,7 +34,7 @@ def parse_args():
         type=str,
     )
 
-    parser.add_argument("--equ", type=int, default=1, choices=[1, 2, 3])
+    parser.add_argument("--equ", type=int, default=2, choices=[1, 2, 3])
 
     parser.add_argument(
         "--mode",
