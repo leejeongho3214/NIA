@@ -33,47 +33,10 @@ else:
 class Model(object):
     def __init__(
         self,
-        args,
-        model,
-        train_loader,
-        valid_loader,
-        logger,
-        check_path,
-        model_num_class,
-        writer,
-        dig_k,
-        grade_num,
-        info,
+        **kwargs
     ):
-        (
-            self.args,
-            self.model,
-            self.temp_model,
-            self.train_loader,
-            self.valid_loader,
-            self.best_loss,
-            self.logger,
-            self.check_path,
-            self.model_num_class,
-            self.writer,
-            self.m_dig,
-            self.grade_num,
-            self.info
-        ) = (
-            args,
-            model,
-            None,
-            train_loader,
-            valid_loader,
-            args.best_loss,
-            logger,
-            check_path,
-            model_num_class,
-            writer,
-            dig_k,
-            grade_num,
-            info,
-        )
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
         self.train_loss, self.val_loss = AverageMeter(), AverageMeter()
         self.keep_acc = {
@@ -171,12 +134,6 @@ class Model(object):
         self.wandb_run.log({loss_phase: loss_avg, 'lr': self.optimizer.param_groups[0]['lr'], 'epoch': self.epoch, 'global_step': self.global_step}, step = self.global_step)
         
         if final_flag:
-            self.writer.add_scalar(
-                f"{self.phase}/{self.m_dig}",
-                self.train_loss.avg if self.phase == "Train" else self.val_loss.avg,
-                self.epoch,
-            )
-
             f_pred = list()
             f_gt = list()
             
@@ -309,10 +266,10 @@ class Model(object):
 
         return result
 
-    def reset_log(self, flag):
+    def reset_log(self):
         self.train_loss = AverageMeter()
         self.val_loss = AverageMeter()
-        if flag: self.epoch += 1
+        self.epoch += 1
         self.pred = list()
         self.gt = list()
         self.pred_t = list()
@@ -359,6 +316,8 @@ class Model(object):
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+            
+            self.global_step += 1
             
         self.print_loss(len(self.train_loader), final_flag=True)
 

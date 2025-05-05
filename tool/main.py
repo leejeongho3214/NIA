@@ -5,6 +5,10 @@ import uuid
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# use line-buffering for both stdout and stderr
+sys.stdout = open(sys.stdout.fileno(), mode='w', buffering=1)
+sys.stderr = open(sys.stderr.fileno(), mode='w', buffering=1)
+
 # 스크립트 디렉토리 강제 설정
 script_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 os.chdir(script_dir)
@@ -22,11 +26,8 @@ from logger import setup_logger
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
 import argparse
 from tool.model import Model
-<<<<<<< HEAD
-=======
 
 import wandb  # 상단에 추가
->>>>>>> 6227645 (250505 Add a wandb code)
 
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
@@ -39,11 +40,7 @@ def parse_args():
         type=str,
     )
 
-<<<<<<< HEAD
     parser.add_argument("--equ", type=int, default=2, choices=[1, 2, 3])
-=======
-    parser.add_argument("--equ", type=int, default=1, choices=[1, 2, 3])
->>>>>>> 6227645 (250505 Add a wandb code)
 
     parser.add_argument(
         "--mode",
@@ -106,12 +103,13 @@ def parse_args():
     return args
 
 
+
 def main(args):
+    now = datetime.now()
     fix_seed(args.seed)
     args.git_name = git_name
     
     check_path = os.path.join("checkpoint", git_name, args.mode, args.name)
-    log_path = os.path.join("tensorboard", git_name, args.mode, args.name)
     model_num_class = (
         {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 6, "wrinkle": 7}
         if args.mode == "class"
@@ -142,8 +140,6 @@ def main(args):
         print(f"\033[90mReseting......{check_path}\033[0m")
         if os.path.isdir(check_path):
             shutil.rmtree(check_path)
-        if os.path.isdir(log_path):
-            shutil.rmtree(log_path)
 
     loading = False
     if os.path.isdir(model_path):
@@ -161,13 +157,10 @@ def main(args):
                 if os.path.isdir(os.path.join(dig_path, "done")):
                     print(f"\043[92mPassing......{dig_path}\043[0m")
                     pass_list.append(path)
-            
 
     mkdir(model_path)
-    mkdir(log_path)
     code_path = os.path.join(check_path, "code")
     mkdir(code_path)
-    writer = SummaryWriter(log_path)
  
     [shutil.copy(os.path.join(os.getcwd(), code_name), os.path.join(code_path, code_name.split("/")[-1])) \
         for code_name in ["tool/main.py", "tool/data_loader.py", "tool/model.py", "custom_model/resnet.py", "custom_model/coatnet.py"]]
@@ -254,15 +247,13 @@ def main(args):
             global_step = global_step if loading else 0
         )
 
-        if args.load_epoch[key] < 50:
-            for epoch in range(args.load_epoch[key], args.epoch):
-                if args.load_epoch[key]:
-                    resnet_model.update_e(epoch + 1, *info) 
-                    
-                resnet_model.train()
+        for epoch in range(args.load_epoch[key], args.epoch):
+            if args.load_epoch[key]:
+                resnet_model.update_e(epoch + 1, *info) 
                 
-                resnet_model.valid()
-                resnet_model.reset_log(True)
+            resnet_model.train()
+            resnet_model.valid()
+            resnet_model.reset_log()
 
         resnet_model.print_best()
         wandb.finish()
