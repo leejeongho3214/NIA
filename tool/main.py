@@ -22,6 +22,11 @@ from logger import setup_logger
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
 import argparse
 from tool.model import Model
+<<<<<<< HEAD
+=======
+
+import wandb  # 상단에 추가
+>>>>>>> 6227645 (250505 Add a wandb code)
 
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
@@ -34,7 +39,11 @@ def parse_args():
         type=str,
     )
 
+<<<<<<< HEAD
     parser.add_argument("--equ", type=int, default=2, choices=[1, 2, 3])
+=======
+    parser.add_argument("--equ", type=int, default=1, choices=[1, 2, 3])
+>>>>>>> 6227645 (250505 Add a wandb code)
 
     parser.add_argument(
         "--mode",
