@@ -48,7 +48,7 @@ def resume_checkpoint(args, model, path, dig, test=True):
     model.load_state_dict(state_dict["model_state"], strict=False)
 
     info, step, id = state_dict["info"], state_dict["global_step"], state_dict["run_id"]
-
+    
     del state_dict
 
     return model, info, step, id
