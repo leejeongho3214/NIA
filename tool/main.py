@@ -103,6 +103,7 @@ def parse_args():
     return args
 
 
+
 def main(args):
     now = datetime.now()
     fix_seed(args.seed)
@@ -146,7 +147,7 @@ def main(args):
             dig_path = os.path.join(model_path, path)
             if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
                 print(f"\033[92mResuming......{dig_path}\033[0m")
-                model_list[path], info, global_step, args.run_id = resume_checkpoint(
+                model_list[path], info, global_step, run_id = resume_checkpoint(
                     args,
                     model_list[path],
                     os.path.join(model_path, f"{path}", "state_dict.bin"),
@@ -156,7 +157,6 @@ def main(args):
                 if os.path.isdir(os.path.join(dig_path, "done")):
                     print(f"\043[92mPassing......{dig_path}\043[0m")
                     pass_list.append(path)
-            
 
     mkdir(model_path)
     code_path = os.path.join(check_path, "code")
@@ -175,7 +175,7 @@ def main(args):
     logger = setup_logger(
         args.name + args.mode, os.path.join(check_path, "log", "train")
     )
-    logger.info("Command Line: " + " ".join(sys.argv))
+    logger.info(f"[{git_name}]Command Line: " + " ".join(sys.argv))
 
     dataset = (
         CustomDataset_class(args, logger, "train")
@@ -196,7 +196,12 @@ def main(args):
         
         if args.ddp: torch.distributed.init_process_group(backend="nccl", init_method="env://", world_size=args.num_gpu, rank=args.local_rank)
         
-        if not loading: args.run_id = str(uuid.uuid4())  # 고유한 run id 생성
+        if loading:
+            args.run_id = run_id
+            loading = False
+        else:
+            args.run_id = str(uuid.uuid4())  # 고유한 run id 생성
+            
         # args.name으로 프로젝트 식별
         wandb_run = wandb.init(
             project = "NIA-Korean-Facial-Assessment",
@@ -249,7 +254,7 @@ def main(args):
 
         for epoch in range(args.load_epoch[key], args.epoch):
             if args.load_epoch[key]:
-                resnet_model.update_e(epoch + 1, *info) 
+                resnet_model.update_e(epoch + 1, **info)
                 
             resnet_model.train()
             resnet_model.valid()
