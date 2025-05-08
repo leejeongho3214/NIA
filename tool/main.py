@@ -235,7 +235,7 @@ def main(args):
             sampler=val_sampler,
         )
 
-        resnet_model = Model(
+        each_model = Model(
             args = args,
             model = model,
             temp_model = None,
@@ -254,13 +254,13 @@ def main(args):
 
         for epoch in range(args.load_epoch[key], args.epoch):
             if args.load_epoch[key]:
-                resnet_model.update_e(epoch + 1, **info) 
+                each_model.update_e(epoch + 1, **info) 
                 
-            resnet_model.train()
-            resnet_model.valid()
-            resnet_model.reset_log()
+            each_model.train()
+            each_model.valid()
+            each_model.reset_log()
 
-        resnet_model.print_best()
+        each_model.print_best()
         wandb.finish()
 
 
