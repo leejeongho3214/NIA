@@ -169,7 +169,7 @@ class CustomDataset_class(Dataset):
         )
 
         for self.i_path, self.grade in tqdm(self.dataset_dict[dig], desc=f"{self.dig}"):
-            self.save_dict(tzransform)
+            self.save_dict(transform)
 
         if self.args.mode == "class":
             return self.area_list, grade_num
