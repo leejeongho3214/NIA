@@ -92,17 +92,13 @@ def parse_args():
         type=int,
     )
 
-
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--ddp", action="store_true")
 
     args = parser.parse_args()
-    
     args.num_workers = int(8 / args.num_gpu)
 
     return args
-
-
 
 def main(args):
     now = datetime.now()
@@ -189,7 +185,6 @@ def main(args):
         args.local_rank = 0  # 기본값 설정
     
     torch.cuda.set_device(args.local_rank)
-     
     for key in model_list:
         if key in pass_list:
             continue
@@ -201,13 +196,32 @@ def main(args):
             loading = False
         else:
             args.run_id = str(uuid.uuid4())  # 고유한 run id 생성
-            
+
+        api = wandb.Api()
+
+        project_path = "NIA-Korean-Facial-Assessment"
+        target_name = f"{now:%Y.%m.%d}/{args.git_name}/{args.name}_{key}"
+
+        runs = api.runs(project_path)
+
+        # name이 일치하는 모든 run 찾기
+        matched_runs = [run for run in runs if run.name == target_name]
+
+        if matched_runs:
+            for run in matched_runs:
+                print(f"Found run with name: {run.name}")
+                print(f"Run ID: {run.id}")
+                print(f"Run State: {run.state}")
+                args.run_id = run.id
+        else:
+            print(f"No run found with name: {target_name}")
+        
         # args.name으로 프로젝트 식별
         wandb_run = wandb.init(
             project = "NIA-Korean-Facial-Assessment",
-            name = f"{now:%Y.%m.%d}/{args.git_name}/{args.name}_{key}",
+            name = target_name,
             config = vars(args),
-            resume = True if loading else False,
+            resume = True if (loading or matched_runs) else False,
             id = args.run_id,
         )
 
