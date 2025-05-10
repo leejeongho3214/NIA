@@ -87,7 +87,7 @@ class CustomDataset_class(Dataset):
         ori_img = cv2.imread(
             os.path.join("dataset/cropped_img", self.i_path + ".jpg")
         )  ## Be careful the path of the dataset whether it is 0-padding or not
-        pil_img = cv2.cvtColor(ori_img, cv2.COLOR_BGR2GRAY)  ## change
+        pil_img = cv2.cvtColor(ori_img, cv2.COLOR_BGR2RGB)
         ori_img = cv2.resize(ori_img, (self.args.res, self.args.res))
 
         s_list = self.i_path.split("/")[-1].split("_")
@@ -124,8 +124,10 @@ class CustomDataset_class(Dataset):
             device = "smart_pad"
         else:
             device = "smart_phone"
-            
-        with open(f"dataset/split/{device}/{self.args.seed}_{mode}set_info.txt", "r") as f:
+
+        with open(
+            f"dataset/split/{device}/{self.args.seed}_{mode}set_info.txt", "r"
+        ) as f:
             dataset_list = json.load(f)
 
         self.dataset_dict = defaultdict(list)
@@ -142,10 +144,11 @@ class CustomDataset_class(Dataset):
                 if self.args.mode == "class":
                     for class_item, value in json_value["annotations"].items():
                         if class_name in class_item:
-                            self.dataset_dict[class_name].append(
+                            name = "_".join(class_item.split("_")[-2:])
+                            self.dataset_dict[name].append(
                                 [f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value]
                             )
-                            self.grade_num[class_name][value] += 1
+                            self.grade_num[name][value] += 1
                 else:
                     for class_item, value in json_value["equipment"].items():
                         if class_name in class_item:
@@ -162,9 +165,8 @@ class CustomDataset_class(Dataset):
         transform = transforms.Compose(
             [
                 transforms.Resize((256, 256), antialias=True),
-                transforms.Grayscale(num_output_channels=1),  # 확실히 1채널로 맞춰줌
-                transforms.ToTensor(),                        # shape: [1, H, W]
-                transforms.Normalize([0.5], [0.5]),           # for gray
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ]
         )
 

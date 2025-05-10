@@ -265,7 +265,7 @@ def coatnet_3():
 def coatnet_4(num_classes):
     num_blocks = [2, 2, 12, 28, 2]          # L
     channels = [192, 192, 384, 768, 1536]   # D
-    return CoAtNet((256, 256), 3, num_blocks, channels, num_classes)    # for gray
+    return CoAtNet((256, 256), 3, num_blocks, channels, num_classes)
 
 
 def count_parameters(model):
