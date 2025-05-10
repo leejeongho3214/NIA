@@ -92,17 +92,13 @@ def parse_args():
         type=int,
     )
 
-
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--ddp", action="store_true")
 
     args = parser.parse_args()
-    
     args.num_workers = int(8 / args.num_gpu)
 
     return args
-
-
 
 def main(args):
     now = datetime.now()
@@ -147,7 +143,7 @@ def main(args):
             dig_path = os.path.join(model_path, path)
             if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
                 print(f"\033[92mResuming......{dig_path}\033[0m")
-                model_list[path], info, global_step, args.run_id = resume_checkpoint(
+                model_list[path], info, global_step, run_id = resume_checkpoint(
                     args,
                     model_list[path],
                     os.path.join(model_path, f"{path}", "state_dict.bin"),
@@ -189,20 +185,43 @@ def main(args):
         args.local_rank = 0  # 기본값 설정
     
     torch.cuda.set_device(args.local_rank)
-     
     for key in model_list:
         if key in pass_list:
             continue
         
         if args.ddp: torch.distributed.init_process_group(backend="nccl", init_method="env://", world_size=args.num_gpu, rank=args.local_rank)
         
-        if not loading: args.run_id = str(uuid.uuid4())  # 고유한 run id 생성
+        if loading:
+            args.run_id = run_id
+            loading = False
+        else:
+            args.run_id = str(uuid.uuid4())  # 고유한 run id 생성
+
+        api = wandb.Api()
+
+        project_path = "NIA-Korean-Facial-Assessment"
+        target_name = f"{now:%Y.%m.%d}/{args.git_name}/{args.name}_{key}"
+
+        runs = api.runs(project_path)
+
+        # name이 일치하는 모든 run 찾기
+        matched_runs = [run for run in runs if run.name == target_name]
+
+        if matched_runs:
+            for run in matched_runs:
+                print(f"Found run with name: {run.name}")
+                print(f"Run ID: {run.id}")
+                print(f"Run State: {run.state}")
+                args.run_id = run.id
+        else:
+            print(f"No run found with name: {target_name}")
+        
         # args.name으로 프로젝트 식별
         wandb_run = wandb.init(
             project = "NIA-Korean-Facial-Assessment",
-            name = f"{now:%Y.%m.%d}/{args.git_name}/{args.name}_{key}",
+            name = target_name,
             config = vars(args),
-            resume = True if loading else False,
+            resume = True if (loading or matched_runs) else False,
             id = args.run_id,
         )
 
@@ -230,7 +249,7 @@ def main(args):
             sampler=val_sampler,
         )
 
-        resnet_model = Model(
+        each_model = Model(
             args = args,
             model = model,
             temp_model = None,
@@ -249,13 +268,13 @@ def main(args):
 
         for epoch in range(args.load_epoch[key], args.epoch):
             if args.load_epoch[key]:
-                resnet_model.update_e(epoch + 1, *info) 
+                each_model.update_e(epoch + 1, **info) 
                 
-            resnet_model.train()
-            resnet_model.valid()
-            resnet_model.reset_log()
+            each_model.train()
+            each_model.valid()
+            each_model.reset_log()
 
-        resnet_model.print_best()
+        each_model.print_best()
         wandb.finish()
 
 
