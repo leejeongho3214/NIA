@@ -117,26 +117,15 @@ def main(args):
             "pore": 1,
         }
     )
-    detailed_model = {
-        "dryness": ["lip_dryness"],
-        "pigmentation": ["forehead_pigmentation", "cheek_pigmentation"],
-        "pore": ["cheek_pore"],
-        "sagging": ["chin_sagging"],
-        "wrinkle": ["forehead_wrinkle", "glabellus_wrinkle", "perocular_wrinkle"],
-        
-    }
-    
-
-
-    model_list = {
-            value: coatnet_4(num_classes=v)
-            for k, v in model_num_class.items() for value in detailed_model[k]
-        }
-    
     pass_list = list()
 
-    args.best_loss = {item: np.inf for item in model_list.keys()}
-    args.load_epoch = {item: 0 for item in model_list.keys()}
+    args.best_loss = {item: np.inf for item in model_num_class}
+    args.load_epoch = {item: 0 for item in model_num_class}
+
+    model_list = {
+            key: coatnet_4(num_classes=value)
+            for key, value in model_num_class.items()
+        }
     
     model_path = os.path.join(check_path, "save_model")
         
@@ -244,20 +233,25 @@ def main(args):
         if args.ddp: model = torch.nn.parallel.DistributedDataParallel(
             model, device_ids=[args.local_rank]
         ) 
-        
-        def get_loader(dataset, split, key, args, ):
-            data_set, grade_num = dataset.load_dataset(split, key)
-            data_loader = data.DataLoader(
-                dataset=data_set,
-                batch_size=args.batch_size // args.num_gpu,
-                num_workers=args.num_workers,
-                shuffle= True if split == "train" else False,
-            )
-            return data_loader, grade_num
 
-        
-        trainset_loader, grade_num = get_loader(dataset, "train", key, args)
-        valset_loader, _ = get_loader(dataset, "val", key, args)
+        trainset, grade_num = dataset.load_dataset("train", key)
+        train_sampler = torch.utils.data.distributed.DistributedSampler(trainset, num_replicas=args.num_gpu, rank=args.local_rank, shuffle=True) if args.ddp else None
+        trainset_loader = data.DataLoader(
+            dataset=trainset,
+            batch_size=args.batch_size // args.num_gpu,
+            num_workers=args.num_workers,
+            shuffle=False if args.ddp else True,
+            sampler=train_sampler,
+        )
+        valset, _ = dataset.load_dataset("val", key)
+        val_sampler = torch.utils.data.distributed.DistributedSampler(valset, num_replicas=args.num_gpu, rank=args.local_rank, shuffle=False)  if args.ddp else None
+        valset_loader = data.DataLoader(
+            dataset=valset,
+            batch_size=args.batch_size // args.num_gpu,
+            num_workers=args.num_workers,
+            shuffle=False,
+            sampler=val_sampler,
+        )
 
         each_model = Model(
             args = args,
