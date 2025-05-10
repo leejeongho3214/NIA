@@ -220,7 +220,7 @@ class Model(object):
                 if self.phase == "Valid":
                     if self.best_loss[self.m_dig] > self.val_loss.avg:
                         self.best_loss[self.m_dig] = round(self.val_loss.avg, 4)
-                        save_checkpoint(self, correlation=correlation)
+                        save_checkpoint(self, None, None, None, correlation)
                     else:
                         self.update_c += 1
 
@@ -309,12 +309,10 @@ class Model(object):
         self.pred_t = list()
         self.gt_t = list()
 
-    def update_e(self, epoch, correct_, all_, micro_precision, correlation):
+    def update_e(self, epoch, **kwargs):
         self.epoch = self.best_epoch = epoch
-        self.correct_ = correct_
-        self.all_ = all_
-        self.acc_ = micro_precision
-        self.corre_ = correlation
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
     def train(self):
         self.model.train()
