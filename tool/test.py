@@ -1,24 +1,14 @@
-from collections import defaultdict
-import json
 import shutil
 import sys
 import os
-
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-# 스크립트 디렉토리 강제 설정
-script_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-os.chdir(script_dir)
-
-from torchvision import models
+from torch.utils import data
+from tool.utils import resume_checkpoint, path_organize
+path_organize()
+from custom_model.coatnet import coatnet_4
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
 import argparse
 from tool.logger import setup_logger
-from torch.utils import data
-import torch.nn as nn
 from tool.model import Model_test
-from tool.utils import resume_checkpoint, fix_seed
 
 
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
@@ -98,7 +88,7 @@ def main(args):
     )
     
     model_list = {
-        key: models.coatnet.coatnet_4(num_classes=value)
+        key: coatnet_4(num_classes=value)
         for key, value in model_num_class.items()
     }
 
@@ -108,7 +98,7 @@ def main(args):
             dig_path = os.path.join(model_path, path)
             if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
                 print(f"\033[92mResuming......{dig_path}\033[0m")
-                model_list[path], _ = resume_checkpoint(
+                model_list[path], _, _, _ = resume_checkpoint(
                     args,
                     model_list[path],
                     os.path.join(dig_path, "state_dict.bin"),
