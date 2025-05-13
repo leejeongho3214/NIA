@@ -1,14 +1,16 @@
 import random
+import shutil
+import sys
 import cv2
 import numpy as np
 import torch
-import inspect
+from torch.utils import data
 import errno
 import os
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.utils import make_grid
-from torchvision import transforms
+import yaml
 
 
 if torch.cuda.is_available():
@@ -49,7 +51,7 @@ def resume_checkpoint(args, model, path, dig, test=True):
 
     info = state_dict["info"]
     if any(key not in info.keys() for key in ["global_step", "run_id"]):
-        pass
+        step, id = 0, None
     else:
         step, id = info["global_step"], info["run_id"]
     del state_dict
@@ -391,3 +393,69 @@ def fix_seed(random_seed):
     torch.backends.cudnn.benchmark = False
     np.random.seed(random_seed)
     random.seed(random_seed)
+
+def load_checkpoint(args, model_path, model_list, pass_list, loading):
+    if os.path.isdir(model_path):
+        for path in os.listdir(model_path):
+            dig_path = os.path.join(model_path, path)
+            if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
+                print(f"\033[92mResuming......{dig_path}\033[0m")
+                model_list[path], info, global_step, run_id = resume_checkpoint(
+                    args,
+                    model_list[path],
+                    os.path.join(model_path, f"{path}", "state_dict.bin"),
+                    path, 
+                )
+                loading = True
+                if os.path.isdir(os.path.join(dig_path, "done")):
+                    print(f"\043[92mPassing......{dig_path}\043[0m")
+                    pass_list.append(path)
+                    
+    return loading, model_list, pass_list, info, global_step, run_id
+
+def get_loader(
+        dataset,
+        split,
+        key,
+        args,
+    ):
+    data_set, grade_num = dataset.load_dataset(split, key)
+    data_loader = data.DataLoader(
+        dataset=data_set,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        shuffle=True if split == "train" else False,
+    )
+    return data_loader, grade_num
+
+def save_code_copy(args, check_path, model_path):
+    code_path = os.path.join(check_path, "code")
+    for path in [model_path, code_path]:
+        mkdir(path)
+
+    for code_name in [
+        "tool/main.py",
+        "tool/data_loader.py",
+        "tool/model.py",
+        "custom_model/resnet.py",
+        "custom_model/coatnet.py",
+    ]:
+        shutil.copy(
+            os.path.join(os.getcwd(), code_name),
+            os.path.join(code_path, os.path.basename(code_name)),
+        )
+    args_dict = vars(args)
+    yaml_file_path = os.path.join(code_path, "config.yaml")
+    with open(yaml_file_path, "w") as yaml_file:
+        yaml.dump(args_dict, yaml_file, default_flow_style=False)
+        
+def path_organize():
+    home_path = os.path.expanduser("~")
+    workspace_path = os.path.join(home_path, "dir/NIA")
+    sys.path.insert(0, workspace_path)
+
+    sys.stdout = open(sys.stdout.fileno(), mode="w", buffering=1)
+    sys.stderr = open(sys.stderr.fileno(), mode="w", buffering=1)
+
+    script_dir = os.path.join(workspace_path, "..")
+    os.chdir(script_dir)

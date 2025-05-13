@@ -2,32 +2,23 @@ from datetime import datetime
 import os
 import sys
 import uuid
+from utils import get_loader, load_checkpoint, fix_seed, save_code_copy, path_organize
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-# use line-buffering for both stdout and stderr
-sys.stdout = open(sys.stdout.fileno(), mode='w', buffering=1)
-sys.stderr = open(sys.stderr.fileno(), mode='w', buffering=1)
-
-# 스크립트 디렉토리 강제 설정
-script_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-os.chdir(script_dir)
+path_organize()
 
 import torch
-import yaml
 
-from torch.utils import data
 import shutil
 import numpy as np
 
 from custom_model.coatnet import coatnet_4
-from utils import mkdir, resume_checkpoint, fix_seed
+
 from logger import setup_logger
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
 import argparse
 from tool.model import Model
 
-import wandb  # 상단에 추가
+import wandb 
 
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
@@ -48,7 +39,6 @@ def parse_args():
         choices=["regression", "class"],
         type=str,
     )
-
 
     parser.add_argument(
         "--epoch",
@@ -79,13 +69,13 @@ def parse_args():
         default=8,
         type=int,
     )
-    
+
     parser.add_argument(
-        "--num_gpu",
-        default=1,
+        "--stop_early",
+        default=15,
         type=int,
     )
-    
+
     parser.add_argument(
         "--seed",
         default=1,
@@ -96,15 +86,16 @@ def parse_args():
     parser.add_argument("--ddp", action="store_true")
 
     args = parser.parse_args()
-    args.num_workers = int(8 / args.num_gpu)
+    args.num_workers = 8
 
     return args
+
 
 def main(args):
     now = datetime.now()
     fix_seed(args.seed)
     args.git_name = git_name
-    
+
     check_path = os.path.join("checkpoint", git_name, args.mode, args.name)
     model_num_class = (
         {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 6, "wrinkle": 7}
@@ -123,13 +114,10 @@ def main(args):
     args.load_epoch = {item: 0 for item in model_num_class}
 
     model_list = {
-            key: coatnet_4(num_classes=value)
-            for key, value in model_num_class.items()
-        }
-    
+        key: coatnet_4(num_classes=value) for key, value in model_num_class.items()
+    }
+
     model_path = os.path.join(check_path, "save_model")
-        
-    args.save_img = os.path.join(check_path, "save_img")
     args.pred_path = os.path.join(check_path, "prediction")
 
     if args.reset:
@@ -138,40 +126,12 @@ def main(args):
             shutil.rmtree(check_path)
 
     loading = False
-    if os.path.isdir(model_path):
-        for path in os.listdir(model_path):
-            dig_path = os.path.join(model_path, path)
-            if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
-                print(f"\033[92mResuming......{dig_path}\033[0m")
-                model_list[path], info, global_step, run_id = resume_checkpoint(
-                    args,
-                    model_list[path],
-                    os.path.join(model_path, f"{path}", "state_dict.bin"),
-                    path, 
-                )
-                loading = True
-                if os.path.isdir(os.path.join(dig_path, "done")):
-                    print(f"\043[92mPassing......{dig_path}\043[0m")
-                    pass_list.append(path)
+    loading, model_list, pass_list, info, global_step, run_id = load_checkpoint(
+        args, model_path, model_list, pass_list, loading
+    )
 
-    code_path = os.path.join(check_path, "code")
-    for path in [model_path, code_path]:
-        mkdir(path)
- 
-    for code_name in [
-        "tool/main.py", "tool/data_loader.py", "tool/model.py",
-        "custom_model/resnet.py", "custom_model/coatnet.py"
-    ]:
-        shutil.copy(os.path.join(os.getcwd(), code_name),
-                    os.path.join(code_path, os.path.basename(code_name)))
-    
-    args_dict = vars(args)
+    save_code_copy(args, check_path, model_path)
 
-    # YAML 파일에 저장
-    yaml_file_path = os.path.join(code_path, 'config.yaml')
-    with open(yaml_file_path, 'w') as yaml_file:
-        yaml.dump(args_dict, yaml_file, default_flow_style=False)
-    
     logger = setup_logger(
         args.name + args.mode, os.path.join(check_path, "log", "train")
     )
@@ -182,21 +142,16 @@ def main(args):
         if args.mode == "class"
         else CustomDataset_regress(args, logger)
     )
-    
-    if "LOCAL_RANK" in os.environ:
-        args.local_rank = int(os.environ["LOCAL_RANK"])
-    else:
-        args.local_rank = 0  # 기본값 설정
-    
-    torch.cuda.set_device(args.local_rank)
+
     for key in model_list:
         if key in pass_list:
             continue
-        
-        if args.ddp: torch.distributed.init_process_group(backend="nccl", init_method="env://", world_size=args.num_gpu, rank=args.local_rank)
-        
+
+        if args.ddp:
+            torch.distributed.init_process_group(backend="nccl", init_method="env://")
+
         if loading:
-            args.run_id = run_id
+            args.run_id = run_id if run_id is not None else str(uuid.uuid4())
             loading = False
         else:
             args.run_id = str(uuid.uuid4())  # 고유한 run id 생성
@@ -219,68 +174,53 @@ def main(args):
                 args.run_id = run.id
         else:
             print(f"No run found with name: {target_name}")
-        
+
         # args.name으로 프로젝트 식별
         wandb_run = wandb.init(
-            project = "NIA-Korean-Facial-Assessment",
-            name = target_name,
-            config = vars(args),
-            resume = True if (loading or matched_runs) else False,
-            id = args.run_id,
+            project="NIA-Korean-Facial-Assessment",
+            name=target_name,
+            config=vars(args),
+            resume=True if (loading or matched_runs) else False,
+            id=args.run_id,
         )
 
         model = model_list[key].cuda()
-        if args.ddp: model = torch.nn.parallel.DistributedDataParallel(
-            model, device_ids=[args.local_rank]
-        ) 
+        if args.ddp:
+            model = torch.nn.parallel.DistributedDataParallel(model)
 
-        trainset, grade_num = dataset.load_dataset("train", key)
-        train_sampler = torch.utils.data.distributed.DistributedSampler(trainset, num_replicas=args.num_gpu, rank=args.local_rank, shuffle=True) if args.ddp else None
-        trainset_loader = data.DataLoader(
-            dataset=trainset,
-            batch_size=args.batch_size // args.num_gpu,
-            num_workers=args.num_workers,
-            shuffle=False if args.ddp else True,
-            sampler=train_sampler,
-        )
-        valset, _ = dataset.load_dataset("val", key)
-        val_sampler = torch.utils.data.distributed.DistributedSampler(valset, num_replicas=args.num_gpu, rank=args.local_rank, shuffle=False)  if args.ddp else None
-        valset_loader = data.DataLoader(
-            dataset=valset,
-            batch_size=args.batch_size // args.num_gpu,
-            num_workers=args.num_workers,
-            shuffle=False,
-            sampler=val_sampler,
-        )
+        trainset_loader, grade_num = get_loader(dataset, "train", key, args)
+        valset_loader, _ = get_loader(dataset, "val", key, args)
 
         each_model = Model(
-            args = args,
-            model = model,
-            temp_model = None,
-            train_loader = trainset_loader,
-            valid_loader = valset_loader,
-            logger = logger,
-            best_loss = args.best_loss,
-            check_path = check_path,
-            model_num_class = model_num_class,
-            wandb_run = wandb_run,
-            m_dig = key,
-            grade_num = grade_num,
-            info = info if loading else None, 
-            global_step = global_step if loading else 0
+            args=args,
+            model=model,
+            temp_model=None,
+            train_loader=trainset_loader,
+            valid_loader=valset_loader,
+            logger=logger,
+            best_loss=args.best_loss,
+            check_path=check_path,
+            model_num_class=model_num_class,
+            wandb_run=wandb_run,
+            m_dig=key,
+            grade_num=grade_num,
+            info=info if loading else None,
+            global_step=global_step if loading else 0,
         )
 
         for epoch in range(args.load_epoch[key], args.epoch):
             if args.load_epoch[key]:
-                each_model.update_e(epoch + 1, **info) 
-                
+                each_model.update_e(epoch + 1, **info)
+
             each_model.train()
             each_model.valid()
             each_model.reset_log()
 
+            if each_model.stop_early():
+                break
+
         each_model.print_best()
         wandb.finish()
-
 
 
 if __name__ == "__main__":

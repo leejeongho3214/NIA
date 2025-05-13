@@ -1,6 +1,5 @@
 from collections import defaultdict
 from copy import deepcopy
-import random
 import torch
 import torch.nn as nn
 import numpy as np
@@ -13,14 +12,11 @@ from data_loader import mkdir
 import torch.optim as optim
 from utils import (
     AverageMeter,
-    FocalLoss,
     mape_loss,
     save_checkpoint,
-    save_image,
     CB_loss,
 )
 import os
-import torch.autograd as autograd
 
 from sklearn.metrics import precision_recall_fscore_support, mean_absolute_error
 
@@ -73,29 +69,16 @@ class Model(object):
         self.pred, self.gt = list(), list()
         self.pred_t, self.gt_t = list(), list()
 
-        self.optimizer = torch.optim.AdamW(
+        self.optimizer = torch.optim.Adam(
             params=self.model.parameters(),
             lr=self.args.lr,
-            weight_decay=0.05,
+            betas=(0.9, 0.999),
+            weight_decay=0,
         )
 
-        self.warmup = torch.optim.lr_scheduler.LambdaLR(
-            self.optimizer, lr_lambda=self.warmup_scheduler
+        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            self.optimizer, "min", patience=10
         )
-        self.cosine_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            self.optimizer, T_max=self.args.epoch
-        )
-
-        self.scheduler = torch.optim.lr_scheduler.SequentialLR(
-            self.optimizer,
-            schedulers=[self.warmup, self.cosine_scheduler],
-            milestones=[20],
-        )
-
-    def warmup_scheduler(self, epoch):
-        if (epoch + 1) < 20:
-            return (epoch + 1) / 20
-        return 1.0
 
     def acc_avg(self, name):
         return round(self.test_value[name].avg * 100, 2)
@@ -397,8 +380,8 @@ class Model(object):
                     )
 
                 self.print_loss(len(self.valid_loader))
-
-            self.scheduler.step()
+                
+            self.scheduler.step(self.val_loss.avg)
             self.print_loss(len(self.valid_loader), final_flag=True)
 
 
