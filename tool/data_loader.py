@@ -29,6 +29,13 @@ class CustomDataset_class(Dataset):
     def __init__(self, args, logger, mode):
         self.args = args
         self.logger = logger
+        self.mode = mode
+        self.img_path = "dataset/img"
+        self.json_path = "dataset/label"
+        self.dataset_dict = defaultdict(list)
+        self.grade_num = defaultdict(lambda: defaultdict(int))
+        
+        self.loading()
 
     def __len__(self):
         return len(self.sub_path)
@@ -36,6 +43,41 @@ class CustomDataset_class(Dataset):
     def __getitem__(self, idx):
         idx_list = list(self.sub_path.keys())
         return idx_list[idx], self.sub_path[idx_list[idx]], self.train_num
+    
+    def loading(self):
+        if self.args.equ == 1:
+            device = "digital_camera"
+        elif self.args.equ == 2:
+            device = "smart_pad"
+        else:
+            device = "smart_phone"
+            
+        with open(
+            f"dataset/split/{device}/{self.args.seed}_{self.mode}set_info.txt", "r"
+        ) as f:
+            dataset_list = json.load(f)
+            
+        for class_name, file_list in dataset_list.items():
+            for file_name in file_list:
+                sub, equ, angle, area = [file_name.split("_")[i] for i in [1, 3, 5, 7]]
+
+                with open(
+                    f"{self.json_path}/{equ}/{sub}/{sub}_{equ}_{angle}_{area}.json", "r"
+                ) as f:
+                    json_value = json.load(f)
+
+                if self.args.mode == "class":
+                    for class_item, value in json_value["annotations"].items():
+                        self.dataset_dict[class_name].append(
+                            [f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value]
+                        )
+                        self.grade_num[class_name][value] += 1
+                else:
+                    for class_item, value in json_value["equipment"].items():
+                        if class_name in class_item:
+                            self.dataset_dict[class_name].append(
+                                [f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value]
+                            )
 
     def process_json_meta(self, json_meta, j_name, sub_path, target_list, sub_fold):
         if (
@@ -113,48 +155,7 @@ class CustomDataset_class(Dataset):
 
         self.area_list.append([patch_img, label_data, desc_area, self.dig, 0, ori_img])
 
-    def load_dataset(self, mode, dig):
-        self.mode = mode
-        self.img_path = "dataset/img"
-        self.json_path = "dataset/label"
-
-        if self.args.equ == 1:
-            device = "digital_camera"
-        elif self.args.equ == 2:
-            device = "smart_pad"
-        else:
-            device = "smart_phone"
-
-        with open(
-            f"dataset/split/{device}/{self.args.seed}_{mode}set_info.txt", "r"
-        ) as f:
-            dataset_list = json.load(f)
-
-        self.dataset_dict = defaultdict(list)
-        self.grade_num = defaultdict(lambda: defaultdict(int))
-        for class_name, file_list in dataset_list.items():
-            for file_name in file_list:
-                sub, equ, angle, area = [file_name.split("_")[i] for i in [1, 3, 5, 7]]
-
-                with open(
-                    f"{self.json_path}/{equ}/{sub}/{sub}_{equ}_{angle}_{area}.json", "r"
-                ) as f:
-                    json_value = json.load(f)
-
-                if self.args.mode == "class":
-                    for class_item, value in json_value["annotations"].items():
-                        if class_name in class_item:
-                            self.dataset_dict[class_name].append(
-                                [f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value]
-                            )
-                            self.grade_num[class_name][value] += 1
-                else:
-                    for class_item, value in json_value["equipment"].items():
-                        if class_name in class_item:
-                            self.dataset_dict[class_name].append(
-                                [f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value]
-                            )
-
+    def load_dataset(self, dig):
         grade_num = [
             self.grade_num[dig][key] for key in sorted(self.grade_num[dig].keys())
         ]

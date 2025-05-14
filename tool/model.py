@@ -77,7 +77,7 @@ class Model(object):
         )
 
         self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer, "min", patience=10
+            self.optimizer, "min", patience=20
         )
 
     def acc_avg(self, name):

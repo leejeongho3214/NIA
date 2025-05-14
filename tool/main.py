@@ -2,12 +2,16 @@ from datetime import datetime
 import os
 import sys
 import uuid
-from utils import get_loader, load_checkpoint, fix_seed, save_code_copy, path_organize
 
-path_organize()
+workspace_path = os.path.join(os.path.expanduser("~"), "dir/NIA")
+sys.path.insert(0, workspace_path)
+os.chdir(workspace_path)
 
+sys.stdout = open(sys.stdout.fileno(), mode="w", buffering=1)
+sys.stderr = open(sys.stderr.fileno(), mode="w", buffering=1)
+
+from utils import get_loader, load_checkpoint, fix_seed, save_code_copy
 import torch
-
 import shutil
 import numpy as np
 
@@ -60,7 +64,7 @@ def parse_args():
 
     parser.add_argument(
         "--lr",
-        default=1e-4,
+        default=0.0001,
         type=float,
     )
 
@@ -76,11 +80,6 @@ def parse_args():
         type=int,
     )
 
-    parser.add_argument(
-        "--seed",
-        default=1,
-        type=int,
-    )
 
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--ddp", action="store_true")
@@ -93,8 +92,14 @@ def parse_args():
 
 def main(args):
     now = datetime.now()
-    fix_seed(args.seed)
+    
+    seed = args.name.split("st")[0]
+    if seed.isdigit():
+        ValueError, f"It's not correct name, {args.name} -> {seed}"
+    
+    fix_seed(int(seed))
     args.git_name = git_name
+    args.seed = int(seed)
 
     check_path = os.path.join("checkpoint", git_name, args.mode, args.name)
     model_num_class = (
@@ -144,8 +149,8 @@ def main(args):
     )
 
     for key in model_list:
-        if key in pass_list:
-            continue
+        # if key in pass_list:
+        #     continue
 
         if args.ddp:
             torch.distributed.init_process_group(backend="nccl", init_method="env://")

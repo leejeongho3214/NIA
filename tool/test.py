@@ -1,15 +1,18 @@
 import shutil
 import sys
 import os
-from torch.utils import data
-from tool.utils import resume_checkpoint, path_organize
-path_organize()
-from custom_model.coatnet import coatnet_4
-from tool.data_loader import CustomDataset_class, CustomDataset_regress
 import argparse
+
+import yaml
+
+
+
+from torch.utils.data import DataLoader
+from tool.utils import resume_checkpoint, fix_seed
+from tool.data_loader import CustomDataset_class, CustomDataset_regress
 from tool.logger import setup_logger
 from tool.model import Model_test
-
+from custom_model.coatnet import coatnet_4
 
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
@@ -22,7 +25,7 @@ def parse_args():
         type=str,
     )
 
-    parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
+    parser.add_argument("--equ", type=int, default=1, choices=[1, 2, 3])
 
     parser.add_argument(
         "--mode",
@@ -61,6 +64,13 @@ def parse_args():
 
 
 def main(args):
+    
+    seed = args.name.split("st")[0]
+    if seed.isdigit():
+        ValueError, f"It's not correct name, {args.name} -> {seed}"
+    args.seed = int(seed)
+    fix_seed(int(seed))
+    
     args.git_name = git_name
     check_path = os.path.join("checkpoint", git_name, args.mode, args.name)
 
@@ -74,6 +84,10 @@ def main(args):
         os.path.join(args.log_path, "eval")
     )
     logger.info("Command Line: " + " ".join(sys.argv))
+    
+    yaml_file_path = os.path.join(check_path, "code", "test_config.yaml")
+    with open(yaml_file_path, "w") as yaml_file:
+        yaml.dump(vars(args), yaml_file, default_flow_style=False)
 
     model_num_class = (
         {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 6, "wrinkle": 7}
@@ -119,31 +133,31 @@ def main(args):
     model_area_dict = (
         {
             "dryness": ["dryness"],
-            "pigmentation": ["forehead_pigmentation", "cheek_pigmentation"],
+            "pigmentation": ["pigmentation_forehead", "pigmentation_cheek"],
             "pore": ["pore"],
             "sagging": ["sagging"],
-            "wrinkle": ["forehead_wrinkle", "glabellus_wrinkle", "perocular_wrinkle"],
+            "wrinkle": ["wrinkle_forehead", "wrinkle_glabellus", "wrinkle_perocular"],
         }
         if args.mode == "class"
         else {
             "pigmentation": ["pigmentation"],
-            "moisture": ["forehead_moisture", "cheek_moisture", "chin_moisture"],
+            "moisture": ["moisture_forehead", "moisture_cheek", "moisture_chin"],
             "elasticity_R2": [
-                "forehead_elasticity_R2",
-                "cheek_elasticity_R2",
-                "chin_elasticity_R2",
+                "elasticity_R2_forehead",
+                "elasticity_R2_cheek",
+                "elasticity_R2_chin",
             ],
-            "wrinkle_Ra": ["perocular_wrinkle_Ra"],
-            "pore": ["cheek_pore"],
+            "wrinkle_Ra": ["wrinkle_Ra_perocular"],
+            "pore": ["pore_cheek"],
         }
     )
  
     for key in model_list:
         model = model_list[key].cuda()
         for w_key in model_area_dict[key]:
-            testset, _ = dataset.load_dataset("test")
-            testset_loader = data.DataLoader(
-                dataset=testset[w_key],
+            testset, _ = dataset.load_dataset(w_key)
+            testset_loader = DataLoader(
+                dataset=testset,
                 batch_size=args.batch_size,
                 num_workers=args.num_workers,
                 shuffle=False,

@@ -120,7 +120,7 @@ class Attention(nn.Module):
         self.relative_bias_table = nn.Parameter(
             torch.zeros((2 * self.ih - 1) * (2 * self.iw - 1), heads))
 
-        coords = torch.meshgrid((torch.arange(self.ih), torch.arange(self.iw)))
+        coords = torch.meshgrid((torch.arange(self.ih), torch.arange(self.iw)), indexing='ij')
         coords = torch.flatten(torch.stack(coords), 1)
         relative_coords = coords[:, :, None] - coords[:, None, :]
 

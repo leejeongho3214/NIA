@@ -33,7 +33,7 @@ def softmax(x):
 
 
 def resume_checkpoint(args, model, path, dig, test=True):
-    state_dict = torch.load(path, map_location=device)
+    state_dict = torch.load(path, map_location=device, weights_only=False)
     if state_dict["best_loss"][dig] != np.inf and test:
         args.best_loss[dig] = state_dict["best_loss"][dig]
 
@@ -419,7 +419,7 @@ def get_loader(
         key,
         args,
     ):
-    data_set, grade_num = dataset.load_dataset(split, key)
+    data_set, grade_num = dataset.load_dataset(key)
     data_loader = data.DataLoader(
         dataset=data_set,
         batch_size=args.batch_size,
@@ -449,13 +449,3 @@ def save_code_copy(args, check_path, model_path):
     with open(yaml_file_path, "w") as yaml_file:
         yaml.dump(args_dict, yaml_file, default_flow_style=False)
         
-def path_organize():
-    home_path = os.path.expanduser("~")
-    workspace_path = os.path.join(home_path, "dir/NIA")
-    sys.path.insert(0, workspace_path)
-
-    sys.stdout = open(sys.stdout.fileno(), mode="w", buffering=1)
-    sys.stderr = open(sys.stderr.fileno(), mode="w", buffering=1)
-
-    script_dir = os.path.join(workspace_path, "..")
-    os.chdir(script_dir)
