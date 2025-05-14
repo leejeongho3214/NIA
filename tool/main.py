@@ -18,7 +18,7 @@ import numpy as np
 from custom_model.coatnet import coatnet_4
 
 from logger import setup_logger
-from tool.data_loader import CustomDataset_class, CustomDataset_regress
+from tool.data_loader import CustomDataset_class, CustomDataset_class_train, CustomDataset_class_valid, CustomDataset_regress
 import argparse
 from tool.model import Model
 
@@ -76,10 +76,9 @@ def parse_args():
 
     parser.add_argument(
         "--stop_early",
-        default=15,
+        default=10,
         type=int,
     )
-
 
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--ddp", action="store_true")
@@ -131,9 +130,10 @@ def main(args):
             shutil.rmtree(check_path)
 
     loading = False
-    loading, model_list, pass_list, info, global_step, run_id = load_checkpoint(
-        args, model_path, model_list, pass_list, loading
-    )
+    if os.path.isdir(os.path.join(model_path, "dryness")):
+        loading, model_list, pass_list, info, global_step, run_id = load_checkpoint(
+            args, model_path, model_list, pass_list, loading
+        )
 
     save_code_copy(args, check_path, model_path)
 
@@ -142,15 +142,21 @@ def main(args):
     )
     logger.info(f"[{git_name}]Command Line: " + " ".join(sys.argv))
 
-    dataset = (
-        CustomDataset_class(args, logger, "train")
+    train_dataset = (
+        CustomDataset_class_train(args, logger)
         if args.mode == "class"
         else CustomDataset_regress(args, logger)
     )
 
+    val_dataset = (
+        CustomDataset_class_valid(args, logger)
+        if args.mode == "class"
+        else CustomDataset_regress(args, logger)
+    )
+    
     for key in model_list:
-        # if key in pass_list:
-        #     continue
+        if key in pass_list:
+            continue
 
         if args.ddp:
             torch.distributed.init_process_group(backend="nccl", init_method="env://")
@@ -193,8 +199,8 @@ def main(args):
         if args.ddp:
             model = torch.nn.parallel.DistributedDataParallel(model)
 
-        trainset_loader, grade_num = get_loader(dataset, "train", key, args)
-        valset_loader, _ = get_loader(dataset, "val", key, args)
+        trainset_loader, grade_num = get_loader(train_dataset, "train", key, args)
+        valset_loader, _ = get_loader(val_dataset, "val", key, args)
 
         each_model = Model(
             args=args,

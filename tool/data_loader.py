@@ -25,11 +25,12 @@ def mkdir(path):
             raise
 
 
+
 class CustomDataset_class(Dataset):
     def __init__(self, args, logger, mode):
         self.args = args
-        self.logger = logger
         self.mode = mode
+        self.logger = logger
         self.img_path = "dataset/img"
         self.json_path = "dataset/label"
         self.dataset_dict = defaultdict(list)
@@ -164,7 +165,10 @@ class CustomDataset_class(Dataset):
 
         transform = transforms.Compose(
             [
-                transforms.Resize((256, 256), antialias=True),
+                transforms.Resize((self.args.res, self.args.res), antialias=True),
+                transforms.RandomResizedCrop(256, scale=(0.9, 1.0)),
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomRotation(degrees=5),
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ]
@@ -204,3 +208,12 @@ class CustomDataset_regress(CustomDataset_class):
     def __init__(self, args, logger):
         self.args = args
         self.logger = logger
+
+
+class CustomDataset_class_train(CustomDataset_class):
+    def __init__(self, args, logger):
+        super().__init__(args, logger, mode="train")
+        
+class CustomDataset_class_valid(CustomDataset_class):
+    def __init__(self, args, logger):
+        super().__init__(args, logger, mode="val")

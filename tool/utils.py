@@ -395,21 +395,20 @@ def fix_seed(random_seed):
     random.seed(random_seed)
 
 def load_checkpoint(args, model_path, model_list, pass_list, loading):
-    if os.path.isdir(model_path):
-        for path in os.listdir(model_path):
-            dig_path = os.path.join(model_path, path)
-            if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
-                print(f"\033[92mResuming......{dig_path}\033[0m")
-                model_list[path], info, global_step, run_id = resume_checkpoint(
-                    args,
-                    model_list[path],
-                    os.path.join(model_path, f"{path}", "state_dict.bin"),
-                    path, 
-                )
-                loading = True
-                if os.path.isdir(os.path.join(dig_path, "done")):
-                    print(f"\043[92mPassing......{dig_path}\043[0m")
-                    pass_list.append(path)
+    for path in os.listdir(model_path):
+        dig_path = os.path.join(model_path, path)
+        if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
+            print(f"\033[92mResuming......{dig_path}\033[0m")
+            model_list[path], info, global_step, run_id = resume_checkpoint(
+                args,
+                model_list[path],
+                os.path.join(model_path, f"{path}", "state_dict.bin"),
+                path, 
+            )
+            loading = True
+            if os.path.isdir(os.path.join(dig_path, "done")):
+                print(f"\043[92mPassing......{dig_path}\043[0m")
+                pass_list.append(path)
                     
     return loading, model_list, pass_list, info, global_step, run_id
 

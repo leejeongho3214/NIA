@@ -77,7 +77,7 @@ class Model(object):
         )
 
         self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer, "min", patience=20
+            self.optimizer, "min", patience=3
         )
 
     def acc_avg(self, name):
@@ -118,7 +118,7 @@ class Model(object):
 
     def print_loss(self, dataloader_len, final_flag=False):
         print(
-            f"\r[{self.args.git_name}] Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}",
+            f"\r[{self.args.git_name}] Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter * (self.iter_epoch + 1) + self.iter}/{self.rep * dataloader_len}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}",
             end="",
         )
         loss_phase, loss_avg = (
@@ -171,21 +171,13 @@ class Model(object):
                         correct_[i] += 1
 
                 info_m = (
-                    f"[Lr: {self.optimizer.param_groups[0]['lr']:4f}][Gamma: {self.args.gamma}][NaN count: {self.nan}]"
+                    f"[Lr: {self.optimizer.param_groups[0]['lr']:4f}][Gamma: {self.args.gamma}][Early Stop: {self.update_c}/{self.args.stop_early}]"
                     if self.phase == "Train"
                     else ""
                 )
                 self.logger.info(
-                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}]{info_m}[{self.iter}/{dataloader_len}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}, Correlation: {correlation:.2f} micro Precision: {(micro_precision * 100):.2f}%"
+                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}]{info_m}[{self.iter * (self.iter_epoch + 1) + self.iter}/{self.rep * dataloader_len}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}, Correlation: {correlation:.2f} micro Precision: {(micro_precision * 100):.2f}%"
                 )
-
-                grade_ = sorted(list(all_.keys()))
-                for grade in grade_:
-                    print(
-                        f"        [Grade {grade}]  {correct_[grade]} / {all_[grade]} => {(correct_[grade] / all_[grade] * 100):.2f}%",
-                        end="",
-                    )
-                print("")
 
                 if self.phase == "Valid":
                     if self.best_loss[self.m_dig] > self.val_loss.avg:
@@ -198,7 +190,7 @@ class Model(object):
 
             else:
                 self.logger.info(
-                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter}/{dataloader_len}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
+                    f"Epoch: {self.epoch} [{self.phase}][{self.m_dig}][{self.iter * (self.iter_epoch + 1) + self.iter}/{self.rep * dataloader_len}][Lr: {self.optimizer.param_groups[0]['lr']:4f}][Early Stop: {self.update_c}/{self.args.stop_early}][{self.m_dig}] ---- >  loss: {self.train_loss.avg if self.phase == 'Train' else self.val_loss.avg:.04f}, Correlation: {correlation:.2f}"
                 )
                 if self.phase == "Valid":
                     if self.best_loss[self.m_dig] > self.val_loss.avg:
@@ -311,41 +303,42 @@ class Model(object):
         )
         self.prev_model = deepcopy(self.model)
 
-        for self.iter, (img, label, self.img_names, _, _, _) in enumerate(
-            self.train_loader
-        ):
-            img, label = img.to(device), label.to(device)
+        self.rep = 3
+        for self.iter_epoch in range(self.rep):
+            for self.iter, (img, label, self.img_names, _, _, _) in enumerate(
+                self.train_loader
+            ):
+                img, label = img.to(device), label.to(device)
+                pred = self.model(img)
 
-            pred = self.model(img)
+                if self.args.mode == "class":
+                    loss = self.class_loss(pred, label)
+                else:
+                    loss = self.regression(pred, label)
 
-            if self.args.mode == "class":
-                loss = self.class_loss(pred, label)
-            else:
-                loss = self.regression(pred, label)
+                if not self.iter and not self.epoch:
+                    self.wandb_run.log(
+                        {
+                            "train/image": [
+                                wandb.Image(
+                                    img[i],
+                                    caption=f"GT: {label[i]}, Pred: {pred[i].argmax().item()}, Name: {self.img_names[i]}",
+                                )
+                                for i in range(3)
+                            ]
+                        },
+                        step=self.global_step,
+                    )
 
-            if not self.iter and not self.epoch:
-                self.wandb_run.log(
-                    {
-                        "train/image": [
-                            wandb.Image(
-                                img[i],
-                                caption=f"GT: {label[i]}, Pred: {pred[i].argmax().item()}, Name: {self.img_names[i]}",
-                            )
-                            for i in range(4)
-                        ]
-                    },
-                    step=self.global_step,
-                )
+                self.print_loss(len(self.train_loader))
 
-            self.print_loss(len(self.train_loader))
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
 
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
+                self.global_step += 1
 
-            self.global_step += 1
-
-        self.print_loss(len(self.train_loader), final_flag=True)
+            self.print_loss(len(self.train_loader), final_flag=True)
 
     def valid(self):
         self.phase = "Valid"
@@ -373,7 +366,7 @@ class Model(object):
                                     img[i],
                                     caption=f"GT: {label[i]}, Pred: {pred[i].argmax().item()}, Name: {self.img_names[i]}",
                                 )
-                                for i in range(4)
+                                for i in range(3)
                             ]
                         },
                         step=self.global_step,
