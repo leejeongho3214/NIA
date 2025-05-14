@@ -102,7 +102,7 @@ def main(args):
 
     check_path = os.path.join("checkpoint", git_name, args.mode, args.name)
     model_num_class = (
-        {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 6, "wrinkle": 7}
+        {"dryness": 5, "pigmentation": 7, "pore": 6, "sagging": 6, "wrinkle": 7}
         if args.mode == "class"
         else {
             "pigmentation": 1,

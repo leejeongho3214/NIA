@@ -24,8 +24,6 @@ def mkdir(path):
         if e.errno != errno.EEXIST:
             raise
 
-
-
 class CustomDataset_class(Dataset):
     def __init__(self, args, logger, mode):
         self.args = args
@@ -68,63 +66,19 @@ class CustomDataset_class(Dataset):
                     json_value = json.load(f)
 
                 if self.args.mode == "class":
-                    for class_item, value in json_value["annotations"].items():
-                        self.dataset_dict[class_name].append(
-                            [f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value]
-                        )
-                        self.grade_num[class_name][value] += 1
+                    for full_name, value in json_value["annotations"].items():
+                        if class_name in full_name:
+                            self.dataset_dict[class_name].append(
+                                [f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value]
+                            )
+                            self.grade_num[class_name][value] += 1
                 else:
-                    for class_item, value in json_value["equipment"].items():
-                        if class_name in class_item:
+                    for full_name, value in json_value["equipment"].items():
+                        if class_name in full_name:
                             self.dataset_dict[class_name].append(
                                 [f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value]
                             )
 
-    def process_json_meta(self, json_meta, j_name, sub_path, target_list, sub_fold):
-        if (
-            (
-                list(json_meta["annotations"].keys())[0] == "acne"
-                or json_meta["images"]["bbox"] is None
-            )
-            and self.args.mode == "class"
-        ) or (
-            (json_meta["equipment"] is None or json_meta["images"]["bbox"] is None)
-            and self.args.mode == "regression"
-        ):
-            return
-
-        age = torch.tensor([round((json_meta["info"]["age"] - 13.0) / 69.0, 5)])
-        gender = 0 if json_meta["info"]["gender"] == "F" else 1
-        gender_l = F.one_hot(torch.tensor(gender), 2)
-        meta_v = torch.cat([age, gender_l])
-
-        if self.args.mode == "class":
-            for dig_n, grade in json_meta["annotations"].items():
-                if dig_n == "chin_sagging" and grade == 6:
-                    continue
-
-                dig, area = dig_n.split("_")[-1], dig_n.split("_")[-2]
-
-                if dig in ["wrinkle", "pigmentation"] and self.mode == "test":
-                    dig = f"{dig}_{area}"
-
-                self.json_dict[dig][str(grade)][sub_fold].append(
-                    [os.path.join(sub_path, j_name.split(".")[0]), meta_v]
-                )
-        else:
-            for dig_n, value in json_meta["equipment"].items():
-                matching_dig = [
-                    dig_n for target_dig in target_list if target_dig in dig_n
-                ]
-                if matching_dig:
-                    dig = matching_dig[0]
-                    self.json_dict[dig][value][sub_fold].append(
-                        [
-                            os.path.join(sub_path, j_name.split(".")[0]),
-                            value,
-                            meta_v,
-                        ]
-                    )
 
     def save_dict(self, transform):
         ori_img = cv2.imread(
@@ -208,12 +162,9 @@ class CustomDataset_regress(CustomDataset_class):
     def __init__(self, args, logger):
         self.args = args
         self.logger = logger
-
-
 class CustomDataset_class_train(CustomDataset_class):
     def __init__(self, args, logger):
         super().__init__(args, logger, mode="train")
-        
 class CustomDataset_class_valid(CustomDataset_class):
     def __init__(self, args, logger):
         super().__init__(args, logger, mode="val")
