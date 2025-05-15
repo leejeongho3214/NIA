@@ -120,9 +120,6 @@ class CustomDataset_class(Dataset):
         transform = transforms.Compose(
             [
                 transforms.Resize((self.args.res, self.args.res), antialias=True),
-                transforms.RandomResizedCrop(256, scale=(0.9, 1.0)),
-                transforms.RandomHorizontalFlip(),
-                transforms.RandomRotation(degrees=5),
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ]
