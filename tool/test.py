@@ -2,10 +2,14 @@ import shutil
 import sys
 import os
 import argparse
-
 import yaml
 
+workspace_path = os.path.join(os.path.expanduser("~"), "dir/NIA")
+sys.path.insert(0, workspace_path)
+os.chdir(workspace_path)
 
+sys.stdout = open(sys.stdout.fileno(), mode="w", buffering=1)
+sys.stderr = open(sys.stderr.fileno(), mode="w", buffering=1)
 
 from torch.utils.data import DataLoader
 from tool.utils import resume_checkpoint, fix_seed
@@ -133,10 +137,10 @@ def main(args):
     model_area_dict = (
         {
             "dryness": ["dryness"],
-            "pigmentation": ["pigmentation_forehead", "pigmentation_cheek"],
+            "pigmentation": ["forehead_pigmentation", "cheek_pigmentation"],
             "pore": ["pore"],
             "sagging": ["sagging"],
-            "wrinkle": ["wrinkle_forehead", "wrinkle_glabellus", "wrinkle_perocular"],
+            "wrinkle": ["forehead_wrinkle", "glabellus_wrinkle", "perocular_wrinkle"],
         }
         if args.mode == "class"
         else {
