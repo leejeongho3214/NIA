@@ -60,6 +60,10 @@ class CustomDataset_class(Dataset):
             for file_name in file_list:
                 sub, equ, angle, area = [file_name.split("_")[i] for i in [1, 3, 5, 7]]
 
+                if self.mode == "train":
+                    if angle not in ["F"]:
+                        continue
+                
                 with open(
                     f"{self.json_path}/{equ}/{sub}/{sub}_{equ}_{angle}_{area}.json", "r"
                 ) as f:
@@ -78,7 +82,6 @@ class CustomDataset_class(Dataset):
                             self.dataset_dict[class_name].append(
                                 [f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value]
                             )
-
 
     def save_dict(self, transform):
         ori_img = cv2.imread(
