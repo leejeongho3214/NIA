@@ -292,6 +292,8 @@ def save_checkpoint(self, correct_, all_, micro_precision, correlation):
                 "optimizer_state_dict": self.optimizer.state_dict(),
                 "scheduler_state_dict": self.scheduler.state_dict(),
                 "run_id": self.args.run_id,
+                "acc_": micro_precision,
+                "corre_": correlation,
             },
             
         },
