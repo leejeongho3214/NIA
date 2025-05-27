@@ -174,7 +174,6 @@ def main(args):
 
         runs = api.runs(project_path)
 
-        # name이 일치하는 모든 run 찾기
         matched_runs = [run for run in runs if run.name == target_name]
 
         if matched_runs:
@@ -186,7 +185,6 @@ def main(args):
         else:
             print(f"No run found with name: {target_name}")
 
-        # args.name으로 프로젝트 식별
         wandb_run = wandb.init(
             project="NIA-Korean-Facial-Assessment",
             name=target_name,
