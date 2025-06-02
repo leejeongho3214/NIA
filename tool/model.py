@@ -336,7 +336,7 @@ class Model(object):
             self.optimizer.step()
 
             self.global_step += 1
-
+            
         self.print_loss(len(self.train_loader), final_flag=True)
 
     def valid(self):

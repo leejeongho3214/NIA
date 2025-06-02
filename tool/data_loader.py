@@ -67,11 +67,13 @@ class CustomDataset_class(Dataset):
 
                 if self.args.mode == "class":
                     for full_name, value in json_value["annotations"].items():
-                        if class_name in full_name:
-                            self.dataset_dict[class_name].append(
-                                [f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value]
-                            )
-                            self.grade_num[class_name][value] += 1
+                        dig, area = full_name.split("_")[-2], full_name.split("_")[-1]
+                        f_name = f"{dig}_{area}"
+                            
+                        self.dataset_dict[f_name].append(
+                            [f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value]
+                        )
+                        self.grade_num[f_name][value] += 1
                 else:
                     for full_name, value in json_value["equipment"].items():
                         if class_name in full_name:

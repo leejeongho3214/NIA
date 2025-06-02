@@ -112,13 +112,37 @@ def main(args):
             "pore": 1,
         }
     )
+    
+    model_area_dict = (
+        {
+            "dryness": ["lip_dryness"],
+            "pigmentation": ["forehead_pigmentation", "cheek_pigmentation"],
+            "pore": ["cheek_pore"],
+            "sagging": ["chin_sagging"],
+            "wrinkle": ["forehead_wrinkle", "glabellus_wrinkle", "perocular_wrinkle"],
+        }
+        if args.mode == "class"
+        else {
+            "pigmentation": ["pigmentation"],
+            "moisture": ["moisture_forehead", "moisture_cheek", "moisture_chin"],
+            "elasticity_R2": [
+                "elasticity_R2_forehead",
+                "elasticity_R2_cheek",
+                "elasticity_R2_chin",
+            ],
+            "wrinkle_Ra": ["wrinkle_Ra_perocular"],
+            "pore": ["pore_cheek"],
+        }
+    )
+    
+    
     pass_list = list()
 
     args.best_loss = {item: np.inf for item in model_num_class}
     args.load_epoch = {item: 0 for item in model_num_class}
 
     model_list = {
-        key: coatnet_4(num_classes=value) for key, value in model_num_class.items()
+        k: coatnet_4(num_classes=value) for key, value in model_num_class.items() for k in model_area_dict[key]
     }
 
     model_path = os.path.join(check_path, "save_model")
@@ -157,7 +181,7 @@ def main(args):
     for key in model_list:
         if key in pass_list:
             continue
-
+        
         if args.ddp:
             torch.distributed.init_process_group(backend="nccl", init_method="env://")
 
