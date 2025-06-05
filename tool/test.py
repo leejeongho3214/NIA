@@ -104,11 +104,34 @@ def main(args):
         }
     )
     
+    model_area_dict = (
+        {
+            "dryness": ["dryness"],
+            "pigmentation": ["forehead_pigmentation", "cheek_pigmentation"],
+            "pore": ["pore"],
+            "sagging": ["sagging"],
+            "wrinkle": ["forehead_wrinkle", "glabellus_wrinkle", "perocular_wrinkle"],
+        }
+        if args.mode == "class"
+        else {
+            "pigmentation": ["pigmentation"],
+            "moisture": ["moisture_forehead", "moisture_cheek", "moisture_chin"],
+            "elasticity_R2": [
+                "elasticity_R2_forehead",
+                "elasticity_R2_cheek",
+                "elasticity_R2_chin",
+            ],
+            "wrinkle_Ra": ["wrinkle_Ra_perocular"],
+            "pore": ["pore_cheek"],
+        }
+    )
+ 
+ 
+    
     model_list = {
-        key: coatnet_4(num_classes=value)
-        for key, value in model_num_class.items()
+        k: coatnet_4(num_classes=value) for key, value in model_num_class.items() for k in model_area_dict[key]
     }
-
+    
     model_path = os.path.join(check_path, "save_model")
     if os.path.isdir(model_path):
         for path in os.listdir(model_path):
@@ -133,40 +156,18 @@ def main(args):
     )
     resnet_model = Model_test(args, logger)
 
-    model_area_dict = (
-        {
-            "dryness": ["dryness"],
-            "pigmentation": ["forehead_pigmentation", "cheek_pigmentation"],
-            "pore": ["pore"],
-            "sagging": ["sagging"],
-            "wrinkle": ["forehead_wrinkle", "glabellus_wrinkle", "perocular_wrinkle"],
-        }
-        if args.mode == "class"
-        else {
-            "pigmentation": ["pigmentation"],
-            "moisture": ["moisture_forehead", "moisture_cheek", "moisture_chin"],
-            "elasticity_R2": [
-                "elasticity_R2_forehead",
-                "elasticity_R2_cheek",
-                "elasticity_R2_chin",
-            ],
-            "wrinkle_Ra": ["wrinkle_Ra_perocular"],
-            "pore": ["pore_cheek"],
-        }
-    )
- 
+
     for key in model_list:
         model = model_list[key].cuda()
-        for w_key in model_area_dict[key]:
-            testset, _ = dataset.load_dataset(w_key)
-            testset_loader = DataLoader(
-                dataset=testset,
-                batch_size=args.batch_size,
-                num_workers=args.num_workers,
-                shuffle=False,
-            )
-            resnet_model.test(model, testset_loader, w_key)
-            resnet_model.print_test()
+        testset, _ = dataset.load_dataset(key)
+        testset_loader = DataLoader(
+            dataset=testset,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            shuffle=False,
+        )
+        resnet_model.test(model, testset_loader, key)
+        resnet_model.print_test()
     resnet_model.save_value()
 
 if __name__ == "__main__":

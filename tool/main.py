@@ -115,10 +115,10 @@ def main(args):
     
     model_area_dict = (
         {
-            "dryness": ["lip_dryness"],
+            "dryness": ["dryness"],
             "pigmentation": ["forehead_pigmentation", "cheek_pigmentation"],
-            "pore": ["cheek_pore"],
-            "sagging": ["chin_sagging"],
+            "pore": ["pore"],
+            "sagging": ["sagging"],
             "wrinkle": ["forehead_wrinkle", "glabellus_wrinkle", "perocular_wrinkle"],
         }
         if args.mode == "class"
@@ -138,8 +138,8 @@ def main(args):
     
     pass_list = list()
 
-    args.best_loss = {item: np.inf for item in model_num_class}
-    args.load_epoch = {item: 0 for item in model_num_class}
+    args.best_loss = {item: np.inf for items in model_area_dict.values() for item in items}
+    args.load_epoch = {item: 0 for items in model_area_dict.values() for item in items}
 
     model_list = {
         k: coatnet_4(num_classes=value) for key, value in model_num_class.items() for k in model_area_dict[key]

@@ -67,8 +67,12 @@ class CustomDataset_class(Dataset):
 
                 if self.args.mode == "class":
                     for full_name, value in json_value["annotations"].items():
-                        dig, area = full_name.split("_")[-2], full_name.split("_")[-1]
-                        f_name = f"{dig}_{area}"
+                        dig, area_ = full_name.split("_")[-2], full_name.split("_")[-1]
+                        
+                        if area_ in ["dryness", "pore", "sagging"]:
+                            f_name = area_
+                        else:
+                            f_name = f"{dig}_{area_}"
                             
                         self.dataset_dict[f_name].append(
                             [f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value]
