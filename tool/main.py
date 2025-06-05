@@ -91,7 +91,6 @@ def parse_args():
 
 def main(args):
     now = datetime.now()
-    
     seed = args.name.split("st")[0]
     if seed.isdigit():
         ValueError, f"It's not correct name, {args.name} -> {seed}"
