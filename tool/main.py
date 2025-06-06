@@ -15,7 +15,6 @@ import shutil
 import torch.nn as nn
 import numpy as np
 from torchvision import models
-from tensorboardX import SummaryWriter
 from utils import mkdir, resume_checkpoint, fix_seed
 from logger import setup_logger
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
@@ -23,7 +22,7 @@ from model import Model
 import argparse
 
 
-git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
+git_name = "None"
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -34,7 +33,7 @@ def parse_args():
         type=str,
     )
 
-    parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
+    parser.add_argument("--equ", type=int, default=[2], choices=[1, 2, 3], nargs="+")
 
     parser.add_argument("--stop_early", type=int, default=50)
 
@@ -167,7 +166,6 @@ def main(args):
     mkdir(log_path)
     code_path = os.path.join(check_path, "code")
     mkdir(code_path)
-    writer = SummaryWriter(log_path)
     
     [shutil.copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), code_name), os.path.join(code_path, code_name.split("/")[-1])) \
         for code_name in ["main.py", "data_loader.py", "model.py", "../torchvision/models/resnet.py"]]
@@ -192,71 +190,24 @@ def main(args):
     )
     train_dict = defaultdict(list)
     val_dict = defaultdict(list)
+    test_dict = defaultdict(list)
     
     for key in model_list:
-        if key in pass_list:
-            continue
         
-        model = model_list[key].cuda()
-
         trainset, grade_num = dataset.load_dataset("train", key)
+        valset, _ = dataset.load_dataset("val", key)
 
-        trainset_loader = data.DataLoader(
-            dataset=trainset,
-            batch_size=args.batch_size,
-            num_workers=args.num_workers,
-            shuffle=True,
-        )
-
-        valset, _ = dataset.load_dataset("valid", key)
-        valset_loader = data.DataLoader(
-            dataset=valset,
-            batch_size=args.batch_size,
-            num_workers=args.num_workers,
-            shuffle=False,
-        )
-
-        resnet_model = Model(
-            args,
-            model,
-            trainset_loader,
-            valset_loader,
-            logger,
-            check_path,
-            model_num_class,
-            writer,
-            key,
-            grade_num,
-            info if loading else None, 
-        )
-        
         train_dict[key] = [i[2] for i in trainset]
         val_dict[key] = [i[2] for i in valset]
         
-        if args.load_epoch[key] < 50:
-            for epoch in range(args.load_epoch[key], args.epoch):
-                if args.load_epoch[key]:
-                    resnet_model.update_e(epoch + 1, *info) 
-                
-                schedule_flag = True
-                while schedule_flag:
-                    resnet_model.reset_log(False)
-                    schedule_flag = resnet_model.train()
-                
-                resnet_model.valid()
-                resnet_model.reset_log(True)
-
-                if resnet_model.stop_early():
-                    break
-            resnet_model.print_best()
-            
-        del trainset_loader, valset_loader
-        mode = "w" if os.path.isfile(f"{check_path}/log/train/trainset_info.txt") else "a"
+        check_path = "/home/jeongho/dir/NIA/dataset/split/smart_pad"
         
-        with open(f"{check_path}/log/train/trainset_info.txt", mode) as f:
-            json.dump(train_dict, f)
-        with open(f"{check_path}/log/train/valset_info.txt", mode) as f:
-            json.dump(val_dict, f)
+    mode = "w" 
+    
+    with open(f"{check_path}/{args.seed}_trainset_info.txt", mode) as f:
+        json.dump(train_dict, f)
+    with open(f"{check_path}/{args.seed}_valset_info.txt", mode) as f:
+        json.dump(val_dict, f)
 
 
 if __name__ == "__main__":

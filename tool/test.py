@@ -19,7 +19,7 @@ from tool.model import Model_test
 from tool.utils import resume_checkpoint, fix_seed
 
 
-git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
+git_name = "None"
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -116,49 +116,40 @@ def main(args):
         if args.mode == "class"
         else CustomDataset_regress(args, logger)
     )
-    resnet_model = Model_test(args, logger)
 
     model_area_dict = (
         {
             "dryness": ["dryness"],
-            "pigmentation": ["pigmentation_forehead", "pigmentation_cheek"],
+            "pigmentation": ["forehead_pigmentation", "cheek_pigmentation"],
             "pore": ["pore"],
             "sagging": ["sagging"],
-            "wrinkle": ["wrinkle_forehead", "wrinkle_glabellus", "wrinkle_perocular"],
+            "wrinkle": ["forehead_wrinkle", "glabellus_wrinkle", "perocular_wrinkle"],
         }
         if args.mode == "class"
         else {
             "pigmentation": ["pigmentation"],
-            "moisture": ["forehead_moisture", "cheek_moisture", "chin_moisture"],
+            "moisture": ["moisture_forehead", "moisture_cheek", "moisture_chin"],
             "elasticity_R2": [
-                "forehead_elasticity_R2",
-                "cheek_elasticity_R2",
-                "chin_elasticity_R2",
+                "elasticity_R2_forehead",
+                "elasticity_R2_cheek",
+                "elasticity_R2_chin",
             ],
-            "wrinkle_Ra": ["perocular_wrinkle_Ra"],
-            "pore": ["cheek_pore"],
+            "wrinkle_Ra": ["wrinkle_Ra_perocular"],
+            "pore": ["pore_cheek"],
         }
     )
     
- 
-        
-    print_dict = defaultdict(list)
+    test_dict = defaultdict(list)
     for key in model_list:
-        model = model_list[key].cuda()
         for w_key in model_area_dict[key]:
             testset, _ = dataset.load_dataset("test", w_key)
-            print_dict[w_key] = [i[2] for i in testset]
-            testset_loader = data.DataLoader(
-                dataset=testset,
-                batch_size=args.batch_size,
-                num_workers=args.num_workers,
-                shuffle=False,
-            )
-            resnet_model.test(model, testset_loader, w_key)
-            resnet_model.print_test()
-    resnet_model.save_value()
-    with open(f"{args.log_path}/eval/testset_info.txt", "a") as f:
-        json.dump(print_dict, f)
+            test_dict[w_key] = [i[2] for i in testset]
+    
+    check_path = "/home/jeongho/dir/NIA/dataset/split/smart_pad"
+    mode = "w" 
+    
+    with open(f"{check_path}/{args.seed}_testset_info.txt", mode) as f:
+        json.dump(test_dict, f)
 
 
 if __name__ == "__main__":

@@ -71,7 +71,7 @@ class CustomDataset_class(Dataset):
                         for idx in idx_list:
                             tt_list = list()
                             for each_value in grade_dict[idx]:
-                                if each_value[0].split("_")[-2] in ["F", "L30", "R30"]:
+                                if each_value[0].split("_")[-2] in ["F", "L", "R"]:
                                     tt_list.append(each_value)
                             in_list.append(tt_list)
                     out_list[dig][grade] = in_list
@@ -163,7 +163,7 @@ class CustomDataset_class(Dataset):
                 dig, area = dig_n.split("_")[-1], dig_n.split("_")[-2]
 
                 if dig in ["wrinkle", "pigmentation"] and self.mode == "test":
-                    dig = f"{dig}_{area}"
+                    dig = f"{area}_{dig}"
 
                 self.json_dict[dig][str(grade)][sub_fold].append(
                     [os.path.join(sub_path, j_name.split(".")[0]), meta_v]
