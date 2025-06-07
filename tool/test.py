@@ -139,6 +139,11 @@ def main(args):
     }
     
     model_path = os.path.join(check_path, "save_model")
+    save_log_path = os.path.join(check_path, "log", "save-log")
+    
+    if os.path.isdir(save_log_path):
+        shutil.rmtree(save_log_path)
+        
     if os.path.isdir(model_path):
         for path in os.listdir(model_path):
             dig_path = os.path.join(model_path, path)
