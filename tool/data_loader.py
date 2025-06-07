@@ -75,8 +75,12 @@ class CustomDataset_class(Dataset):
                         else:
                             f_name = f"{area_}_{dig}"
                             
-                        if ((f_name != class_name) and self.args.mode == "test") or (dig != class_name):
-                            continue
+                        if self.mode == "test":
+                            if f_name != class_name:
+                                continue
+                        else: 
+                            if dig != class_name:
+                                continue
                         
                         self.dataset_dict[f_name].append(
                             [f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value]
