@@ -37,6 +37,12 @@ def parse_args():
         choices=["regression", "class"],
         type=str,
     )
+    
+    parser.add_argument(
+        "--check_root",
+        default="",
+        type=str,
+    )
 
     parser.add_argument(
         "--batch_size",
@@ -76,7 +82,7 @@ def main(args):
     fix_seed(int(seed))
     
     args.git_name = git_name
-    check_path = os.path.join("checkpoint", git_name, args.mode, args.name)
+    check_path = os.path.join(args.check_root, "checkpoint", git_name, args.mode, args.name)
 
     if os.path.isdir(os.path.join(check_path, "log", "eval")):
         shutil.rmtree(os.path.join(check_path, "log", "eval"))
