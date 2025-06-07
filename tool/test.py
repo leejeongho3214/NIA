@@ -30,7 +30,7 @@ def parse_args():
         type=str,
     )
 
-    parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
+    parser.add_argument("--equ", type=int, default=[2], choices=[1, 2, 3], nargs="+")
 
     parser.add_argument(
         "--mode",
@@ -93,23 +93,6 @@ def main(args):
         key: models.coatnet.coatnet_4(num_classes=value)
         for key, value in model_num_class.items()
     }
-
-    model_path = os.path.join(check_path, "save_model")
-    if os.path.isdir(model_path):
-        for path in os.listdir(model_path):
-            dig_path = os.path.join(model_path, path)
-            if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
-                print(f"\033[92mResuming......{dig_path}\033[0m")
-                model_list[path], _ = resume_checkpoint(
-                    args,
-                    model_list[path],
-                    os.path.join(dig_path, "state_dict.bin"),
-                    path,
-                    False,
-                )
-    else: 
-        shutil.rmtree(check_path)
-        assert 0, "Incorrect checkpoint path"
 
     dataset = (
         CustomDataset_class(args, logger, "test")
