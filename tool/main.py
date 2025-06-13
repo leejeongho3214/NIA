@@ -33,7 +33,7 @@ def parse_args():
         type=str,
     )
 
-    parser.add_argument("--equ", type=int, default=[2], choices=[1, 2, 3], nargs="+")
+    parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
 
     parser.add_argument("--stop_early", type=int, default=50)
 
@@ -190,23 +190,23 @@ def main(args):
     )
     train_dict = defaultdict(list)
     val_dict = defaultdict(list)
-    test_dict = defaultdict(list)
-    
+
     for key in model_list:
         
-        trainset, grade_num = dataset.load_dataset("train", key)
+        trainset, _ = dataset.load_dataset("train", key)
         valset, _ = dataset.load_dataset("val", key)
 
         train_dict[key] = [i[2] for i in trainset]
         val_dict[key] = [i[2] for i in valset]
         
-        check_path = "/home/jeongho/dir/NIA/dataset/split/smart_pad"
         
+    check_path = "/home/jeongho/dir/NIA/dataset/split/regression/digital_camera"
+    os.makedirs(check_path, exist_ok=True)
     mode = "w" 
     
-    with open(f"{check_path}/{args.seed}_trainset_info.txt", mode) as f:
+    with open(f"{check_path}/{args.seed}_trainset_info.json", mode) as f:
         json.dump(train_dict, f)
-    with open(f"{check_path}/{args.seed}_valset_info.txt", mode) as f:
+    with open(f"{check_path}/{args.seed}_valset_info.json", mode) as f:
         json.dump(val_dict, f)
 
 

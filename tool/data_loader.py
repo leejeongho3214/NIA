@@ -317,11 +317,9 @@ class CustomDataset_class(Dataset):
 
 class CustomDataset_regress(CustomDataset_class):
     def __init__(self, args, logger):
-        self.args = args
-        self.logger = logger
-        self.load_list(args)
-        self.generate_datasets()
-
+        self.val_angle = ["F", "L30", "R30"] if args.mode == "class" else ["F", "L", "R"]
+        super().__init__(args, logger, mode = "train")
+        
     def generate_datasets(self):
         self.train_list, self.val_list, self.test_list = dict(), dict(), dict()
         for dig in sorted(self.json_dict):
@@ -332,10 +330,10 @@ class CustomDataset_regress(CustomDataset_class):
                 for _, value_list in self.json_dict[dig][idx].items():
                     for value in value_list:
                         if i % 10 == 8:
-                            if value[0].split("_")[-2] in ["F", "L30", "R30"]:
+                            if value[0].split("_")[-2] in self.val_angle:
                                 val_sub.append(value)
                         elif i % 10 == 9:
-                            if value[0].split("_")[-2] in ["F", "L30", "R30"]:
+                            if value[0].split("_")[-2] in self.val_angle:
                                 test_sub.append(value)
                         else:
                             train_sub.append(value)

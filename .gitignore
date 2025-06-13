@@ -27,6 +27,7 @@ eval/
 class/
 save_img/
 pytorch_grad_cam/
+wandb/
 
 IEC_korea_data
 cam_output
