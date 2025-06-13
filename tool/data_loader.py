@@ -83,7 +83,7 @@ class CustomDataset_class(Dataset):
     def save_dict(self, transform):
         ori_img = cv2.imread(
             os.path.join("dataset/cropped_img", self.i_path + ".jpg")
-        )  ## Be careful the path of the dataset whether it is 0-padding or not
+        )  
         pil_img = cv2.cvtColor(ori_img, cv2.COLOR_BGR2RGB)
         ori_img = cv2.resize(ori_img, (self.args.res, self.args.res))
 
@@ -159,9 +159,11 @@ class CustomDataset_regress(CustomDataset_class):
     def __init__(self, args, logger):
         self.args = args
         self.logger = logger
+        
 class CustomDataset_class_train(CustomDataset_class):
     def __init__(self, args, logger):
         super().__init__(args, logger, mode="train")
+        
 class CustomDataset_class_valid(CustomDataset_class):
     def __init__(self, args, logger):
         super().__init__(args, logger, mode="val")
