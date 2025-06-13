@@ -33,7 +33,7 @@ def parse_args():
         type=str,
     )
 
-    parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
+    parser.add_argument("--equ", type=int, default=[3], choices=[1, 2, 3], nargs="+")
 
     parser.add_argument("--stop_early", type=int, default=50)
 
@@ -200,7 +200,7 @@ def main(args):
         val_dict[key] = [i[2] for i in valset]
         
         
-    check_path = "/home/jeongho/dir/NIA/dataset/split/regression/digital_camera"
+    check_path = "/home/jeongho/dir/NIA/dataset/split/regression/smart_phone"
     os.makedirs(check_path, exist_ok=True)
     mode = "w" 
     

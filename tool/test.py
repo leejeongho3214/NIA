@@ -30,7 +30,7 @@ def parse_args():
         type=str,
     )
 
-    parser.add_argument("--equ", type=int, default=[2], choices=[1, 2, 3], nargs="+")
+    parser.add_argument("--equ", type=int, default=[3], choices=[1, 2, 3], nargs="+")
 
     parser.add_argument(
         "--mode",
@@ -111,14 +111,14 @@ def main(args):
         if args.mode == "class"
         else {
             "pigmentation": ["pigmentation"],
-            "moisture": ["moisture_forehead", "moisture_cheek", "moisture_chin"],
+            "moisture": ["forehead_moisture", "cheek_moisture", "chin_moisture"],
             "elasticity_R2": [
-                "elasticity_R2_forehead",
-                "elasticity_R2_cheek",
-                "elasticity_R2_chin",
+                "forehead_elasticity_R2",
+                "cheek_elasticity_R2",
+                "chin_elasticity_R2",
             ],
-            "wrinkle_Ra": ["wrinkle_Ra_perocular"],
-            "pore": ["pore_cheek"],
+            "wrinkle_Ra": ["perocular_wrinkle_Ra"],
+            "pore": ["cheek_pore"],
         }
     )
     
@@ -128,10 +128,11 @@ def main(args):
             testset, _ = dataset.load_dataset("test", w_key)
             test_dict[w_key] = [i[2] for i in testset]
     
-    check_path = "/home/jeongho/dir/NIA/dataset/split/smart_pad"
+    check_path = "/home/jeongho/dir/NIA/dataset/split/regression/smart_phone"
+    os.makedirs(check_path, exist_ok=True)
     mode = "w" 
     
-    with open(f"{check_path}/{args.seed}_testset_info.txt", mode) as f:
+    with open(f"{check_path}/{args.seed}_testset_info.json", mode) as f:
         json.dump(test_dict, f)
 
 
