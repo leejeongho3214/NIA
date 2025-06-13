@@ -24,7 +24,7 @@ def mkdir(path):
         if e.errno != errno.EEXIST:
             raise
 
-class CustomDataset_class(Dataset):
+class CustomDataset(Dataset):
     def __init__(self, args, logger, mode):
         self.args = args
         self.mode = mode
@@ -52,7 +52,7 @@ class CustomDataset_class(Dataset):
             device = "smart_phone"
             
         with open(
-            f"dataset/split/{device}/{self.args.seed}_{self.mode}set_info.txt", "r"
+            f"dataset/split/{self.args.mode}/{device}/{self.args.seed}_{self.mode}set_info.json", "r"
         ) as f:
             dataset_list = json.load(f)
             
@@ -111,9 +111,10 @@ class CustomDataset_class(Dataset):
         self.area_list.append([patch_img, label_data, desc_area, self.dig, 0, ori_img])
 
     def load_dataset(self, dig):
-        grade_num = [
-            self.grade_num[dig][key] for key in sorted(self.grade_num[dig].keys())
-        ]
+        if self.args.mode == "class":
+            grade_num = [
+                self.grade_num[dig][key] for key in sorted(self.grade_num[dig].keys())
+            ]
         self.area_list = list()
         self.dig = dig
 
@@ -153,17 +154,3 @@ class CustomDataset_class(Dataset):
 
         else:
             assert 0, "dig_v is not here"
-
-
-class CustomDataset_regress(CustomDataset_class):
-    def __init__(self, args, logger):
-        self.args = args
-        self.logger = logger
-        
-class CustomDataset_class_train(CustomDataset_class):
-    def __init__(self, args, logger):
-        super().__init__(args, logger, mode="train")
-        
-class CustomDataset_class_valid(CustomDataset_class):
-    def __init__(self, args, logger):
-        super().__init__(args, logger, mode="val")

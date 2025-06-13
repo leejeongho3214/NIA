@@ -18,7 +18,7 @@ import numpy as np
 from custom_model.coatnet import coatnet_4
 
 from logger import setup_logger
-from tool.data_loader import CustomDataset_class, CustomDataset_class_train, CustomDataset_class_valid, CustomDataset_regress
+from tool.data_loader import CustomDataset
 import argparse
 from tool.model import Model
 
@@ -142,15 +142,15 @@ def main(args):
     logger.info(f"[{git_name}]Command Line: " + " ".join(sys.argv))
 
     train_dataset = (
-        CustomDataset_class_train(args, logger)
+        CustomDataset(args, logger, mode = "train")
         if args.mode == "class"
-        else CustomDataset_regress(args, logger)
+        else CustomDataset(args, logger, mode = "train")
     )
 
     val_dataset = (
-        CustomDataset_class_valid(args, logger)
+        CustomDataset(args, logger, mode = "val")
         if args.mode == "class"
-        else CustomDataset_regress(args, logger)
+        else CustomDataset(args, logger, mode = "val")
     )
     
     for key in model_list:
