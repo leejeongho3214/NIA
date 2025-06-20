@@ -103,7 +103,7 @@ class CustomDataset_class(Dataset):
         self.json_dict_train = copy.deepcopy(self.json_dict)
 
         for equ_name in sub_path_list:
-            if equ_name.startswith(".") or int(equ_name) not in self.args.equ:
+            if equ_name.startswith(".") or int(equ_name) != self.args.equ:
                 continue
 
             for sub_fold in tqdm(
@@ -316,9 +316,9 @@ class CustomDataset_class(Dataset):
             assert 0, "dig_v is not here"
 
 class CustomDataset_regress(CustomDataset_class):
-    def __init__(self, args, logger):
-        self.val_angle = ["F", "L30", "R30"] if args.mode == "class" else ["F", "L", "R"]
-        super().__init__(args, logger, mode = "train")
+    def __init__(self, args, logger, mode = "train"):
+        self.val_angle = ["F", "L30", "R30"] if args.equ == 1 else ["F", "L", "R"]
+        super().__init__(args, logger, mode)
         
     def generate_datasets(self):
         self.train_list, self.val_list, self.test_list = dict(), dict(), dict()
