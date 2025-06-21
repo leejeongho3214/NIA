@@ -9,9 +9,7 @@
   <img src="assets/kairos.png" height="150" width="250">
 </p>
 
-<h1 align="center" style="font-size: 2.5em; font-weight: bold;">
-  🇰🇷 한국인 피부상태 AI 데이터셋
-</h1>
+<h1 align="center"><b>🇰🇷 한국인 피부상태 AI 데이터셋</b></h1>
 
 <p align="center">
   <img src="assets/sample_img.png" width="250">
