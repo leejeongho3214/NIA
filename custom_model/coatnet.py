@@ -225,6 +225,7 @@ class CoAtNet(nn.Module):
         x = self.s4(x)
 
         x = self.pool(x).view(-1, x.shape[1])
+    
         x = self.fc(x)
         return x
 

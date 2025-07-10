@@ -15,6 +15,7 @@ from utils import (
     mape_loss,
     save_checkpoint,
     CB_loss,
+    CharbonnierLoss,
 )
 import os
 
@@ -77,7 +78,7 @@ class Model(object):
         )
 
         self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer, "min", patience=3
+            self.optimizer, "min", patience=self.args.patience
         )
 
     def acc_avg(self, name):
@@ -237,7 +238,7 @@ class Model(object):
 
     def regression(self, pred, gt):
         pred = pred.flatten()
-        loss = self.criterion(pred, gt)
+        loss = self.criterion(pred.float(), gt.float())
 
         with torch.no_grad():
             pred_v = [item.item() for item in pred]
@@ -299,7 +300,9 @@ class Model(object):
                 gamma=self.args.gamma,
             )
             if self.args.mode == "class"
-            else nn.L1Loss()
+            else CharbonnierLoss()
+            # else nn.MSELoss()
+            # else torch.nn.SmoothL1Loss()
         )
         self.prev_model = deepcopy(self.model)
 
@@ -336,7 +339,7 @@ class Model(object):
             self.optimizer.step()
 
             self.global_step += 1
-
+            
         self.print_loss(len(self.train_loader), final_flag=True)
 
     def valid(self):
@@ -394,7 +397,6 @@ class Model_test(Model):
                 tqdm(self.testset_loader, desc=self.m_dig)
             ):
                 img, label = img.to(device), label.to(device)
-
                 pred = self.model.to(device)(img)
 
                 if self.args.mode == "class":
@@ -404,6 +406,7 @@ class Model_test(Model):
 
     def save_value(self):
         pred_path = os.path.join(
+            self.args.check_root, 
             "checkpoint",
             self.args.git_name,
             self.args.mode,

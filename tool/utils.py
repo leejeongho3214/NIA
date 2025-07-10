@@ -19,6 +19,21 @@ else:
     device = torch.device("cpu")
 
 
+import torch
+import torch.nn as nn
+
+class CharbonnierLoss(nn.Module):
+    def __init__(self, eps=1e-6):
+        super(CharbonnierLoss, self).__init__()
+        self.eps = eps
+
+    def forward(self, prediction, target):
+        diff = prediction - target
+        loss = torch.sqrt(diff ** 2 + self.eps ** 2)
+        return torch.mean(loss)
+    
+    
+
 def collate_fn(data):  # img, grade, img_name, dig, meta
     # for img, grade, img_name, dig, meta in data:
 

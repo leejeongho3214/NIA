@@ -13,7 +13,7 @@ sys.stderr = open(sys.stderr.fileno(), mode="w", buffering=1)
 
 from torch.utils.data import DataLoader
 from tool.utils import resume_checkpoint, fix_seed
-from tool.data_loader import CustomDataset_class, CustomDataset_regress
+from tool.data_loader import CustomDataset
 from tool.logger import setup_logger
 from tool.model import Model_test
 from custom_model.coatnet import coatnet_4
@@ -116,6 +116,11 @@ def main(args):
     }
 
     model_path = os.path.join(check_path, "save_model")
+    save_log_path = os.path.join(check_path, "log", "save-log")
+    
+    if os.path.isdir(save_log_path):
+        shutil.rmtree(save_log_path)
+    
     if os.path.isdir(model_path):
         for path in os.listdir(model_path):
             dig_path = os.path.join(model_path, path)
@@ -133,9 +138,9 @@ def main(args):
         assert 0, "Incorrect checkpoint path"
 
     dataset = (
-        CustomDataset_class(args, logger, "test")
+        CustomDataset(args, logger, "test")
         if args.mode == "class"
-        else CustomDataset_regress(args, logger)
+        else CustomDataset(args, logger, "test")
     )
     resnet_model = Model_test(args, logger)
 
@@ -150,14 +155,14 @@ def main(args):
         if args.mode == "class"
         else {
             "pigmentation": ["pigmentation"],
-            "moisture": ["moisture_forehead", "moisture_cheek", "moisture_chin"],
+            "moisture": ["forehead_moisture", "cheek_moisture", "chin_moisture"],
             "elasticity_R2": [
-                "elasticity_R2_forehead",
-                "elasticity_R2_cheek",
-                "elasticity_R2_chin",
+                "forehead_elasticity_R2",
+                "cheek_elasticity_R2",
+                "chin_elasticity_R2",
             ],
-            "wrinkle_Ra": ["wrinkle_Ra_perocular"],
-            "pore": ["pore_cheek"],
+            "wrinkle_Ra": ["perocular_wrinkle_Ra"],
+            "pore": ["cheek_pore"],
         }
     )
  

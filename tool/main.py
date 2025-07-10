@@ -64,10 +64,16 @@ def parse_args():
 
     parser.add_argument(
         "--lr",
-        default=0.0001,
+        default=0.001,
         type=float,
     )
 
+    parser.add_argument(
+        "--patience",
+        default=10,
+        type=float,
+    )
+    
     parser.add_argument(
         "--batch_size",
         default=8,
@@ -91,6 +97,7 @@ def parse_args():
 
 def main(args):
     now = datetime.now()
+    
     seed = args.name.split("st")[0]
     if seed.isdigit():
         ValueError, f"It's not correct name, {args.name} -> {seed}"
