@@ -104,6 +104,11 @@ python tool/main.py --name "체크포인트 이름" --mode regression  # 기기 
 python tool/img_crop.py
 ```
 
+### 처리된 Json 파일
+https://gofile.me/7wbhv/6Sqrj3JW4
+
+위 코드의 실행결과 값 입니다. password는 메일로 문의주세요.
+
 ### 폴더 구조
 
 ```
