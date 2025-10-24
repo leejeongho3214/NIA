@@ -36,7 +36,13 @@ def parse_args():
         type=str,
     )
 
-    parser.add_argument("--equ", type=int, default=1, choices=[1, 2, 3])
+    parser.add_argument(
+        "--equ",
+        type=int,
+        nargs="+",
+        default=[1, 2],
+        choices=[1, 2, 3],
+    )
 
     parser.add_argument(
         "--mode",
@@ -174,30 +180,12 @@ def main(args):
         else:
             args.run_id = str(uuid.uuid4())  # 고유한 run id 생성
 
-        api = wandb.Api()
-
-        project_path = "NIA-Korean-Facial-Assessment"
         target_name = f"{now:%Y.%m.%d}/{args.git_name}/{args.name}_{key}"
-
-        runs = api.runs(project_path)
-
-        matched_runs = [run for run in runs if run.name == target_name]
-
-        if matched_runs:
-            for run in matched_runs:
-                print(f"Found run with name: {run.name}")
-                print(f"Run ID: {run.id}")
-                print(f"Run State: {run.state}")
-                args.run_id = run.id
-        else:
-            print(f"No run found with name: {target_name}")
 
         wandb_run = wandb.init(
             project="NIA-Korean-Facial-Assessment",
             name=target_name,
             config=vars(args),
-            resume=True if (loading or matched_runs) else False,
-            id=args.run_id,
         )
 
         model = model_list[key].cuda()

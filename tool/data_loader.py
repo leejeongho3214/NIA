@@ -24,6 +24,7 @@ def mkdir(path):
         if e.errno != errno.EEXIST:
             raise
 
+
 class CustomDataset(Dataset):
     def __init__(self, args, logger, mode):
         self.args = args
@@ -33,7 +34,7 @@ class CustomDataset(Dataset):
         self.json_path = "dataset/label"
         self.dataset_dict = defaultdict(list)
         self.grade_num = defaultdict(lambda: defaultdict(int))
-        
+
         self.loading()
 
     def __len__(self):
@@ -42,20 +43,56 @@ class CustomDataset(Dataset):
     def __getitem__(self, idx):
         idx_list = list(self.sub_path.keys())
         return idx_list[idx], self.sub_path[idx_list[idx]], self.train_num
-    
+
     def loading(self):
-        if self.args.equ == 1:
-            device = "digital_camera"
-        elif self.args.equ == 2:
-            device = "smart_pad"
+        if len(self.args.equ) == 1:
+            if self.args.equ == 1:
+                device = "digital_camera"
+            elif self.args.equ == 2:
+                device = "smart_pad"
+            else:
+                device = "smart_phone"
+
+            with open(
+                f"dataset/split/{self.args.mode}/{device}/{self.args.seed}_{self.mode}set_info.json",
+                "r",
+            ) as f:
+                dataset_list = json.load(f)
+
         else:
-            device = "smart_phone"
-            
-        with open(
-            f"dataset/split/{self.args.mode}/{device}/{self.args.seed}_{self.mode}set_info.json", "r"
-        ) as f:
-            dataset_list = json.load(f)
-            
+            if self.mode == "train":
+                dataset_list = defaultdict(list)
+                for equ in self.args.equ:
+                    if equ == 1:
+                        device = "digital_camera"
+                    elif equ == 2:
+                        device = "smart_pad"
+                    else:
+                        device = "smart_phone"
+
+                    with open(
+                        f"dataset/split/{self.args.mode}/{device}/{self.args.seed}_{self.mode}set_info.json",
+                        "r",
+                    ) as f:
+                        partial = json.load(f)
+
+                    for class_name, files in partial.items():
+                        dataset_list[class_name].extend(files)
+                dataset_list = dict(dataset_list)
+            else:
+                equ = self.args.equ[-1]
+                if equ == 1:
+                    device = "digital_camera"
+                elif equ == 2:
+                    device = "smart_pad"
+                else:
+                    device = "smart_phone"
+                with open(
+                    f"dataset/split/{self.args.mode}/{device}/{self.args.seed}_{self.mode}set_info.json",
+                    "r",
+                ) as f:
+                    dataset_list = json.load(f)
+
         for class_name, file_list in dataset_list.items():
             for file_name in file_list:
                 sub, equ, angle, area = [file_name.split("_")[i] for i in [1, 3, 5, 7]]
@@ -79,11 +116,8 @@ class CustomDataset(Dataset):
                                 [f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value]
                             )
 
-
     def save_dict(self, transform):
-        ori_img = cv2.imread(
-            os.path.join("dataset/cropped_img", self.i_path + ".jpg")
-        )  
+        ori_img = cv2.imread(os.path.join("dataset/cropped_img", self.i_path + ".jpg"))
         pil_img = cv2.cvtColor(ori_img, cv2.COLOR_BGR2RGB)
         ori_img = cv2.resize(ori_img, (self.args.res, self.args.res))
 

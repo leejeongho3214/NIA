@@ -18,7 +18,7 @@ from tool.logger import setup_logger
 from tool.model import Model_test
 from custom_model.coatnet import coatnet_4
 
-git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
+git_name = "coatnet-weight"
 
 def parse_args():
     parser = argparse.ArgumentParser()
