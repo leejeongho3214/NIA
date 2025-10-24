@@ -24,7 +24,8 @@ from tool.model import Model
 
 import wandb 
 
-git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
+# git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
+git_name = "coatnet-weight"
 
 def parse_args():
     parser = argparse.ArgumentParser()
