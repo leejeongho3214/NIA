@@ -8,7 +8,6 @@ workspace_path = os.path.join(os.path.expanduser("~"), "dir/NIA")
 sys.path.insert(0, workspace_path)
 os.chdir(workspace_path)
 
-sys.stdout = open(sys.stdout.fileno(), mode="w", buffering=1)
 sys.stderr = open(sys.stderr.fileno(), mode="w", buffering=1)
 
 from torch.utils.data import DataLoader
@@ -29,7 +28,7 @@ def parse_args():
         type=str,
     )
 
-    parser.add_argument("--equ", type=int, default=1, choices=[1, 2, 3])
+    parser.add_argument("--equ", type=int, nargs= "+", default=[1], choices=[1, 2, 3])
 
     parser.add_argument(
         "--mode",
