@@ -128,7 +128,14 @@ def main(args):
             testset, _ = dataset.load_dataset("test", w_key)
             test_dict[w_key] = [i[2] for i in testset]
     
-    check_path = "/home/jeongho/dir/NIA/dataset/split/regression/digital_camera"
+    if args.equ ==1:
+        device = "digital_camera"
+    elif args.equ ==2:
+        device = "smart_pad"
+    else:
+        device = "smart_phone"
+        
+    check_path = f"/home/jeongho/dir/NIA/dataset/split/{args.mode}/{device}"
     os.makedirs(check_path, exist_ok=True)
     mode = "w" 
     

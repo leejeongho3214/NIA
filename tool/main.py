@@ -190,16 +190,26 @@ def main(args):
     )
     train_dict = defaultdict(list)
     val_dict = defaultdict(list)
+    test_dict = defaultdict(list)
 
     for key in model_list:
         trainset, _ = dataset.load_dataset("train", key)
         valset, _ = dataset.load_dataset("val", key)
+        testset, _ = dataset.load_dataset("test", key)
+    
 
         train_dict[key] = [i[2] for i in trainset]
         val_dict[key] = [i[2] for i in valset]
+        test_dict[key] = [i[2] for i in testset]
         
+    if args.equ ==1:
+        device = "digital_camera"
+    elif args.equ ==2:
+        device = "smart_pad"
+    else:
+        device = "smart_phone"
         
-    check_path = "/home/jeongho/dir/NIA/dataset/split/regression/digital_camera"
+    check_path = f"/home/jeongho/dir/NIA/dataset/split/{args.mode}/{device}"
     os.makedirs(check_path, exist_ok=True)
     mode = "w" 
     
@@ -207,6 +217,9 @@ def main(args):
         json.dump(train_dict, f)
     with open(f"{check_path}/{args.seed}_valset_info.json", mode) as f:
         json.dump(val_dict, f)
+    with open(f"{check_path}/{args.seed}_testset_info.json", mode) as f:
+        json.dump(test_dict, f)
+
 
 
 if __name__ == "__main__":
