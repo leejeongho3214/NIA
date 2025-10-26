@@ -118,6 +118,29 @@ def main(args):
             "pore": 1,
         }
     )
+    
+    model_area_dict = (
+        {
+            "dryness": ["dryness"],
+            "pigmentation": ["forehead_pigmentation", "cheek_pigmentation"],
+            "pore": ["pore"],
+            "sagging": ["sagging"],
+            "wrinkle": ["forehead_wrinkle", "glabellus_wrinkle", "perocular_wrinkle"],
+        }
+        if args.mode == "class"
+        else {
+            "pigmentation": ["pigmentation"],
+            "moisture": ["forehead_moisture", "cheek_moisture", "chin_moisture"],
+            "elasticity_R2": [
+                "forehead_elasticity_R2",
+                "cheek_elasticity_R2",
+                "chin_elasticity_R2",
+            ],
+            "wrinkle_Ra": ["perocular_wrinkle_Ra"],
+            "pore": ["cheek_pore"],
+        }
+    )
+        
     pass_list = list()
 
     args.best_loss = {item: np.inf for item in model_num_class}
@@ -195,12 +218,21 @@ def main(args):
     for key in model_list:
         trainset, _ = dataset.load_dataset("train", key)
         valset, _ = dataset.load_dataset("val", key)
-        testset, _ = dataset.load_dataset("test", key)
     
 
         train_dict[key] = [i[2] for i in trainset]
         val_dict[key] = [i[2] for i in valset]
-        test_dict[key] = [i[2] for i in testset]
+        
+    dataset = (
+        CustomDataset_class(args, logger, "test")
+        if args.mode == "class"
+        else CustomDataset_regress(args, logger)
+    )
+        
+    for key in model_list:
+        for w_key in model_area_dict[key]:
+            testset, _ = dataset.load_dataset("test", w_key)
+            test_dict[w_key] = [i[2] for i in testset]
         
     if args.equ ==1:
         device = "digital_camera"
