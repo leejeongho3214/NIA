@@ -46,9 +46,9 @@ class CustomDataset(Dataset):
 
     def loading(self):
         if len(self.args.equ) == 1:
-            if self.args.equ == 1:
+            if self.args.equ[0] == 1:
                 device = "digital_camera"
-            elif self.args.equ == 2:
+            elif self.args.equ[0] == 2:
                 device = "smart_pad"
             else:
                 device = "smart_phone"
