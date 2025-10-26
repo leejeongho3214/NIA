@@ -217,6 +217,12 @@ def main(args):
         train_dict[key] = [i[2] for i in trainset]
         val_dict[key] = [i[2] for i in valset]
         
+    dataset = (
+        CustomDataset_class(args, logger, "train")
+        if args.mode == "class"
+        else CustomDataset_regress(args, logger)
+    )
+        
     for key in model_list:
         for w_key in model_area_dict[key]:
             testset, _ = dataset.load_dataset("test", w_key)
