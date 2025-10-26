@@ -161,6 +161,8 @@ class CustomDataset(Dataset):
         )
 
         for self.i_path, self.grade in tqdm(self.dataset_dict[dig], desc=f"{self.dig}"):
+            if not os.path.isfile(os.path.join("dataset/cropped_img", self.i_path + ".jpg")):
+                continue
             self.save_dict(transform)
 
         if self.args.mode == "class":
