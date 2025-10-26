@@ -126,8 +126,7 @@ class CustomDataset_class(Dataset):
                         if (j_name.split('.')[0][:-3] != json_meta['info']['filename'].split('.')[0]) or \
                                 (str(json_meta['images']['facepart']).zfill(2) != j_name.split('_')[-1].split('.')[0]):
                                 assert 0
-                        
-                        
+
                         self.process_json_meta(
                             json_meta, j_name, sub_path, target_list, sub_fold
                         )

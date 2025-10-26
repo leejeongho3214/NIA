@@ -8,17 +8,12 @@ import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import torch
-import gc
-from torch.utils import data
 import shutil
-import torch.nn as nn
 import numpy as np
 from torchvision import models
 from utils import mkdir, resume_checkpoint, fix_seed
 from logger import setup_logger
 from tool.data_loader import CustomDataset_class, CustomDataset_regress
-from model import Model
 import argparse
 
 
@@ -218,16 +213,9 @@ def main(args):
     for key in model_list:
         trainset, _ = dataset.load_dataset("train", key)
         valset, _ = dataset.load_dataset("val", key)
-    
 
         train_dict[key] = [i[2] for i in trainset]
         val_dict[key] = [i[2] for i in valset]
-        
-    dataset = (
-        CustomDataset_class(args, logger, "test")
-        if args.mode == "class"
-        else CustomDataset_regress(args, logger)
-    )
         
     for key in model_list:
         for w_key in model_area_dict[key]:
