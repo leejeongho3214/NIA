@@ -43,16 +43,20 @@ class CustomDataset(Dataset):
     def __getitem__(self, idx):
         idx_list = list(self.sub_path.keys())
         return idx_list[idx], self.sub_path[idx_list[idx]], self.train_num
+    
+    def get_device_name(self, equ):
+        if equ == 1:
+            device = "digital_camera"
+        elif equ == 2:
+            device = "smart_pad"
+        else:
+            device = "smart_phone"
+            
+        return device
 
     def loading(self):
         if len(self.args.equ) == 1:
-            if self.args.equ[0] == 1:
-                device = "digital_camera"
-            elif self.args.equ[0] == 2:
-                device = "smart_pad"
-            else:
-                device = "smart_phone"
-
+            device = self.get_device_name(self.args.equ[0])
             with open(
                 f"dataset/split/{self.args.mode}/{device}/{self.args.seed}_{self.mode}set_info.json",
                 "r",
@@ -63,12 +67,7 @@ class CustomDataset(Dataset):
             if self.mode == "train":
                 dataset_list = defaultdict(list)
                 for equ in self.args.equ:
-                    if equ == 1:
-                        device = "digital_camera"
-                    elif equ == 2:
-                        device = "smart_pad"
-                    else:
-                        device = "smart_phone"
+                    device = self.get_device_name(equ)
 
                     with open(
                         f"dataset/split/{self.args.mode}/{device}/{self.args.seed}_{self.mode}set_info.json",
@@ -80,18 +79,29 @@ class CustomDataset(Dataset):
                         dataset_list[class_name].extend(files)
                 dataset_list = dict(dataset_list)
             else:
-                equ = self.args.equ[-1]
-                if equ == 1:
-                    device = "digital_camera"
-                elif equ == 2:
-                    device = "smart_pad"
+                if len(self.args.equ) == 2:
+                    equ = self.args.equ[-1]
+                    device = self.get_device_name(equ)
+                    with open(
+                        f"dataset/split/{self.args.mode}/{device}/{self.args.seed}_{self.mode}set_info.json",
+                        "r",
+                    ) as f:
+                        dataset_list = json.load(f)
+                        
                 else:
-                    device = "smart_phone"
-                with open(
-                    f"dataset/split/{self.args.mode}/{device}/{self.args.seed}_{self.mode}set_info.json",
-                    "r",
-                ) as f:
-                    dataset_list = json.load(f)
+                    dataset_list = defaultdict(list)
+                    for equ in self.args.equ[-2:]:
+                        device = self.get_device_name(equ)
+
+                        with open(
+                            f"dataset/split/{self.args.mode}/{device}/{self.args.seed}_{self.mode}set_info.json",
+                            "r",
+                        ) as f:
+                            partial = json.load(f)
+
+                        for class_name, files in partial.items():
+                            dataset_list[class_name].extend(files)
+                    dataset_list = dict(dataset_list)
 
         for class_name, file_list in dataset_list.items():
             for file_name in file_list:
