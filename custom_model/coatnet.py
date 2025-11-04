@@ -5,25 +5,6 @@ from einops import rearrange
 from einops.layers.torch import Rearrange
 
 
-class DropPath(nn.Module):
-    """Stochastic depth per sample when applied in residual branches."""
-
-    def __init__(self, drop_prob: float = 0.0):
-        super().__init__()
-        self.drop_prob = drop_prob
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        if self.drop_prob == 0.0 or not self.training:
-            return x
-        keep_prob = 1.0 - self.drop_prob
-        shape = (x.shape[0],) + (1,) * (x.ndim - 1)
-        random_tensor = keep_prob + torch.rand(
-            shape, dtype=x.dtype, device=x.device
-        )
-        random_tensor.floor_()
-        return x.div(keep_prob) * random_tensor
-
-
 def conv_3x3_bn(inp, oup, image_size, downsample=False):
     stride = 1 if downsample == False else 2
     return nn.Sequential(
@@ -76,15 +57,7 @@ class FeedForward(nn.Module):
 
 
 class MBConv(nn.Module):
-    def __init__(
-        self,
-        inp,
-        oup,
-        image_size,
-        downsample=False,
-        expansion=4,
-        drop_path=0.0,
-    ):
+    def __init__(self, inp, oup, image_size, downsample=False, expansion=4):
         super().__init__()
         self.downsample = downsample
         stride = 1 if self.downsample == False else 2
@@ -122,17 +95,14 @@ class MBConv(nn.Module):
                 nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=True),
                 nn.BatchNorm2d(oup),
             )
-
+        
         self.conv = PreNorm(inp, self.conv, nn.BatchNorm2d)
-        self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
 
     def forward(self, x):
-        residual = self.drop_path(self.conv(x))
         if self.downsample:
-            shortcut = self.proj(self.pool(x))
+            return self.proj(self.pool(x)) + self.conv(x)
         else:
-            shortcut = x
-        return shortcut + residual
+            return x + self.conv(x)
 
 
 class Attention(nn.Module):
@@ -191,17 +161,7 @@ class Attention(nn.Module):
 
 
 class Transformer(nn.Module):
-    def __init__(
-        self,
-        inp,
-        oup,
-        image_size,
-        heads=8,
-        dim_head=32,
-        downsample=False,
-        dropout=0.,
-        drop_path=0.0,
-    ):
+    def __init__(self, inp, oup, image_size, heads=8, dim_head=32, downsample=False, dropout=0.):
         super().__init__()
         hidden_dim = int(inp * 4)
 
@@ -227,101 +187,34 @@ class Transformer(nn.Module):
             PreNorm(oup, self.ff, nn.LayerNorm),
             Rearrange('b (ih iw) c -> b c ih iw', ih=self.ih, iw=self.iw)
         )
-        self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
 
     def forward(self, x):
         if self.downsample:
-            shortcut = self.proj(self.pool1(x))
-            x = shortcut + self.drop_path(self.attn(self.pool2(x)))
+            x = self.proj(self.pool1(x)) + self.attn(self.pool2(x))
         else:
-            x = x + self.drop_path(self.attn(x))
-        x = x + self.drop_path(self.ff(x))
+            x = x + self.attn(x)
+        x = x + self.ff(x)
         return x
 
 
 class CoAtNet(nn.Module):
-    def __init__(
-        self,
-        image_size,
-        in_channels,
-        num_blocks,
-        channels,
-        num_classes=1000,
-        block_types=['C', 'C', 'T', 'T'],
-        dropout=0.0,
-        drop_path_rate=0.0,
-        classifier_dropout=0.0,
-    ):
+    def __init__(self, image_size, in_channels, num_blocks, channels, num_classes=1000, block_types=['C', 'C', 'T', 'T']):
         super().__init__()
         ih, iw = image_size
         block = {'C': MBConv, 'T': Transformer}
 
-        stochastic_depth_blocks = sum(num_blocks[1:])
-        if drop_path_rate > 0.0 and stochastic_depth_blocks > 0:
-            drop_path_rates = torch.linspace(
-                0, drop_path_rate, stochastic_depth_blocks
-            ).tolist()
-        else:
-            drop_path_rates = [0.0] * stochastic_depth_blocks
-
-        rate_offset = 0
-
-        def take_rates(n, enable=True):
-            nonlocal rate_offset
-            if not enable or n == 0:
-                return [0.0] * n
-            rates = drop_path_rates[rate_offset:rate_offset + n]
-            rate_offset += n
-            return rates
-
         self.s0 = self._make_layer(
-            conv_3x3_bn,
-            in_channels,
-            channels[0],
-            num_blocks[0],
-            (ih // 2, iw // 2),
-            drop_path_rates=take_rates(num_blocks[0], enable=False),
-            dropout=0.0,
-        )
+            conv_3x3_bn, in_channels, channels[0], num_blocks[0], (ih // 2, iw // 2))
         self.s1 = self._make_layer(
-            block[block_types[0]],
-            channels[0],
-            channels[1],
-            num_blocks[1],
-            (ih // 4, iw // 4),
-            drop_path_rates=take_rates(num_blocks[1]),
-            dropout=dropout,
-        )
+            block[block_types[0]], channels[0], channels[1], num_blocks[1], (ih // 4, iw // 4))
         self.s2 = self._make_layer(
-            block[block_types[1]],
-            channels[1],
-            channels[2],
-            num_blocks[2],
-            (ih // 8, iw // 8),
-            drop_path_rates=take_rates(num_blocks[2]),
-            dropout=dropout,
-        )
+            block[block_types[1]], channels[1], channels[2], num_blocks[2], (ih // 8, iw // 8))
         self.s3 = self._make_layer(
-            block[block_types[2]],
-            channels[2],
-            channels[3],
-            num_blocks[3],
-            (ih // 16, iw // 16),
-            drop_path_rates=take_rates(num_blocks[3]),
-            dropout=dropout,
-        )
+            block[block_types[2]], channels[2], channels[3], num_blocks[3], (ih // 16, iw // 16))
         self.s4 = self._make_layer(
-            block[block_types[3]],
-            channels[3],
-            channels[4],
-            num_blocks[4],
-            (ih // 32, iw // 32),
-            drop_path_rates=take_rates(num_blocks[4]),
-            dropout=dropout,
-        )
+            block[block_types[3]], channels[3], channels[4], num_blocks[4], (ih // 32, iw // 32))
 
         self.pool = nn.AvgPool2d(ih // 32, 1)
-        self.head_dropout = nn.Dropout(classifier_dropout) if classifier_dropout > 0.0 else nn.Identity()
         self.fc = nn.Linear(channels[-1], num_classes, bias=True)   
 
     def forward(self, x):
@@ -331,43 +224,18 @@ class CoAtNet(nn.Module):
         x = self.s3(x)
         x = self.s4(x)
 
-        x = torch.flatten(self.pool(x), 1)
-        x = self.head_dropout(x)
+        x = self.pool(x).view(-1, x.shape[1])
+    
         x = self.fc(x)
         return x
 
-    def _make_layer(self, block, inp, oup, depth, image_size, drop_path_rates=None, dropout=0.0):
+    def _make_layer(self, block, inp, oup, depth, image_size):
         layers = nn.ModuleList([])
-        if drop_path_rates is None:
-            drop_path_rates = [0.0] * depth
         for i in range(depth):
-            in_channels = inp if i == 0 else oup
-            downsample = i == 0
-            drop_rate = drop_path_rates[i] if i < len(drop_path_rates) else drop_path_rates[-1]
-
-            if block is MBConv:
-                layers.append(
-                    block(
-                        in_channels,
-                        oup,
-                        image_size,
-                        downsample=downsample,
-                        drop_path=drop_rate,
-                    )
-                )
-            elif block is Transformer:
-                layers.append(
-                    block(
-                        in_channels,
-                        oup,
-                        image_size,
-                        downsample=downsample,
-                        dropout=dropout,
-                        drop_path=drop_rate,
-                    )
-                )
+            if i == 0:
+                layers.append(block(inp, oup, image_size, downsample=True))
             else:
-                layers.append(block(in_channels, oup, image_size, downsample=downsample))
+                layers.append(block(oup, oup, image_size))
         return nn.Sequential(*layers)
 
 
@@ -395,19 +263,10 @@ def coatnet_3():
     return CoAtNet((224, 224), 3, num_blocks, channels, num_classes=1000)
 
 
-def coatnet_4(num_classes=1000, drop_path_rate=0.2, dropout=0.1, classifier_dropout=0.1):
+def coatnet_4(num_classes):
     num_blocks = [2, 2, 12, 28, 2]          # L
     channels = [192, 192, 384, 768, 1536]   # D
-    return CoAtNet(
-        (256, 256),
-        3,
-        num_blocks,
-        channels,
-        num_classes,
-        dropout=dropout,
-        drop_path_rate=drop_path_rate,
-        classifier_dropout=classifier_dropout,
-    )
+    return CoAtNet((256, 256), 3, num_blocks, channels, num_classes)
 
 
 def count_parameters(model):
