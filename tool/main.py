@@ -10,7 +10,7 @@ os.chdir(workspace_path)
 sys.stdout = open(sys.stdout.fileno(), mode="w", buffering=1)
 sys.stderr = open(sys.stderr.fileno(), mode="w", buffering=1)
 
-from utils import get_loader, load_checkpoint, fix_seed, save_code_copy
+from utils import load_checkpoint, fix_seed, save_code_copy
 import torch
 import shutil
 import numpy as np
@@ -20,12 +20,15 @@ from custom_model.coatnet import coatnet_4
 from logger import setup_logger
 from tool.data_loader import CustomDataset
 import argparse
+from torch.utils.data import WeightedRandomSampler
+
 from tool.model import Model
 
-import wandb 
+import wandb
 
 # git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 git_name = "coatnet-weight"
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -77,10 +80,10 @@ def parse_args():
 
     parser.add_argument(
         "--patience",
-        default=10,
+        default=4,
         type=float,
     )
-    
+
     parser.add_argument(
         "--batch_size",
         default=8,
@@ -103,12 +106,10 @@ def parse_args():
 
 
 def main(args):
-    now = datetime.now()
-    
     seed = args.name.split("st")[0]
     if seed.isdigit():
         ValueError, f"It's not correct name, {args.name} -> {seed}"
-    
+
     fix_seed(int(seed))
     args.git_name = git_name
     args.seed = int(seed)
@@ -143,7 +144,7 @@ def main(args):
             shutil.rmtree(check_path)
 
     loading = False
-    if os.path.isdir(os.path.join(model_path, "dryness")):
+    if os.path.isdir(os.path.join(model_path, "pigmentation")):
         loading, model_list, pass_list, info, global_step, run_id = load_checkpoint(
             args, model_path, model_list, pass_list, loading
         )
@@ -156,17 +157,23 @@ def main(args):
     logger.info(f"[{git_name}]Command Line: " + " ".join(sys.argv))
 
     train_dataset = (
-        CustomDataset(args, logger, mode = "train")
+        CustomDataset(args, logger, mode="train")
         if args.mode == "class"
-        else CustomDataset(args, logger, mode = "train")
+        else CustomDataset(args, logger, mode="train")
     )
 
     val_dataset = (
-        CustomDataset(args, logger, mode = "val")
+        CustomDataset(args, logger, mode="val")
         if args.mode == "class"
-        else CustomDataset(args, logger, mode = "val")
+        else CustomDataset(args, logger, mode="val")
     )
-    
+
+    test_dataset = (
+        CustomDataset(args, logger, "test")
+        if args.mode == "class"
+        else CustomDataset(args, logger, "test")
+    )
+
     for key in model_list:
         if key in pass_list:
             continue
@@ -180,7 +187,7 @@ def main(args):
         else:
             args.run_id = str(uuid.uuid4())  # 고유한 run id 생성
 
-        target_name = f"{now:%Y.%m.%d}/{args.git_name}/{args.name}_{key}"
+        target_name = f"{args.git_name}/{args.name}_{key}"
 
         wandb_run = wandb.init(
             project="NIA-Korean-Facial-Assessment",
@@ -192,15 +199,45 @@ def main(args):
         if args.ddp:
             model = torch.nn.parallel.DistributedDataParallel(model)
 
-        trainset_loader, grade_num = get_loader(train_dataset, "train", key, args)
-        valset_loader, _ = get_loader(val_dataset, "val", key, args)
+        train_data, train_grade = train_dataset.load_dataset(key)
+        val_data, val_grade = val_dataset.load_dataset(key)
+
+        merged_data = train_data + val_data
+        grade_num = [t + v for t, v in zip(train_grade, val_grade)]
+
+        class_weights = 1.0 / np.sqrt(grade_num)
+        class_weights = class_weights / np.sum(class_weights)  # 정규화 (optional)
+
+        sample_weights = [class_weights[label[1]] for label in merged_data]
+
+        sampler = WeightedRandomSampler(
+            weights=sample_weights,
+            num_samples=len(merged_data),
+            replacement=True,
+        )
+
+        trainset_loader = torch.utils.data.DataLoader(
+            dataset=merged_data,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            shuffle=False,
+            sampler = sampler
+        )
+
+        test_data, _ = test_dataset.load_dataset(key, True)
+        testset_loader = torch.utils.data.DataLoader(
+            dataset=test_data,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            shuffle=False,
+        )
 
         each_model = Model(
             args=args,
             model=model,
             temp_model=None,
             train_loader=trainset_loader,
-            valid_loader=valset_loader,
+            valid_loader=testset_loader,
             logger=logger,
             best_loss=args.best_loss,
             check_path=check_path,

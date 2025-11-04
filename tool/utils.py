@@ -12,7 +12,6 @@ import torch.nn.functional as F
 from torchvision.utils import make_grid
 import yaml
 
-
 if torch.cuda.is_available():
     device = torch.device("cuda")
 else:
@@ -429,20 +428,6 @@ def load_checkpoint(args, model_path, model_list, pass_list, loading):
                     
     return loading, model_list, pass_list, info, global_step, run_id
 
-def get_loader(
-        dataset,
-        split,
-        key,
-        args,
-    ):
-    data_set, grade_num = dataset.load_dataset(key)
-    data_loader = data.DataLoader(
-        dataset=data_set,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        shuffle=True if split == "train" else False,
-    )
-    return data_loader, grade_num
 
 def save_code_copy(args, check_path, model_path):
     code_path = os.path.join(check_path, "code")

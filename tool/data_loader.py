@@ -154,7 +154,7 @@ class CustomDataset(Dataset):
 
         self.area_list.append([patch_img, label_data, desc_area, self.dig, 0, ori_img])
 
-    def load_dataset(self, dig):
+    def load_dataset(self, dig, special=False):
         if self.args.mode == "class":
             grade_num = [
                 self.grade_num[dig][key] for key in sorted(self.grade_num[dig].keys())
@@ -169,8 +169,15 @@ class CustomDataset(Dataset):
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ]
         )
+        if not special:
+            target_dict = self.dataset_dict[dig] 
+        else:
+            target_dict = list()
+            for key in self.dataset_dict.keys():
+                if dig in key:
+                    target_dict.extend(self.dataset_dict[key])
 
-        for self.i_path, self.grade in tqdm(self.dataset_dict[dig], desc=f"{self.dig}"):
+        for self.i_path, self.grade in tqdm(target_dict, desc=f"{self.dig}"):
             if not os.path.isfile(os.path.join("dataset/cropped_img", self.i_path + ".jpg")):
                 continue
             self.save_dict(transform)

@@ -78,7 +78,7 @@ class Model(object):
         )
 
         self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer, "min", patience=self.args.patience
+            self.optimizer, "min", patience=self.args.patience, factor=0.5
         )
 
     def acc_avg(self, name):
@@ -301,8 +301,6 @@ class Model(object):
             )
             if self.args.mode == "class"
             else CharbonnierLoss()
-            # else nn.MSELoss()
-            # else torch.nn.SmoothL1Loss()
         )
         self.prev_model = deepcopy(self.model)
 
@@ -412,12 +410,14 @@ class Model_test(Model):
             self.args.mode,
             self.args.name,
             "prediction",
+            str(self.args.equ[0]),
         )
         mkdir(pred_path)
+        
         with open(os.path.join(pred_path, f"pred.txt"), "w") as p:
             with open(os.path.join(pred_path, f"gt.txt"), "w") as g:
                 for key in list(self.pred.keys()):
-                    for angle in self.pred[key].keys():
+                    for angle in sorted(self.pred[key].keys()):
                         for p_v, g_v in zip(self.pred[key][angle], self.gt[key][angle]):
                             p.write(f"{angle}, {key}, {p_v[0]}, {p_v[1]} \n")
                             g.write(f"{angle}, {key}, {g_v[0]}, {g_v[1]} \n")
@@ -484,7 +484,8 @@ class Model_test(Model):
                 correct_[gt] += 1
 
         correlation, p_value = pearsonr(gt_v, pred_v)
-        mkdir(f"{self.args.log_path}/save-log")
+        save_path = f"{self.args.log_path}/{self.args.equ}/save-log"
+        mkdir(save_path)
 
         if self.args.mode == "regression":
             n_gt_v = [value / max(gt_v) for value in gt_v]
@@ -500,7 +501,7 @@ class Model_test(Model):
                 )
 
                 with open(
-                    f"{self.args.log_path}/save-log/print_{self.angle}.txt", "a"
+                    f"{save_path}/print_{self.angle}.txt", "a"
                 ) as f:
                     if self.m_dig == "pigmentation":
                         f.write(f"Angle, Area, Correlation, P-value, MAE, MAPE, NMAE\n")
@@ -509,7 +510,7 @@ class Model_test(Model):
                     )
 
             else:
-                with open(f"{self.args.log_path}/save-log/print_total.txt", "a") as f:
+                with open(f"{save_path}/print_total.txt", "a") as f:
                     if self.m_dig == "pigmentation":
                         f.write(f"Area, Correlation, P-value, MAE, MAPE, NMAE\n")
                     f.write(
@@ -538,7 +539,7 @@ class Model_test(Model):
                         f"          {grade} grade Acc: {correct_[grade]} / {all_[grade]} -> {(correct_[grade]/all_[grade] * 100):.2f} %"
                     )
                 with open(
-                    f"{self.args.log_path}/save-log/print_{self.angle}.txt", "a"
+                    f"{save_path}/print_{self.angle}.txt", "a"
                 ) as f:
                     if self.m_dig == "dryness":
                         f.write(
@@ -549,7 +550,7 @@ class Model_test(Model):
                     )
 
             else:
-                with open(f"{self.args.log_path}/save-log/print_total.txt", "a") as f:
+                with open(f"{save_path}/print_total.txt", "a") as f:
                     if self.m_dig == "dryness":
                         f.write(
                             f"Area, Correlation, P-value, MAE, MAE(==0), MAE(=<1), MAE(=<2)\n"
