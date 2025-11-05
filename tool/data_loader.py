@@ -30,7 +30,7 @@ class CustomDataset_class(Dataset):
         self.args = args
         self.logger = logger
         self.load_list(mode)
-        self.generate_datasets()
+        self.generate_datasets(self.json_dict)
 
     def __len__(self):
         return len(self.sub_path)
@@ -39,14 +39,15 @@ class CustomDataset_class(Dataset):
         idx_list = list(self.sub_path.keys())
         return idx_list[idx], self.sub_path[idx_list[idx]], self.train_num
 
-    def generate_datasets(self):
+    def generate_datasets(self, json_dict):
         self.train_list, self.val_list, self.test_list = (
             defaultdict(lambda: defaultdict()),
             defaultdict(lambda: defaultdict()),
             defaultdict(lambda: defaultdict()),
         )
-        for dig in sorted(self.json_dict.keys()):
-            class_dict = self.json_dict[dig]
+        
+        for dig in sorted(json_dict.keys()):
+            class_dict = json_dict[dig]
             for grade in sorted(class_dict.keys()):
                 grade_dict = class_dict[grade]
                 random_list = list(grade_dict.keys())
@@ -64,13 +65,16 @@ class CustomDataset_class(Dataset):
                 for dataset_idx, (idx_list, out_list) in enumerate(
                     zip([train_idx, val_idx, test_idx], [self.train_list, self.val_list, self.test_list])
                 ):
-                    in_list = list()
-                    for idx in idx_list:
-                        tt_list = list()
-                        for each_value in grade_dict[idx]:
-                            if each_value[0].split("_")[-2] in ["F", "L", "R"]:
-                                tt_list.append(each_value)
-                        in_list.append(tt_list)
+                    if dataset_idx != 2:
+                        in_list = [grade_dict[idx] for idx in idx_list]
+                    else:
+                        in_list = list()
+                        for idx in idx_list:
+                            tt_list = list()
+                            for each_value in grade_dict[idx]:
+                                if each_value[0].split("_")[-2] in ["F", "L", "R"]:
+                                    tt_list.append(each_value)
+                            in_list.append(tt_list)
                     out_list[dig][grade] = in_list
 
 
@@ -97,7 +101,7 @@ class CustomDataset_class(Dataset):
         self.json_dict = (
             defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
         )
-        self.json_dict_train = copy.deepcopy(self.json_dict)
+        self.json_dict_detail = copy.deepcopy(self.json_dict)
 
         for equ_name in sub_path_list:
             if equ_name.startswith(".") or int(equ_name) != self.args.equ:
@@ -157,11 +161,15 @@ class CustomDataset_class(Dataset):
                     continue
                 
                 dig, area = dig_n.split("_")[-1], dig_n.split("_")[-2]
-
-                if dig in ["wrinkle", "pigmentation"] and self.mode == "test":
+                
+                self.json_dict[dig][str(grade)][sub_fold].append(
+                    [os.path.join(sub_path, j_name.split(".")[0]), meta_v]
+                )
+                
+                if dig in ["wrinkle", "pigmentation"]:
                     dig = f"{area}_{dig}"
 
-                self.json_dict[dig][str(grade)][sub_fold].append(
+                self.json_dict_detail[dig][str(grade)][sub_fold].append(
                     [os.path.join(sub_path, j_name.split(".")[0]), meta_v]
                 )
         else:
