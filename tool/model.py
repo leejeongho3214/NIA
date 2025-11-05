@@ -1,5 +1,6 @@
 from collections import defaultdict
 from copy import deepcopy
+import math
 import torch
 import torch.nn as nn
 import numpy as np
@@ -77,9 +78,24 @@ class Model(object):
             weight_decay=0,
         )
 
-        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer, "min", patience=self.args.patience, factor=0.5
-        )
+        total_epochs = max(1, self.args.epoch)
+        default_warmup = max(1, total_epochs // 10)
+        warmup_epochs = getattr(self.args, "warmup_epochs", None)
+        warmup_epochs = default_warmup if warmup_epochs is None else warmup_epochs
+        warmup_epochs = min(max(1, warmup_epochs), total_epochs)
+        min_factor = max(0.0, min(1.0, getattr(self.args, "lr_min_scale", 0.01)))
+
+        def lr_lambda(current_epoch: int):
+            if current_epoch < warmup_epochs:
+                return (current_epoch + 1) / float(max(1, warmup_epochs))
+            if warmup_epochs == total_epochs:
+                return 1.0
+            progress = (current_epoch - warmup_epochs) / float(total_epochs - warmup_epochs)
+            progress = min(max(progress, 0.0), 1.0)
+            cosine = 0.5 * (1.0 + math.cos(math.pi * progress))
+            return cosine * (1.0 - min_factor) + min_factor
+
+        self.scheduler = optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda)
 
     def acc_avg(self, name):
         return round(self.test_value[name].avg * 100, 2)
@@ -263,7 +279,9 @@ class Model(object):
             result = (
                 f"{color}+{value}{c_color}%"
                 if value > 0
-                else "No change" if value == 0 else f"{color}{value}{c_color}%"
+                else "No change"
+                if value == 0
+                else f"{color}{value}{c_color}%"
             )
         else:
             sub = (self.test_value[name].avg) - self.keep_mae[name]
@@ -271,7 +289,9 @@ class Model(object):
             result = (
                 f"{color}+{value}{c_color}"
                 if value > 0
-                else "No change" if value == 0 else f"{color}{value}{c_color}"
+                else "No change"
+                if value == 0
+                else f"{color}{value}{c_color}"
             )
 
         return result
@@ -337,7 +357,7 @@ class Model(object):
             self.optimizer.step()
 
             self.global_step += 1
-            
+
         self.print_loss(len(self.train_loader), final_flag=True)
 
     def valid(self):
@@ -373,8 +393,8 @@ class Model(object):
                     )
 
                 self.print_loss(len(self.valid_loader))
-                
-            self.scheduler.step(self.val_loss.avg)
+
+            self.scheduler.step()
             self.print_loss(len(self.valid_loader), final_flag=True)
 
 
@@ -404,7 +424,7 @@ class Model_test(Model):
 
     def save_value(self):
         pred_path = os.path.join(
-            self.args.check_root, 
+            self.args.check_root,
             "checkpoint",
             self.args.git_name,
             self.args.mode,
@@ -413,7 +433,7 @@ class Model_test(Model):
             str(self.args.equ[0]),
         )
         mkdir(pred_path)
-        
+
         with open(os.path.join(pred_path, f"pred.txt"), "w") as p:
             with open(os.path.join(pred_path, f"gt.txt"), "w") as g:
                 for key in list(self.pred.keys()):
@@ -500,9 +520,7 @@ class Model_test(Model):
                     f"[{self.angle}][{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae:.4f}, MAPE: {mape:.3f}, NMAE: {nmae:.3f}"
                 )
 
-                with open(
-                    f"{save_path}/print_{self.angle}.txt", "a"
-                ) as f:
+                with open(f"{save_path}/print_{self.angle}.txt", "a") as f:
                     if self.m_dig == "pigmentation":
                         f.write(f"Angle, Area, Correlation, P-value, MAE, MAPE, NMAE\n")
                     f.write(
@@ -538,9 +556,7 @@ class Model_test(Model):
                     self.logger.info(
                         f"          {grade} grade Acc: {correct_[grade]} / {all_[grade]} -> {(correct_[grade]/all_[grade] * 100):.2f} %"
                     )
-                with open(
-                    f"{save_path}/print_{self.angle}.txt", "a"
-                ) as f:
+                with open(f"{save_path}/print_{self.angle}.txt", "a") as f:
                     if self.m_dig == "dryness":
                         f.write(
                             f"Angle, Area, Correlation, P-value, MAE, MAE(==0), MAE(=<1), MAE(=<2)\n"

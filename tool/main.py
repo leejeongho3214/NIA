@@ -28,6 +28,7 @@ import wandb
 
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
+
 def parse_args():
     parser = argparse.ArgumentParser()
 
@@ -56,6 +57,18 @@ def parse_args():
         "--epoch",
         default=100,
         type=int,
+    )
+
+    parser.add_argument(
+        "--warmup_epochs",
+        default=5,
+        type=int,
+    )
+
+    parser.add_argument(
+        "--lr_min_scale",
+        default=0.01,
+        type=float,
     )
 
     parser.add_argument(
@@ -90,7 +103,7 @@ def parse_args():
 
     parser.add_argument(
         "--stop_early",
-        default=20,
+        default=100,
         type=int,
     )
 
@@ -219,7 +232,7 @@ def main(args):
             batch_size=args.batch_size,
             num_workers=args.num_workers,
             shuffle=False,
-            sampler = sampler
+            sampler=sampler,
         )
 
         test_data, _ = test_dataset.load_dataset(key)
