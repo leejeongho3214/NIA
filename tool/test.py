@@ -137,9 +137,9 @@ def main(args):
         assert 0, "Incorrect checkpoint path"
 
     dataset = (
-        CustomDataset(args, logger, "test")
+        CustomDataset(args, logger, "test", special = True)
         if args.mode == "class"
-        else CustomDataset(args, logger, "test")
+        else CustomDataset(args, logger, "test", special = True)
     )
     resnet_model = Model_test(args, logger)
 

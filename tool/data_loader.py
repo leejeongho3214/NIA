@@ -26,7 +26,7 @@ def mkdir(path):
 
 
 class CustomDataset(Dataset):
-    def __init__(self, args, logger, mode):
+    def __init__(self, args, logger, mode, special = False):
         self.args = args
         self.mode = mode
         self.logger = logger
@@ -34,7 +34,7 @@ class CustomDataset(Dataset):
         self.json_path = "dataset/label"
         self.dataset_dict = defaultdict(list)
         self.grade_num = defaultdict(lambda: defaultdict(int))
-        self.loading()
+        self.loading(special)
 
     def __len__(self):
         return len(self.sub_path)
@@ -53,54 +53,20 @@ class CustomDataset(Dataset):
             
         return device
 
-    def loading(self):
-        if len(self.args.equ) == 1:
-            device = self.get_device_name(self.args.equ[0])
+    def loading(self, special):
+        device = self.get_device_name(self.args.equ[0])
+        if special:
             with open(
-                f"dataset/split/{self.args.mode}/{device}/{self.args.seed}_{self.mode}set_info.json",
+                f"dataset/split3/{self.args.mode}/{device}/{self.args.seed}_{self.mode}set_info.json",
                 "r",
             ) as f:
                 dataset_list = json.load(f)
-
         else:
-            if self.mode == "train":
-                dataset_list = defaultdict(list)
-                for equ in self.args.equ:
-                    device = self.get_device_name(equ)
-
-                    with open(
-                        f"dataset/split/{self.args.mode}/{device}/{self.args.seed}_{self.mode}set_info.json",
-                        "r",
-                    ) as f:
-                        partial = json.load(f)
-
-                    for class_name, files in partial.items():
-                        dataset_list[class_name].extend(files)
-                dataset_list = dict(dataset_list)
-            else:
-                if len(self.args.equ) == 2:
-                    equ = self.args.equ[-1]
-                    device = self.get_device_name(equ)
-                    with open(
-                        f"dataset/split/{self.args.mode}/{device}/{self.args.seed}_{self.mode}set_info.json",
-                        "r",
-                    ) as f:
-                        dataset_list = json.load(f)
-                        
-                else:
-                    dataset_list = defaultdict(list)
-                    for equ in self.args.equ[-2:]:
-                        device = self.get_device_name(equ)
-
-                        with open(
-                            f"dataset/split/{self.args.mode}/{device}/{self.args.seed}_{self.mode}set_info.json",
-                            "r",
-                        ) as f:
-                            partial = json.load(f)
-
-                        for class_name, files in partial.items():
-                            dataset_list[class_name].extend(files)
-                    dataset_list = dict(dataset_list)
+            with open(
+                f"dataset/split2/{self.args.mode}/{device}/{self.args.seed}_{self.mode}set_info.json",
+                "r",
+            ) as f:
+                dataset_list = json.load(f)
 
         for class_name, file_list in dataset_list.items():
             for file_name in file_list:
@@ -153,7 +119,7 @@ class CustomDataset(Dataset):
 
         self.area_list.append([patch_img, label_data, desc_area, self.dig, 0, ori_img])
 
-    def load_dataset(self, dig, special=False):
+    def load_dataset(self, dig):
         if self.args.mode == "class":
             grade_num = [
                 self.grade_num[dig][key] for key in sorted(self.grade_num[dig].keys())
@@ -168,15 +134,8 @@ class CustomDataset(Dataset):
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ]
         )
-        if not special:
-            target_dict = self.dataset_dict[dig] 
-        else:
-            target_dict = list()
-            for key in self.dataset_dict.keys():
-                if dig in key:
-                    target_dict.extend(self.dataset_dict[key])
 
-        for self.i_path, self.grade in tqdm(target_dict, desc=f"{self.dig}"):
+        for self.i_path, self.grade in tqdm(self.dataset_dict[dig] , desc=f"{self.dig}"):
             if not os.path.isfile(os.path.join("dataset/cropped_img", self.i_path + ".jpg")):
                 continue
             self.save_dict(transform)

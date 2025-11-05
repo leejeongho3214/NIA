@@ -72,7 +72,7 @@ def parse_args():
 
     parser.add_argument(
         "--lr",
-        default=0.0001,
+        default=0.001,
         type=float,
     )
 
@@ -84,7 +84,7 @@ def parse_args():
 
     parser.add_argument(
         "--batch_size",
-        default=8,
+        default=32,
         type=int,
     )
 
@@ -222,7 +222,7 @@ def main(args):
             sampler = sampler
         )
 
-        test_data, _ = test_dataset.load_dataset(key, True)
+        test_data, _ = test_dataset.load_dataset(key)
         testset_loader = torch.utils.data.DataLoader(
             dataset=test_data,
             batch_size=args.batch_size,
