@@ -34,7 +34,6 @@ class CustomDataset(Dataset):
         self.json_path = "dataset/label"
         self.dataset_dict = defaultdict(list)
         self.grade_num = defaultdict(lambda: defaultdict(int))
-
         self.loading()
 
     def __len__(self):

@@ -15,7 +15,7 @@ import torch
 import shutil
 import numpy as np
 
-from custom_model.coatnet import coatnet_4
+from custom_model.coatnet import coatnet_1
 
 from logger import setup_logger
 from tool.data_loader import CustomDataset
@@ -26,9 +26,7 @@ from tool.model import Model
 
 import wandb
 
-# git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
-git_name = "coatnet-weight"
-
+git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -43,7 +41,7 @@ def parse_args():
         "--equ",
         type=int,
         nargs="+",
-        default=[1, 2],
+        default=[1],
         choices=[1, 2, 3],
     )
 
@@ -56,7 +54,7 @@ def parse_args():
 
     parser.add_argument(
         "--epoch",
-        default=50,
+        default=100,
         type=int,
     )
 
@@ -80,7 +78,7 @@ def parse_args():
 
     parser.add_argument(
         "--patience",
-        default=4,
+        default=5,
         type=float,
     )
 
@@ -92,7 +90,7 @@ def parse_args():
 
     parser.add_argument(
         "--stop_early",
-        default=10,
+        default=20,
         type=int,
     )
 
@@ -132,7 +130,7 @@ def main(args):
     args.load_epoch = {item: 0 for item in model_num_class}
 
     model_list = {
-        key: coatnet_4(num_classes=value) for key, value in model_num_class.items()
+        key: coatnet_1(num_classes=value) for key, value in model_num_class.items()
     }
 
     model_path = os.path.join(check_path, "save_model")
@@ -213,7 +211,7 @@ def main(args):
         sampler = WeightedRandomSampler(
             weights=sample_weights,
             num_samples=len(merged_data),
-            replacement=True,
+            replacement=False,
         )
 
         trainset_loader = torch.utils.data.DataLoader(
