@@ -7,7 +7,6 @@ workspace_path = os.path.join(os.path.expanduser("~"), "dir/NIA")
 sys.path.insert(0, workspace_path)
 os.chdir(workspace_path)
 
-sys.stdout = open(sys.stdout.fileno(), mode="w", buffering=1)
 sys.stderr = open(sys.stderr.fileno(), mode="w", buffering=1)
 
 from utils import load_checkpoint, fix_seed, save_code_copy
@@ -15,7 +14,7 @@ import torch
 import shutil
 import numpy as np
 
-from custom_model.coatnet import coatnet_1
+from custom_model.coatnet import coatnet_1, coatnet_2, coatnet_3, coatnet_4
 
 from logger import setup_logger
 from tool.data_loader import CustomDataset
@@ -85,7 +84,7 @@ def parse_args():
 
     parser.add_argument(
         "--lr",
-        default=0.001,
+        default=0.0001,
         type=float,
     )
 
@@ -103,8 +102,14 @@ def parse_args():
 
     parser.add_argument(
         "--stop_early",
-        default=100,
+        default=20,
         type=int,
+    )
+
+    parser.add_argument(
+        "--grad_clip",
+        default=1.0,
+        type=float,
     )
 
     parser.add_argument("--reset", action="store_true")
@@ -143,7 +148,7 @@ def main(args):
     args.load_epoch = {item: 0 for item in model_num_class}
 
     model_list = {
-        key: coatnet_1(num_classes=value) for key, value in model_num_class.items()
+        key: coatnet_2(num_classes=value) for key, value in model_num_class.items()
     }
 
     model_path = os.path.join(check_path, "save_model")
@@ -210,21 +215,36 @@ def main(args):
         if args.ddp:
             model = torch.nn.parallel.DistributedDataParallel(model)
 
-        train_data, train_grade = train_dataset.load_dataset(key)
-        val_data, val_grade = val_dataset.load_dataset(key)
+        train_data, _ = train_dataset.load_dataset(key)
+        val_data, _ = val_dataset.load_dataset(key)
 
         merged_data = train_data + val_data
-        grade_num = [t + v for t, v in zip(train_grade, val_grade)]
 
-        class_weights = 1.0 / np.sqrt(grade_num)
-        class_weights = class_weights / np.sum(class_weights)  # 정규화 (optional)
+        num_classes = model_num_class[key]
+        class_counts = [0] * num_classes
 
-        sample_weights = [class_weights[label[1]] for label in merged_data]
+        for sample in merged_data:
+            label_value = int(sample[1])
+            if label_value < 0 or label_value >= num_classes:
+                raise ValueError(
+                    f"Label value {label_value} for {key} out of range [0, {num_classes - 1}]"
+                )
+            class_counts[label_value] += 1
+
+        grade_num = [max(1, count) for count in class_counts]
+
+        class_weights = np.asarray(grade_num, dtype=np.float32)
+        class_weights = 1.0 / np.sqrt(class_weights)
+        class_weights /= np.sum(class_weights)
+        class_weights = np.nan_to_num(class_weights, nan=0.0, posinf=0.0, neginf=0.0)
+
+        sample_weights = [class_weights[int(sample[1])] for sample in merged_data]
+        sample_weights = torch.as_tensor(sample_weights, dtype=torch.double)
 
         sampler = WeightedRandomSampler(
             weights=sample_weights,
             num_samples=len(merged_data),
-            replacement=False,
+            replacement=True,
         )
 
         trainset_loader = torch.utils.data.DataLoader(

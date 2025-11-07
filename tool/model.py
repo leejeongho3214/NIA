@@ -3,8 +3,10 @@ from copy import deepcopy
 import math
 import torch
 import torch.nn as nn
+from torch.nn.utils import clip_grad_norm_
 import numpy as np
 from scipy.stats import pearsonr
+import glob
 
 import wandb
 
@@ -97,6 +99,30 @@ class Model(object):
 
         self.scheduler = optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda)
 
+    def _handle_non_finite_loss(self, loss, pred, label):
+        self.nan += 1
+        loss_state = "nan" if torch.isnan(loss) else "inf"
+        try:
+            logits_min = pred.detach().min().item()
+            logits_max = pred.detach().max().item()
+        except Exception:
+            logits_min, logits_max = float("nan"), float("nan")
+
+        try:
+            label_preview = (
+                label.detach().cpu().tolist()
+                if isinstance(label, torch.Tensor)
+                else label
+            )
+        except Exception:
+            label_preview = "unavailable"
+
+        self.logger.warning(
+            f"[{self.phase}] Non-finite loss detected ({loss_state}) "
+            f"at epoch {self.epoch} iter {self.iter}. "
+            f"logits range [{logits_min:.4f}, {logits_max:.4f}] labels {label_preview}"
+        )
+
     def acc_avg(self, name):
         return round(self.test_value[name].avg * 100, 2)
 
@@ -170,7 +196,18 @@ class Model(object):
                     f_pred.append(v)
                     f_gt.append(v1)
 
-            correlation, _ = pearsonr(f_gt, f_pred)
+            # safe Pearson: pearsonr returns nan for constant inputs
+            try:
+                if len(f_gt) > 1 and np.std(f_gt) > 0 and np.std(f_pred) > 0:
+                    correlation, _ = pearsonr(f_gt, f_pred)
+                else:
+                    correlation = float("nan")
+                    self.logger.warning(
+                        f"Pearson correlation not defined (constant input) for {self.m_dig}: std(gt)={np.std(f_gt):.6f}, std(pred)={np.std(f_pred):.6f}, len={len(f_gt)}"
+                    )
+            except Exception as e:
+                correlation = float("nan")
+                self.logger.warning(f"Pearsonr failed for {self.m_dig}: {e}")
 
             if self.args.mode == "class":
                 (
@@ -233,8 +270,12 @@ class Model(object):
             )
             return True
 
-    def class_loss(self, pred, gt):
-        loss = self.criterion(pred, gt)
+    def class_loss(self, pred, gt, loss=None):
+        loss = self.criterion(pred, gt) if loss is None else loss
+
+        if not torch.isfinite(loss):
+            self._handle_non_finite_loss(loss, pred, gt)
+            return None
 
         with torch.no_grad():
             pred_v = [item.argmax().item() for item in pred]
@@ -252,9 +293,13 @@ class Model(object):
 
         return loss
 
-    def regression(self, pred, gt):
+    def regression(self, pred, gt, loss=None):
         pred = pred.flatten()
-        loss = self.criterion(pred.float(), gt.float())
+        loss = self.criterion(pred.float(), gt.float()) if loss is None else loss
+
+        if not torch.isfinite(loss):
+            self._handle_non_finite_loss(loss, pred, gt)
+            return None
 
         with torch.no_grad():
             pred_v = [item.item() for item in pred]
@@ -336,6 +381,10 @@ class Model(object):
             else:
                 loss = self.regression(pred, label)
 
+            if loss is None:
+                self.optimizer.zero_grad(set_to_none=True)
+                continue
+
             if not self.iter and not self.epoch:
                 self.wandb_run.log(
                     {
@@ -354,6 +403,8 @@ class Model(object):
 
             self.optimizer.zero_grad()
             loss.backward()
+            if getattr(self.args, "grad_clip", 0) and self.args.grad_clip > 0:
+                clip_grad_norm_(self.model.parameters(), max_norm=self.args.grad_clip)
             self.optimizer.step()
 
             self.global_step += 1
@@ -374,9 +425,12 @@ class Model(object):
                 pred = self.model(img)
 
                 if self.args.mode == "class":
-                    self.class_loss(pred, label)
+                    loss = self.class_loss(pred, label)
                 else:
-                    self.regression(pred, label)
+                    loss = self.regression(pred, label)
+
+                if loss is None:
+                    continue
 
                 if not self.iter and not self.epoch:
                     self.wandb_run.log(
@@ -404,6 +458,18 @@ class Model_test(Model):
         self.pred = defaultdict(lambda: defaultdict(list))
         self.gt = defaultdict(lambda: defaultdict(list))
         self.logger = logger
+        self._save_path = None
+        self._log_files_reset = False
+
+    def _ensure_save_path(self):
+        if self._save_path is None:
+            self._save_path = os.path.join(
+                self.args.log_path,
+                str(self.args.equ),
+                "save-log",
+            )
+        mkdir(self._save_path)
+        return self._save_path
 
     def test(self, model, testset_loader, key):
         self.model = model
@@ -445,6 +511,16 @@ class Model_test(Model):
         p.close()
 
     def print_test(self):
+        save_path = self._ensure_save_path()
+        if not self._log_files_reset:
+            # Remove stale log files only once per evaluation run
+            for file_path in glob.glob(os.path.join(save_path, "print_*.txt")):
+                try:
+                    os.remove(file_path)
+                except OSError:
+                    pass
+            self._log_files_reset = True
+
         pred_total, gt_total = list(), list()
         for self.angle in self.pred[self.m_dig].keys():
             gt_v = [value[0] for value in self.gt[self.m_dig][self.angle]]
@@ -503,9 +579,21 @@ class Model_test(Model):
             if gt == pred:
                 correct_[gt] += 1
 
-        correlation, p_value = pearsonr(gt_v, pred_v)
-        save_path = f"{self.args.log_path}/{self.args.equ}/save-log"
-        mkdir(save_path)
+        # safe Pearson: guard against constant arrays or other failures
+        try:
+            if len(gt_v) > 1 and np.std(gt_v) > 0 and np.std(pred_v) > 0:
+                correlation, p_value = pearsonr(gt_v, pred_v)
+            else:
+                correlation = float("nan")
+                p_value = float("nan")
+                self.logger.warning(
+                    f"Pearson correlation not defined (constant input) for {self.m_dig} angle={self.angle if hasattr(self, 'angle') else 'N/A'}: std(gt)={np.std(gt_v):.6f}, std(pred)={np.std(pred_v):.6f}, len={len(gt_v)}"
+                )
+        except Exception as e:
+            correlation = float("nan")
+            p_value = float("nan")
+            self.logger.warning(f"Pearsonr failed for {self.m_dig}: {e}")
+        save_path = self._ensure_save_path()
 
         if self.args.mode == "regression":
             n_gt_v = [value / max(gt_v) for value in gt_v]

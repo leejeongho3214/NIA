@@ -216,24 +216,24 @@ class CB_loss(nn.Module):
         Returns:
         focal_loss: A float32 scalar representing normalized total loss.
         """
+        logits = logits.clamp(min=-20.0, max=20.0)
         BCLoss = F.binary_cross_entropy_with_logits(
             input=logits, target=labels, reduction="none"
         )
 
         if self.gamma == 0.0:
-            modulator = 1.0
+            loss = BCLoss
         else:
-            modulator = torch.exp(
-                -self.gamma * labels * logits
-                - self.gamma * torch.log(1 + torch.exp(-1.0 * logits))
-            )
-
-        loss = modulator * BCLoss
+            probs = torch.sigmoid(logits)
+            pt = probs * labels + (1 - probs) * (1 - labels)
+            focal_weight = (1 - pt).clamp(min=0.0, max=1.0).pow(self.gamma)
+            loss = focal_weight * BCLoss
 
         weighted_loss = alpha * loss
         focal_loss = torch.sum(weighted_loss)
-
-        focal_loss /= torch.sum(labels)
+        denom = labels.sum().clamp_min(1.0)
+        focal_loss = focal_loss / denom
+        focal_loss = torch.nan_to_num(focal_loss, nan=0.0, posinf=1e4, neginf=-1e4)
 
         return focal_loss
 
@@ -256,13 +256,20 @@ class CB_loss(nn.Module):
         cb_loss: A float tensor representing class balanced loss
         """
 
-        effective_num = 1.0 - np.power(self.beta, self.samples_per_cls)
-        weights = (1.0 - self.beta) / np.array(effective_num)
-        weights = weights / np.sum(weights) * self.no_of_classes
+        samples = np.array(self.samples_per_cls, dtype=np.float32)
+        effective_num = 1.0 - np.power(self.beta, samples)
+        effective_num = np.where(samples > 0, effective_num, np.nan)
+        weights = (1.0 - self.beta) / effective_num
+        weights = np.where(np.isfinite(weights), weights, 0.0)
+        weight_sum = np.sum(weights)
+        if weight_sum > 0:
+            weights = weights / weight_sum * self.no_of_classes
 
         labels_one_hot = F.one_hot(labels, self.no_of_classes).float()
 
-        weights = torch.tensor(weights).float().cuda()
+        labels_one_hot = labels_one_hot.to(logits.device, logits.dtype)
+
+        weights = torch.tensor(weights, device=logits.device, dtype=logits.dtype)
         weights = weights.unsqueeze(0)
         weights = weights.repeat(labels_one_hot.shape[0], 1) * labels_one_hot
         weights = weights.sum(1)
@@ -270,6 +277,7 @@ class CB_loss(nn.Module):
         weights = weights.repeat(1, self.no_of_classes)
 
         cb_loss = self.focal_loss(logits, labels_one_hot, weights)
+        cb_loss = torch.nan_to_num(cb_loss, nan=0.0, posinf=1e4, neginf=-1e4)
 
         # cb_loss = F.binary_cross_entropy_with_logits(input = logits,target = labels_one_hot, weights = weights)
 

@@ -15,9 +15,9 @@ from tool.utils import resume_checkpoint, fix_seed
 from tool.data_loader import CustomDataset
 from tool.logger import setup_logger
 from tool.model import Model_test
-from custom_model.coatnet import coatnet_4
+from custom_model.coatnet import coatnet_1, coatnet_2, coatnet_2, coatnet_4
 
-git_name = "coatnet-weight"
+git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -45,7 +45,7 @@ def parse_args():
 
     parser.add_argument(
         "--batch_size",
-        default=8,
+        default=32,
         type=int,
     )
     
@@ -110,7 +110,7 @@ def main(args):
     )
     
     model_list = {
-        key: coatnet_4(num_classes=value)
+        key: coatnet_1(num_classes=value)
         for key, value in model_num_class.items()
     }
 
