@@ -211,23 +211,14 @@ def main(args):
     test_dict = defaultdict(list)
 
     for key in model_list:
-        trainset, _ = dataset.load_dataset("train", key)
-        valset, _ = dataset.load_dataset("val", key)
-        testset, _ = dataset.load_dataset("test", key)
+        for w_key in model_area_dict[key]:
+            trainset, _ = dataset.load_dataset("train", w_key)
+            valset, _ = dataset.load_dataset("val", w_key)
+            testset, _ = dataset.load_dataset("test", w_key)
 
-        train_dict[key] = [i[2] for i in trainset]
-        val_dict[key] = [i[2] for i in valset]
-        test_dict[key] = [i[2] for i in testset]
-
-    # for key in model_list:
-    #     for w_key in model_area_dict[key]:
-    #         trainset, _ = dataset.load_dataset("train", w_key)
-    #         valset, _ = dataset.load_dataset("val", w_key)
-    #         testset, _ = dataset.load_dataset("test", w_key)
-
-    #         train_dict[w_key] = [i[2] for i in trainset]
-    #         val_dict[w_key] = [i[2] for i in valset]
-    #         test_dict[w_key] = [i[2] for i in testset]
+            train_dict[w_key] = [i[2] for i in trainset]
+            val_dict[w_key] = [i[2] for i in valset]
+            test_dict[w_key] = [i[2] for i in testset]
         
     if args.equ ==1:
         device = "digital_camera"
@@ -236,7 +227,7 @@ def main(args):
     else:
         device = "smart_phone"
         
-    check_path = f"/home/jeongho/dir/NIA/dataset/split2/{args.mode}/{device}"
+    check_path = f"/home/jeongho/dir/NIA/dataset/split3/{args.mode}/{device}"
     os.makedirs(check_path, exist_ok=True)
     mode = "w" 
     

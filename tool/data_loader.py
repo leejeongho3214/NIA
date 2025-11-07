@@ -30,7 +30,7 @@ class CustomDataset_class(Dataset):
         self.args = args
         self.logger = logger
         self.load_list(mode)
-        self.generate_datasets(self.json_dict)
+        self.generate_datasets(self.json_dict_detail)
 
     def __len__(self):
         return len(self.sub_path)
@@ -72,7 +72,7 @@ class CustomDataset_class(Dataset):
                         for idx in idx_list:
                             tt_list = list()
                             for each_value in grade_dict[idx]:
-                                if each_value[0].split("_")[-2] in ["F", "L", "R"]:
+                                if each_value[0].split("_")[-2] in ["F", "L", "R", "L30", "R30"]:
                                     tt_list.append(each_value)
                             in_list.append(tt_list)
                     out_list[dig][grade] = in_list
