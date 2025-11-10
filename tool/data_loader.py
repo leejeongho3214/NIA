@@ -13,8 +13,6 @@ import json
 from collections import defaultdict
 from tqdm import tqdm
 from torch.utils.data import Dataset
-from sklearn.model_selection import KFold, train_test_split
-
 
 def mkdir(path):
     if path == "":
@@ -76,7 +74,6 @@ class CustomDataset_class(Dataset):
                                     tt_list.append(each_value)
                             in_list.append(tt_list)
                     out_list[dig][grade] = in_list
-
 
     def load_list(self, mode="train"):
         self.mode = mode
