@@ -71,15 +71,64 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--warmup_ratio",
+        default=0.1,
+        type=float,
+        help="Fallback ratio of total epochs to use for warmup when warmup_epochs <= 0",
+    )
+
+    parser.add_argument(
         "--lr_min_scale",
         default=0.01,
         type=float,
     )
 
     parser.add_argument(
+        "--lr_min",
+        default=None,
+        type=float,
+        help="Absolute minimum learning rate; defaults to lr * lr_min_scale",
+    )
+
+    parser.add_argument(
+        "--lr_scheduler",
+        default="cosine",
+        choices=["cosine", "multistep"],
+        type=str,
+    )
+
+    parser.add_argument(
+        "--decay_milestones",
+        type=int,
+        nargs="+",
+        default=[5, 10, 15],
+        help="Epochs (0-indexed) at which to decay LR for multistep scheduler",
+    )
+
+    parser.add_argument(
+        "--decay_gamma",
+        default=0.5,
+        type=float,
+        help="Multiplicative gamma applied at each milestone for multistep scheduler",
+    )
+
+    parser.add_argument(
         "--res",
         default=256,
         type=int,
+    )
+
+    parser.add_argument(
+        "--aug_level",
+        default="light",
+        choices=["none", "light", "medium", "heavy"],
+        help="Controls strength of train-time augmentations applied to cropped facial patches.",
+    )
+
+    parser.add_argument(
+        "--allow_hflip",
+        action="store_true",
+        help="Enable horizontal flips during augmentation (disable if left/right areas differ).",
     )
 
     parser.add_argument(
@@ -123,6 +172,20 @@ def parse_args():
 
     args = parser.parse_args()
     args.num_workers = 8
+
+    args.decay_milestones = sorted({m for m in args.decay_milestones if m >= 0})
+    args.decay_gamma = max(0.0, min(1.0, args.decay_gamma))
+    args.warmup_ratio = max(0.0, min(0.5, args.warmup_ratio))
+
+    if args.warmup_epochs <= 0:
+        args.warmup_epochs = max(1, int(args.epoch * args.warmup_ratio))
+    args.warmup_epochs = min(args.warmup_epochs, max(1, args.epoch - 1))
+
+    if args.lr_min is None:
+        args.lr_min = max(1e-8, args.lr * args.lr_min_scale)
+    else:
+        args.lr_min = max(1e-8, args.lr_min)
+        args.lr_min_scale = args.lr_min / max(args.lr, 1e-12)
 
     return args
 
@@ -221,9 +284,9 @@ def main(args):
         target_name = f"{args.git_name}/{args.name}_{key}"
 
         wandb_run = wandb.init(
-            project="NIA-Korean-Facial-Assessment",
-            name=target_name,
-            config=vars(args),
+           project="NIA-Korean-Facial-Assessment",
+           name=target_name,
+           config=vars(args),
         )
 
         model = model_list[key].cuda()

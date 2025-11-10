@@ -80,24 +80,55 @@ class Model(object):
             weight_decay=0,
         )
 
-        total_epochs = max(1, self.args.epoch)
-        default_warmup = max(1, total_epochs // 10)
-        warmup_epochs = getattr(self.args, "warmup_epochs", None)
-        warmup_epochs = default_warmup if warmup_epochs is None else warmup_epochs
-        warmup_epochs = min(max(1, warmup_epochs), total_epochs)
-        min_factor = max(0.0, min(1.0, getattr(self.args, "lr_min_scale", 0.01)))
+        total_epochs = max(1, int(self.args.epoch))
+        warmup_epochs = min(
+            max(0, int(getattr(self.args, "warmup_epochs", max(1, total_epochs // 10)))),
+            max(0, total_epochs - 1),
+        )
+
+        base_lr = max(self.args.lr, 1e-8)
+        lr_min = max(
+            1e-8,
+            float(getattr(self.args, "lr_min", base_lr * getattr(self.args, "lr_min_scale", 0.01))),
+        )
+        min_factor = min(1.0, max(lr_min / base_lr, 1e-6))
+
+        scheduler_mode = getattr(self.args, "lr_scheduler", "cosine")
+        milestones = sorted(set(int(m) for m in getattr(self.args, "decay_milestones", []) if m >= 0))
+        decay_gamma = float(getattr(self.args, "decay_gamma", 0.5))
+        decay_gamma = decay_gamma if decay_gamma > 0 else 0.1
 
         def lr_lambda(current_epoch: int):
-            if current_epoch < warmup_epochs:
+            if warmup_epochs > 0 and current_epoch < warmup_epochs:
                 return (current_epoch + 1) / float(max(1, warmup_epochs))
-            if warmup_epochs == total_epochs:
+
+            if warmup_epochs >= total_epochs:
                 return 1.0
-            progress = (current_epoch - warmup_epochs) / float(total_epochs - warmup_epochs)
-            progress = min(max(progress, 0.0), 1.0)
-            cosine = 0.5 * (1.0 + math.cos(math.pi * progress))
-            return cosine * (1.0 - min_factor) + min_factor
+
+            if scheduler_mode == "cosine":
+                progress = (current_epoch - warmup_epochs) / float(max(1, total_epochs - warmup_epochs))
+                progress = min(max(progress, 0.0), 1.0)
+                cosine = 0.5 * (1.0 + math.cos(math.pi * progress))
+                return cosine * (1.0 - min_factor) + min_factor
+
+            # multistep decay
+            factor = 1.0
+            for milestone in milestones:
+                if current_epoch >= milestone:
+                    factor *= decay_gamma
+            return max(min_factor, factor)
 
         self.scheduler = optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda)
+        self._norm_mean = torch.tensor([0.485, 0.456, 0.406], device=self.device).view(1, 3, 1, 1)
+        self._norm_std = torch.tensor([0.229, 0.224, 0.225], device=self.device).view(1, 3, 1, 1)
+
+    def _denormalize_for_logging(self, tensor: torch.Tensor) -> torch.Tensor:
+        """Undo dataset normalization for visualization."""
+        if tensor.dim() == 3:
+            tensor = tensor.unsqueeze(0)
+        img = tensor.detach()
+        img = img * self._norm_std.to(img.device) + self._norm_mean.to(img.device)
+        return img.clamp(0.0, 1.0).squeeze(0)
 
     def _handle_non_finite_loss(self, loss, pred, label):
         self.nan += 1
@@ -169,15 +200,15 @@ class Model(object):
             if self.phase == "Train"
             else ("valid_loss", self.val_loss.avg)
         )
-        self.wandb_run.log(
-            {
-                loss_phase: loss_avg,
-                "lr": self.optimizer.param_groups[0]["lr"],
-                "epoch": self.epoch,
-                "global_step": self.global_step,
-            },
-            step=self.global_step,
-        )
+        #self.wandb_run.log(
+        #    {
+        #        loss_phase: loss_avg,
+        #        "lr": self.optimizer.param_groups[0]["lr"],
+        #       "epoch": self.epoch,
+        #        "global_step": self.global_step,
+        #    },
+        #    step=self.global_step,
+        #)
 
         if final_flag:
             f_pred = list()
@@ -386,19 +417,24 @@ class Model(object):
                 self.optimizer.zero_grad(set_to_none=True)
                 continue
 
-            if not self.iter and not self.epoch:
-                self.wandb_run.log(
-                    {
-                        "train/image": [
-                            wandb.Image(
-                                img[i],
-                                caption=f"GT: {label[i]}, Pred: {pred[i].argmax().item()}, Name: {self.img_names[i]}",
-                            )
-                            for i in range(3)
-                        ]
-                    },
-                    step=self.global_step,
-                )
+            if (
+                self.wandb_run is not None
+                and not self.iter
+                and not self.epoch
+                and img.size(0) > 0
+            ):
+                preview = []
+                limit = min(3, img.size(0))
+                for i in range(limit):
+                    vis_img = self._denormalize_for_logging(img[i]).cpu()
+                    caption = (
+                        f"GT: {label[i].item()}, "
+                        f"Pred: {pred[i].argmax().item()}, "
+                        f"Name: {self.img_names[i]}"
+                    )
+                    preview.append(wandb.Image(vis_img, caption=caption))
+                if preview:
+                    self.wandb_run.log({"train/image": preview}, step=self.global_step)
 
             self.print_loss(len(self.train_loader))
 
@@ -433,19 +469,28 @@ class Model(object):
                 if loss is None:
                     continue
 
-                if not self.iter and not self.epoch:
-                    self.wandb_run.log(
-                        {
-                            "valid/image": [
-                                wandb.Image(
-                                    img[i],
-                                    caption=f"GT: {label[i]}, Pred: {pred[i].argmax().item()}, Name: {self.img_names[i]}",
-                                )
-                                for i in range(3)
-                            ]
-                        },
-                        step=self.global_step,
-                    )
+                if (
+                    self.wandb_run is not None
+                    and not self.iter
+                    and not self.epoch
+                    and img.size(0) > 0
+                ):
+                    preview = []
+                    limit = min(3, img.size(0))
+                    for i in range(limit):
+                        vis_img = self._denormalize_for_logging(img[i]).cpu()
+                        if self.args.mode == "class":
+                            pred_value = pred[i].argmax().item()
+                        else:
+                            pred_value = round(pred[i].item(), 4)
+                        caption = (
+                            f"GT: {label[i].item()}, "
+                            f"Pred: {pred_value}, "
+                            f"Name: {self.img_names[i]}"
+                        )
+                        preview.append(wandb.Image(vis_img, caption=caption))
+                    if preview:
+                        self.wandb_run.log({"valid/image": preview}, step=self.global_step)
 
                 self.print_loss(len(self.valid_loader))
 
@@ -609,7 +654,7 @@ class Model_test(Model):
                     f"[{self.angle}][{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae:.4f}, MAPE: {mape:.3f}, NMAE: {nmae:.3f}"
                 )
 
-                with open(f"{save_path}/print_{self.angle}.txt", "a") as f:
+                with open(f"{save_path}/print_{self.angle}.txt", "w") as f:
                     if self.m_dig == "pigmentation":
                         f.write(f"Angle, Area, Correlation, P-value, MAE, MAPE, NMAE\n")
                     f.write(
@@ -617,7 +662,7 @@ class Model_test(Model):
                     )
 
             else:
-                with open(f"{save_path}/print_total.txt", "a") as f:
+                with open(f"{save_path}/print_total.txt", "w") as f:
                     if self.m_dig == "pigmentation":
                         f.write(f"Area, Correlation, P-value, MAE, MAPE, NMAE\n")
                     f.write(
