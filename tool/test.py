@@ -15,9 +15,10 @@ from tool.utils import resume_checkpoint, fix_seed
 from tool.data_loader import CustomDataset
 from tool.logger import setup_logger
 from tool.model import Model_test
-from custom_model.coatnet import coatnet_1, coatnet_2, coatnet_2, coatnet_4
+from custom_model.coatnet import coatnet_1, coatnet_2, coatnet_3, coatnet_4
 
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -28,7 +29,7 @@ def parse_args():
         type=str,
     )
 
-    parser.add_argument("--equ", type=int, nargs= "+", default=[1], choices=[1, 2, 3])
+    parser.add_argument("--equ", type=int, nargs="+", default=[1], choices=[1, 2, 3])
 
     parser.add_argument(
         "--mode",
@@ -36,7 +37,7 @@ def parse_args():
         choices=["regression", "class"],
         type=str,
     )
-    
+
     parser.add_argument(
         "--check_root",
         default="",
@@ -48,13 +49,13 @@ def parse_args():
         default=32,
         type=int,
     )
-    
+
     parser.add_argument(
         "--seed",
         default=1,
         type=int,
     )
-    
+
     parser.add_argument(
         "--res",
         default=256,
@@ -66,7 +67,13 @@ def parse_args():
         default=8,
         type=int,
     )
-    
+
+    parser.add_argument(
+        "--coatnet",
+        default=1,
+        type=int,
+    )
+
     args = parser.parse_args()
 
     return args
@@ -78,21 +85,20 @@ def main(args):
         ValueError, f"It's not correct name, {args.name} -> {seed}"
     args.seed = int(seed)
     fix_seed(int(seed))
-    
+
     args.git_name = git_name
-    check_path = os.path.join(args.check_root, "checkpoint", git_name, args.mode, args.name)
+    check_path = os.path.join(
+        args.check_root, "checkpoint", git_name, args.mode, args.name
+    )
 
     if os.path.isdir(os.path.join(check_path, "log", "eval")):
         shutil.rmtree(os.path.join(check_path, "log", "eval"))
-        
+
     args.log_path = os.path.join(check_path, "log")
-    
-    logger = setup_logger(
-        args.name,
-        os.path.join(args.log_path, "eval")
-    )
+
+    logger = setup_logger(args.name, os.path.join(args.log_path, "eval"))
     logger.info("Command Line: " + " ".join(sys.argv))
-    
+
     yaml_file_path = os.path.join(check_path, "code", "test_config.yaml")
     with open(yaml_file_path, "w") as yaml_file:
         yaml.dump(vars(args), yaml_file, default_flow_style=False)
@@ -108,18 +114,18 @@ def main(args):
             "pore": 1,
         }
     )
-    
+    model_choice = {1: coatnet_1, 2: coatnet_2, 3: coatnet_3, 4: coatnet_4}
+
     model_list = {
-        key: coatnet_1(num_classes=value)
-        for key, value in model_num_class.items()
+        key: model_choice[args.coatnet](num_classes=value) for key, value in model_num_class.items()
     }
 
     model_path = os.path.join(check_path, "save_model")
     save_log_path = os.path.join(check_path, "log", "save-log")
-    
+
     if os.path.isdir(save_log_path):
         shutil.rmtree(save_log_path)
-    
+
     if os.path.isdir(model_path):
         for path in os.listdir(model_path):
             dig_path = os.path.join(model_path, path)
@@ -132,14 +138,14 @@ def main(args):
                     path,
                     False,
                 )
-    else: 
+    else:
         shutil.rmtree(check_path)
         assert 0, "Incorrect checkpoint path"
 
     dataset = (
-        CustomDataset(args, logger, "test", special = True)
+        CustomDataset(args, logger, "test", special=True)
         if args.mode == "class"
-        else CustomDataset(args, logger, "test", special = True)
+        else CustomDataset(args, logger, "test", special=True)
     )
     resnet_model = Model_test(args, logger)
 
@@ -164,7 +170,7 @@ def main(args):
             "pore": ["cheek_pore"],
         }
     )
- 
+
     for key in model_list:
         model = model_list[key].cuda()
         for w_key in model_area_dict[key]:
@@ -178,6 +184,7 @@ def main(args):
             resnet_model.test(model, testset_loader, w_key)
             resnet_model.print_test()
     resnet_model.save_value()
+
 
 if __name__ == "__main__":
     args = parse_args()

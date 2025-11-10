@@ -59,6 +59,12 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--coatnet",
+        default=1,
+        type=int,
+    )
+
+    parser.add_argument(
         "--warmup_epochs",
         default=5,
         type=int,
@@ -122,6 +128,13 @@ def parse_args():
 
 
 def main(args):
+    if args.coatnet < 3:
+        args.batch_size = 32
+    elif args.coatnet == 3:
+        args.batch_size = 16
+    else:
+        args.batch_size = 8
+
     seed = args.name.split("st")[0]
     if seed.isdigit():
         ValueError, f"It's not correct name, {args.name} -> {seed}"
@@ -147,8 +160,10 @@ def main(args):
     args.best_loss = {item: np.inf for item in model_num_class}
     args.load_epoch = {item: 0 for item in model_num_class}
 
+    model_choice = {1: coatnet_1, 2: coatnet_2, 3: coatnet_3, 4: coatnet_4}
+
     model_list = {
-        key: coatnet_2(num_classes=value) for key, value in model_num_class.items()
+        key: model_choice[args.coatnet](num_classes=value) for key, value in model_num_class.items()
     }
 
     model_path = os.path.join(check_path, "save_model")
@@ -283,6 +298,15 @@ def main(args):
         for epoch in range(args.load_epoch[key], args.epoch):
             if args.load_epoch[key]:
                 each_model.update_e(epoch + 1, **info)
+
+            if epoch == 10:
+                trainset_loader = torch.utils.data.DataLoader(
+                    dataset=merged_data,
+                    batch_size=args.batch_size,
+                    num_workers=args.num_workers,
+                    shuffle=True,
+                )
+                each_model.train_loader = trainset_loader
 
             each_model.train()
             each_model.valid()

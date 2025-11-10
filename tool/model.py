@@ -359,6 +359,7 @@ class Model(object):
         self.model.train()
         self.phase = "Train"
         self.criterion = (
+            # nn.CrossEntropyLoss()
             CB_loss(
                 samples_per_cls=self.grade_num,
                 no_of_classes=len(self.grade_num),
