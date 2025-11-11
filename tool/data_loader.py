@@ -52,7 +52,7 @@ class CustomDataset_class(Dataset):
                 
                 random.shuffle(random_list)
 
-                train_len, val_len = int(len(grade_dict) * 0.8), int(len(grade_dict) * 0.1)
+                train_len, val_len = int(len(grade_dict) * 0.7), int(len(grade_dict) * 0.1)
                 train_idx, val_idx, test_idx = (
                     random_list[:train_len],
                     random_list[train_len : train_len + val_len],
@@ -60,9 +60,9 @@ class CustomDataset_class(Dataset):
                 )
                 grade_dict = dict(grade_dict)
                 
-                if len(random_list) < 60: 
-                    val_idx += test_idx
-                    test_idx = list()
+                # if len(random_list) < 60: 
+                #     val_idx += test_idx
+                #     test_idx = list()
 
                 for dataset_idx, (idx_list, out_list) in enumerate(
                     zip([train_idx, val_idx, test_idx], [self.train_list, self.val_list, self.test_list])
