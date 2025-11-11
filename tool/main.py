@@ -90,6 +90,7 @@ def parse_args():
 
 
     parser.add_argument("--reset", action="store_true")
+    parser.add_argument("--detail", action="store_true")
 
     args = parser.parse_args()
 
@@ -103,7 +104,11 @@ def main(args):
     check_path = os.path.join(args.root_path , "checkpoint", git_name, args.mode, args.name)
     log_path = os.path.join(args.root_path , "tensorboard", git_name, args.mode, args.name)
     model_num_class = (
-        {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 6, "wrinkle": 7}
+        {"dryness": 5, 
+         "pore": 6, 
+         "sagging": 6, 
+         "pigmentation": 6, 
+         "wrinkle": 7}
         if args.mode == "class"
         else {
             "pigmentation": 1,
@@ -117,27 +122,25 @@ def main(args):
     model_area_dict = (
         {
             "dryness": ["dryness"],
-            "pigmentation": ["forehead_pigmentation", "cheek_pigmentation"],
             "pore": ["pore"],
             "sagging": ["sagging"],
+            "pigmentation": ["forehead_pigmentation", "cheek_pigmentation"],
             "wrinkle": ["forehead_wrinkle", "glabellus_wrinkle", "perocular_wrinkle"],
         }
         if args.mode == "class"
         else {
             "pigmentation": ["pigmentation"],
+            "pore": ["cheek_pore"],
+            "wrinkle_Ra": ["perocular_wrinkle_Ra"],
             "moisture": ["forehead_moisture", "cheek_moisture", "chin_moisture"],
             "elasticity_R2": [
                 "forehead_elasticity_R2",
                 "cheek_elasticity_R2",
                 "chin_elasticity_R2",
             ],
-            "wrinkle_Ra": ["perocular_wrinkle_Ra"],
-            "pore": ["cheek_pore"],
         }
     )
         
-    pass_list = list()
-
     args.best_loss = {item: np.inf for item in model_num_class}
     args.load_epoch = {item: 0 for item in model_num_class}
 
@@ -148,37 +151,8 @@ def main(args):
     
     model_path = os.path.join(check_path, "save_model")
         
-    # for key, model in model_list.items(): 
-    #     model.fc = nn.Linear(model.fc.in_features, model_num_class[key])
-    #     model_list.update({key: model})
-
     args.save_img = os.path.join(check_path, "save_img")
     args.pred_path = os.path.join(check_path, "prediction")
-
-    if args.reset:
-        print(f"\033[90mReseting......{check_path}\033[0m")
-        if os.path.isdir(check_path):
-            shutil.rmtree(check_path)
-        if os.path.isdir(log_path):
-            shutil.rmtree(log_path)
-
-    loading = False
-    if os.path.isdir(model_path):
-        for path in os.listdir(model_path):
-            dig_path = os.path.join(model_path, path)
-            if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
-                print(f"\033[92mResuming......{dig_path}\033[0m")
-                model_list[path], info = resume_checkpoint(
-                    args,
-                    model_list[path],
-                    os.path.join(model_path, f"{path}", "state_dict.bin"),
-                    path, 
-                )
-                loading = True
-                if os.path.isdir(os.path.join(dig_path, "done")):
-                    print(f"\043[92mPassing......{dig_path}\043[0m")
-                    pass_list.append(path)
-            
 
     mkdir(model_path)
     mkdir(log_path)
@@ -190,7 +164,6 @@ def main(args):
     
     args_dict = vars(args)
 
-    # YAML 파일에 저장
     yaml_file_path = os.path.join(code_path, 'config.yaml')
     with open(yaml_file_path, 'w') as yaml_file:
         yaml.dump(args_dict, yaml_file, default_flow_style=False)
@@ -210,6 +183,10 @@ def main(args):
     val_dict = defaultdict(list)
     test_dict = defaultdict(list)
 
+    train_dict_merge = defaultdict(list)
+    val_dict_merge = defaultdict(list)
+    test_dict_merge = defaultdict(list)
+
     for key in model_list:
         for w_key in model_area_dict[key]:
             trainset, _ = dataset.load_dataset("train", w_key)
@@ -220,13 +197,24 @@ def main(args):
             val_dict[w_key] = [i[2] for i in valset]
             test_dict[w_key] = [i[2] for i in testset]
         
+    train_dict_merge = defaultdict(list)
+    val_dict_merge = defaultdict(list)
+    test_dict_merge = defaultdict(list)
+
+    for key in model_num_class.keys():
+        for k in train_dict.keys():
+            if key in k:
+                train_dict_merge[key].extend(train_dict[k])
+                val_dict_merge[key].extend(val_dict[k])
+                test_dict_merge[key].extend(test_dict[k])
+
     if args.equ ==1:
         device = "digital_camera"
     elif args.equ ==2:
         device = "smart_pad"
     else:
         device = "smart_phone"
-        
+
     check_path = f"/home/jeongho/dir/NIA/dataset/split3/{args.mode}/{device}"
     os.makedirs(check_path, exist_ok=True)
     mode = "w" 
@@ -237,6 +225,17 @@ def main(args):
         json.dump(val_dict, f)
     with open(f"{check_path}/{args.seed}_testset_info.json", mode) as f:
         json.dump(test_dict, f)
+
+    check_path = f"/home/jeongho/dir/NIA/dataset/split2/{args.mode}/{device}"
+    os.makedirs(check_path, exist_ok=True)
+
+    with open(f"{check_path}/{args.seed}_trainset_info.json", mode) as f:
+        json.dump(train_dict_merge, f)
+    with open(f"{check_path}/{args.seed}_valset_info.json", mode) as f:
+        json.dump(val_dict_merge, f)
+    with open(f"{check_path}/{args.seed}_testset_info.json", mode) as f:
+        json.dump(test_dict_merge, f)
+
 
 
 

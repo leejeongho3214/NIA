@@ -28,7 +28,7 @@ class CustomDataset_class(Dataset):
         self.args = args
         self.logger = logger
         self.load_list(mode)
-        self.generate_datasets(self.json_dict_detail)
+        self.generate_datasets(self.json_dict_detail) 
 
     def __len__(self):
         return len(self.sub_path)
@@ -44,14 +44,13 @@ class CustomDataset_class(Dataset):
             defaultdict(lambda: defaultdict()),
         )
         
-        for dig in sorted(json_dict.keys()):
+        for dig in json_dict.keys():
             class_dict = json_dict[dig]
             for grade in sorted(class_dict.keys()):
                 grade_dict = class_dict[grade]
                 random_list = list(grade_dict.keys())
                 
                 random.shuffle(random_list)
-
                 train_len, val_len = int(len(grade_dict) * 0.7), int(len(grade_dict) * 0.1)
                 train_idx, val_idx, test_idx = (
                     random_list[:train_len],
@@ -77,7 +76,8 @@ class CustomDataset_class(Dataset):
                                 if each_value[0].split("_")[-2] in ["F", "L", "R", "L30", "R30"]:
                                     tt_list.append(each_value)
                             in_list.append(tt_list)
-                    if len(in_list) > 0: out_list[dig][grade] = in_list
+                    out_list[dig][grade] = in_list
+
 
     def load_list(self, mode="train"):
         self.mode = mode
