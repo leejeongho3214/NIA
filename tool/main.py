@@ -167,6 +167,7 @@ def parse_args():
         type=float,
     )
 
+    parser.add_argument("--turn_epoch", action="store_true")
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--ddp", action="store_true")
 
@@ -362,7 +363,7 @@ def main(args):
             if args.load_epoch[key]:
                 each_model.update_e(epoch + 1, **info)
 
-            if epoch == 10:
+            if epoch == 10 and args.turn_epoch:
                 trainset_loader = torch.utils.data.DataLoader(
                     dataset=merged_data,
                     batch_size=args.batch_size,

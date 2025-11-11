@@ -200,15 +200,15 @@ class Model(object):
             if self.phase == "Train"
             else ("valid_loss", self.val_loss.avg)
         )
-        #self.wandb_run.log(
-        #    {
-        #        loss_phase: loss_avg,
-        #        "lr": self.optimizer.param_groups[0]["lr"],
-        #       "epoch": self.epoch,
-        #        "global_step": self.global_step,
-        #    },
-        #    step=self.global_step,
-        #)
+        self.wandb_run.log(
+           {
+               loss_phase: loss_avg,
+               "lr": self.optimizer.param_groups[0]["lr"],
+              "epoch": self.epoch,
+               "global_step": self.global_step,
+           },
+           step=self.global_step,
+        )
 
         if final_flag:
             f_pred = list()
