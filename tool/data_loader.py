@@ -59,6 +59,10 @@ class CustomDataset_class(Dataset):
                     random_list[train_len + val_len :],
                 )
                 grade_dict = dict(grade_dict)
+                
+                if len(random_list) < 60: 
+                    val_idx += test_idx
+                    test_idx = list()
 
                 for dataset_idx, (idx_list, out_list) in enumerate(
                     zip([train_idx, val_idx, test_idx], [self.train_list, self.val_list, self.test_list])
@@ -73,7 +77,7 @@ class CustomDataset_class(Dataset):
                                 if each_value[0].split("_")[-2] in ["F", "L", "R", "L30", "R30"]:
                                     tt_list.append(each_value)
                             in_list.append(tt_list)
-                    out_list[dig][grade] = in_list
+                    if len(in_list) > 0: out_list[dig][grade] = in_list
 
     def load_list(self, mode="train"):
         self.mode = mode
