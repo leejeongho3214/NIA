@@ -568,7 +568,7 @@ class Model_test(Model):
             self._log_files_reset = True
 
         pred_total, gt_total = list(), list()
-        for self.angle in self.pred[self.m_dig].keys():
+        for self.angle in sorted(self.pred[self.m_dig].keys()):
             gt_v = [value[0] for value in self.gt[self.m_dig][self.angle]]
             pred_v = [value[0] for value in self.pred[self.m_dig][self.angle]]
 

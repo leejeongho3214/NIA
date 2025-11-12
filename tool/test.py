@@ -70,7 +70,7 @@ def parse_args():
 
     parser.add_argument(
         "--coatnet",
-        default=1,
+        default=4,
         type=int,
     )
 

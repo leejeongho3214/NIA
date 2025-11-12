@@ -60,7 +60,7 @@ def parse_args():
 
     parser.add_argument(
         "--coatnet",
-        default=1,
+        default=4, 
         type=int,
     )
 
@@ -157,7 +157,7 @@ def parse_args():
 
     parser.add_argument(
         "--stop_early",
-        default=20,
+        default=10,
         type=int,
     )
 
