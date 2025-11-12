@@ -28,6 +28,16 @@ import wandb
 git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
 
 
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ("yes", "true", "t", "y", "1"):  # pragma: no cover
+        return True
+    if v.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    raise argparse.ArgumentTypeError("Boolean value expected.")
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
 
@@ -167,6 +177,15 @@ def parse_args():
         type=float,
     )
 
+    parser.add_argument(
+        "--bias",
+        type=str2bool,
+        nargs="?",
+        const=True,
+        default=True,
+        help="Enable/disable learnable bias terms across CoAtNet layers.",
+    )
+
     parser.add_argument("--turn_epoch", action="store_true")
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--ddp", action="store_true")
@@ -227,7 +246,8 @@ def main(args):
     model_choice = {1: coatnet_1, 2: coatnet_2, 3: coatnet_3, 4: coatnet_4}
 
     model_list = {
-        key: model_choice[args.coatnet](num_classes=value) for key, value in model_num_class.items()
+        key: model_choice[args.coatnet](num_classes=value, bias=args.bias)
+        for key, value in model_num_class.items()
     }
 
     model_path = os.path.join(check_path, "save_model")
