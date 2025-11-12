@@ -325,7 +325,7 @@ class CustomDataset_regress(CustomDataset_class):
         self.val_angle = ["F", "L30", "R30"] if args.equ == 1 else ["F", "L", "R"]
         super().__init__(args, logger, mode)
         
-    def generate_datasets(self):
+    def generate_datasets(self, *_args, **_kwargs):
         self.train_list, self.val_list, self.test_list = dict(), dict(), dict()
         for dig in sorted(self.json_dict):
             train_sub, val_sub, test_sub = list(), list(), list()
