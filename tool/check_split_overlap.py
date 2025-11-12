@@ -147,9 +147,9 @@ def _print_compact_summary(
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Check Sub/Equ subject overlap in train/val/test JSON files.")
-    parser.add_argument("--train-json", default="dataset/split2/class/digital_camera/1_trainset_info.json", type=Path, help="Path to *_trainset_info.json")
-    parser.add_argument("--val-json", default="dataset/split2/class/digital_camera/1_valset_info.json", type=Path, help="Path to *_valset_info.json")
-    parser.add_argument("--test-json", default="dataset/split2/class/digital_camera/1_testset_info.json", type=Path, help="Path to *_testset_info.json")
+    parser.add_argument("--train-json", default="dataset/split/regression/digital_camera/1_testset_info.json", type=Path, help="Path to *_trainset_info.json")
+    parser.add_argument("--val-json", default="dataset/split/regression/digital_camera/1_valset_info.json", type=Path, help="Path to *_valset_info.json")
+    parser.add_argument("--test-json", default="dataset/split/regression/digital_camera/1_testset_info.json", type=Path, help="Path to *_testset_info.json")
     parser.add_argument(
         "--compact",
         action="store_false",
