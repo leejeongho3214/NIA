@@ -397,7 +397,7 @@ class Model(object):
                 gamma=self.args.gamma,
             )
             if self.args.mode == "class"
-            else CharbonnierLoss()
+            else nn.HuberLoss()
         )
         self.prev_model = deepcopy(self.model)
 
