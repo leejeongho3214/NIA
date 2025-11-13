@@ -61,8 +61,8 @@
 - Task별로 분리된 모델 학습 (예: 주름, 모공, 건조도 등)
 
 ```bash
-python tool/main.py --name "체크포인트 이름" --mode class   # 육안평가
-python tool/main.py --name "체크포인트 이름" --mode regression  # 기기 측정값
+python tool/main.py --name "저장할 체크포인트 이름" --mode class   # 육안평가
+python tool/main.py --name "저장할 체크포인트 이름" --mode regression  # 기기 측정값
 ```
 
 <p align="center">
