@@ -213,20 +213,28 @@ class CustomDataset(Dataset):
             
         return device
 
+    def _dataset_info_path(self, device, special):
+        split = "split3" if special else "split2"
+        return f"dataset/{split}/{self.args.mode}/{device}/{self.args.seed}_{self.mode}set_info.json"
+
+    def _load_device_dataset(self, equ, special):
+        device = self.get_device_name(equ)
+        with open(self._dataset_info_path(device, special), "r") as f:
+            return json.load(f)
+
+    def _merge_datasets(self, equ_list, special):
+        merged = defaultdict(list)
+        for equ in equ_list:
+            partial = self._load_device_dataset(equ, special)
+            for class_name, files in partial.items():
+                merged[class_name].extend(files)
+        return dict(merged)
+
     def loading(self, special):
-        device = self.get_device_name(self.args.equ[0])
-        if special:
-            with open(
-                f"dataset/split3/{self.args.mode}/{device}/{self.args.seed}_{self.mode}set_info.json",
-                "r",
-            ) as f:
-                dataset_list = json.load(f)
+        if len(self.args.equ) == 1:
+            dataset_list = self._load_device_dataset(self.args.equ[0], special)
         else:
-            with open(
-                f"dataset/split2/{self.args.mode}/{device}/{self.args.seed}_{self.mode}set_info.json",
-                "r",
-            ) as f:
-                dataset_list = json.load(f)
+            dataset_list = self._merge_datasets(self.args.equ, special)
 
         for class_name, file_list in dataset_list.items():
             for file_name in file_list:

@@ -2,6 +2,7 @@ from datetime import datetime
 import os
 import sys
 import uuid
+import math
 
 workspace_path = os.path.join(os.path.expanduser("~"), "dir/NIA")
 sys.path.insert(0, workspace_path)
@@ -146,6 +147,12 @@ def parse_args():
         default=2,
         type=float,
     )
+    parser.add_argument(
+        "--distance_loss_weight",
+        default=1.0,
+        type=float,
+        help="Scales additional ordinal penalty so farther misclassifications incur higher loss.",
+    )
 
     parser.add_argument(
         "--lr",
@@ -163,6 +170,20 @@ def parse_args():
         "--batch_size",
         default=32,
         type=int,
+    )
+    
+    parser.add_argument(
+        "--grad_accum_steps",
+        default=1,
+        type=int,
+        help="Accumulate gradients over this many mini-batches before each optimizer step.",
+    )
+    
+    parser.add_argument(
+        "--effective_batch_size",
+        default=None,
+        type=int,
+        help="Optional target batch size achieved via gradient accumulation (overrides grad_accum_steps).",
     )
 
     parser.add_argument(
@@ -196,6 +217,7 @@ def parse_args():
     args.decay_milestones = sorted({m for m in args.decay_milestones if m >= 0})
     args.decay_gamma = max(0.0, min(1.0, args.decay_gamma))
     args.warmup_ratio = max(0.0, min(0.5, args.warmup_ratio))
+    args.distance_loss_weight = max(0.0, float(args.distance_loss_weight))
 
     if args.warmup_epochs <= 0:
         args.warmup_epochs = max(1, int(args.epoch * args.warmup_ratio))
@@ -217,6 +239,15 @@ def main(args):
         args.batch_size = 16
     else:
         args.batch_size = 8
+    args.grad_accum_steps = max(1, int(getattr(args, "grad_accum_steps", 1)))
+    
+    if args.effective_batch_size is not None:
+        args.effective_batch_size = max(args.batch_size, int(args.effective_batch_size))
+        args.grad_accum_steps = max(
+            1, math.ceil(args.effective_batch_size / args.batch_size)
+        )
+    else:
+        args.effective_batch_size = args.batch_size * args.grad_accum_steps
 
     seed = args.name.split("st")[0]
     if seed.isdigit():

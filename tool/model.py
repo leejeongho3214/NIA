@@ -16,8 +16,8 @@ import torch.optim as optim
 from utils import (
     AverageMeter,
     mape_loss,
-    save_checkpoint,
     CB_loss,
+    save_checkpoint,
     CharbonnierLoss,
 )
 import os
@@ -79,6 +79,7 @@ class Model(object):
             betas=(0.9, 0.999),
             weight_decay=0,
         )
+        self.grad_accum_steps = max(1, int(getattr(self.args, "grad_accum_steps", 1)))
 
         total_epochs = max(1, int(self.args.epoch))
         warmup_epochs = min(
@@ -302,7 +303,25 @@ class Model(object):
             return True
 
     def class_loss(self, pred, gt, loss=None):
-        loss = self.criterion(pred, gt) if loss is None else loss
+        sample_loss = self.criterion(pred, gt) if loss is None else loss
+        if isinstance(self.criterion, nn.CrossEntropyLoss):
+            if sample_loss.dim() == 0:
+                loss = sample_loss
+            else:
+                distance_lambda = getattr(self.args, "distance_loss_weight", 0.0)
+                if distance_lambda > 0:
+                    probs = torch.softmax(pred, dim=1)
+                    class_positions = torch.arange(
+                        probs.size(1), device=probs.device, dtype=probs.dtype
+                    )
+                    expected_grade = (probs * class_positions).sum(dim=1)
+                    grade_distance = torch.abs(expected_grade - gt.to(probs.dtype))
+                    weight = 1.0 + distance_lambda * grade_distance
+                    sample_loss = sample_loss * weight
+                loss = sample_loss.mean()
+
+        else:
+            loss = sample_loss.mean()
 
         if not torch.isfinite(loss):
             self._handle_non_finite_loss(loss, pred, gt)
@@ -400,6 +419,10 @@ class Model(object):
             else nn.HuberLoss()
         )
         self.prev_model = deepcopy(self.model)
+        accum_steps = self.grad_accum_steps
+        total_batches = len(self.train_loader)
+        accum_counter = 0
+        self.optimizer.zero_grad()
 
         for self.iter, (img, label, self.img_names, _, _, _) in enumerate(
             self.train_loader
@@ -415,6 +438,7 @@ class Model(object):
 
             if loss is None:
                 self.optimizer.zero_grad(set_to_none=True)
+                accum_counter = 0
                 continue
 
             if (
@@ -438,13 +462,23 @@ class Model(object):
 
             self.print_loss(len(self.train_loader))
 
-            self.optimizer.zero_grad()
-            loss.backward()
+            loss_to_backprop = loss / accum_steps
+            loss_to_backprop.backward()
+            accum_counter += 1
+
+            should_step = (
+                accum_counter == accum_steps or (self.iter + 1) == total_batches
+            )
+            if not should_step:
+                continue
+
             if getattr(self.args, "grad_clip", 0) and self.args.grad_clip > 0:
                 clip_grad_norm_(self.model.parameters(), max_norm=self.args.grad_clip)
+                
             self.optimizer.step()
-
+            self.optimizer.zero_grad()
             self.global_step += 1
+            accum_counter = 0
 
         self.print_loss(len(self.train_loader), final_flag=True)
 
@@ -559,7 +593,6 @@ class Model_test(Model):
     def print_test(self):
         save_path = self._ensure_save_path()
         if not self._log_files_reset:
-            # Remove stale log files only once per evaluation run
             for file_path in glob.glob(os.path.join(save_path, "print_*.txt")):
                 try:
                     os.remove(file_path)
@@ -654,16 +687,20 @@ class Model_test(Model):
                     f"[{self.angle}][{self.m_dig}]Correlation: {correlation:.2f}, P-value: {p_value:.4f}, MAE: {mae:.4f}, MAPE: {mape:.3f}, NMAE: {nmae:.3f}"
                 )
 
-                with open(f"{save_path}/print_{self.angle}.txt", "w") as f:
-                    if self.m_dig == "pigmentation":
+                file_path = os.path.join(save_path, f"print_{self.angle}.txt")
+                file_exists = os.path.exists(file_path)
+                with open(file_path, "a") as f:
+                    if self.m_dig == "pigmentation" and not file_exists:
                         f.write(f"Angle, Area, Correlation, P-value, MAE, MAPE, NMAE\n")
                     f.write(
                         f"{self.angle}, {self.m_dig}, {correlation:.2f}, {p_value:.4f}, {mae:.2f}, {mape:.2f}, {nmae:.2f}\n"
                     )
 
             else:
-                with open(f"{save_path}/print_total.txt", "w") as f:
-                    if self.m_dig == "pigmentation":
+                file_path = os.path.join(save_path, "print_total.txt")
+                file_exists = os.path.exists(file_path)
+                with open(file_path, "a") as f:
+                    if self.m_dig == "pigmentation" and not file_exists:
                         f.write(f"Area, Correlation, P-value, MAE, MAPE, NMAE\n")
                     f.write(
                         f"{self.m_dig}, {correlation:.2f}, {p_value:.4f}, {mae:.2f}, {mape:.2f}, {nmae:.2f}\n"
@@ -690,8 +727,10 @@ class Model_test(Model):
                     self.logger.info(
                         f"          {grade} grade Acc: {correct_[grade]} / {all_[grade]} -> {(correct_[grade]/all_[grade] * 100):.2f} %"
                     )
-                with open(f"{save_path}/print_{self.angle}.txt", "a") as f:
-                    if self.m_dig == "dryness":
+                file_path = os.path.join(save_path, f"print_{self.angle}.txt")
+                file_exists = os.path.exists(file_path)
+                with open(file_path, "a") as f:
+                    if self.m_dig == "dryness" and not file_exists:
                         f.write(
                             f"Angle, Area, Correlation, P-value, MAE, MAE(==0), MAE(=<1), MAE(=<2)\n"
                         )
@@ -700,8 +739,10 @@ class Model_test(Model):
                     )
 
             else:
-                with open(f"{save_path}/print_total.txt", "a") as f:
-                    if self.m_dig == "dryness":
+                file_path = os.path.join(save_path, "print_total.txt")
+                file_exists = os.path.exists(file_path)
+                with open(file_path, "a") as f:
+                    if self.m_dig == "dryness" and not file_exists:
                         f.write(
                             f"Area, Correlation, P-value, MAE, MAE(==0), MAE(=<1), MAE(=<2)\n"
                         )
