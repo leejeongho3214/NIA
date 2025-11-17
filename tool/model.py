@@ -7,6 +7,7 @@ from torch.nn.utils import clip_grad_norm_
 import numpy as np
 from scipy.stats import pearsonr
 import glob
+import shutil
 
 import wandb
 
@@ -549,7 +550,28 @@ class Model_test(Model):
                 "save-log",
             )
         mkdir(self._save_path)
+        self._reset_log_files(self._save_path)
         return self._save_path
+
+    def _reset_log_files(self, save_path: str):
+        """Prevent appending to old evaluation logs by clearing them once per run."""
+        if self._log_files_reset:
+            return
+
+        if os.path.isdir(save_path):
+            try:
+                shutil.rmtree(save_path)
+            except OSError as exc:
+                self.logger.warning(f"Failed to clear old log directory {save_path}: {exc}")
+        mkdir(save_path)
+
+        for pattern in ("print_*.txt", "print_total.txt"):
+            for file_path in glob.glob(os.path.join(save_path, pattern)):
+                try:
+                    os.remove(file_path)
+                except OSError as exc:
+                    self.logger.warning(f"Failed to remove old log file {file_path}: {exc}")
+        self._log_files_reset = True
 
     def test(self, model, testset_loader, key):
         self.model = model
@@ -592,14 +614,6 @@ class Model_test(Model):
 
     def print_test(self):
         save_path = self._ensure_save_path()
-        if not self._log_files_reset:
-            for file_path in glob.glob(os.path.join(save_path, "print_*.txt")):
-                try:
-                    os.remove(file_path)
-                except OSError:
-                    pass
-            self._log_files_reset = True
-
         pred_total, gt_total = list(), list()
         for self.angle in sorted(self.pred[self.m_dig].keys()):
             gt_v = [value[0] for value in self.gt[self.m_dig][self.angle]]
