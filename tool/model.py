@@ -20,6 +20,7 @@ from utils import (
     CB_loss,
     save_checkpoint,
     CharbonnierLoss,
+    FocalLoss,
 )
 import os
 
@@ -305,24 +306,28 @@ class Model(object):
 
     def class_loss(self, pred, gt, loss=None):
         sample_loss = self.criterion(pred, gt) if loss is None else loss
-        if isinstance(self.criterion, nn.CrossEntropyLoss):
-            if sample_loss.dim() == 0:
-                loss = sample_loss
-            else:
-                distance_lambda = getattr(self.args, "distance_loss_weight", 0.0)
-                if distance_lambda > 0:
-                    probs = torch.softmax(pred, dim=1)
-                    class_positions = torch.arange(
-                        probs.size(1), device=probs.device, dtype=probs.dtype
-                    )
-                    expected_grade = (probs * class_positions).sum(dim=1)
-                    grade_distance = torch.abs(expected_grade - gt.to(probs.dtype))
-                    weight = 1.0 + distance_lambda * grade_distance
-                    sample_loss = sample_loss * weight
-                loss = sample_loss.mean()
+        
+        loss = sample_loss.mean()
+        
+        
+        # if isinstance(self.criterion, nn.CrossEntropyLoss):
+        #     if sample_loss.dim() == 0:
+        #         loss = sample_loss
+        #     else:
+        #         distance_lambda = getattr(self.args, "distance_loss_weight", 0.0)
+        #         if distance_lambda > 0:
+        #             probs = torch.softmax(pred, dim=1)
+        #             class_positions = torch.arange(
+        #                 probs.size(1), device=probs.device, dtype=probs.dtype
+        #             )
+        #             expected_grade = (probs * class_positions).sum(dim=1)
+        #             grade_distance = torch.abs(expected_grade - gt.to(probs.dtype))
+        #             weight = 1.0 + distance_lambda * grade_distance
+        #             sample_loss = sample_loss * weight
+        #         loss = sample_loss.mean()
 
-        else:
-            loss = sample_loss.mean()
+        # else:
+        #     loss = sample_loss.mean()
 
         if not torch.isfinite(loss):
             self._handle_non_finite_loss(loss, pred, gt)
@@ -410,6 +415,7 @@ class Model(object):
         self.model.train()
         self.phase = "Train"
         self.criterion = (
+            # FocalLoss(gamma=self.args.gamma)
             # nn.CrossEntropyLoss()
             CB_loss(
                 samples_per_cls=self.grade_num,
