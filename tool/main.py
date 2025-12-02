@@ -27,7 +27,7 @@ def parse_args():
 
     parser.add_argument(
         "--name",
-        default="1st_test",
+        default="1st_cnn",
         type=str,
     )
 
