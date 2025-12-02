@@ -1,24 +1,21 @@
 import shutil
 import sys
 import os
-
-import torch
-import gc
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from torchvision import models
-from tool.data_loader import CustomDataset_class, CustomDataset_regress
 import argparse
-from tool.logger import setup_logger
-from torch.utils import data
-import torch.nn as nn
-from tool.model import Model_test
-from tool.utils import resume_checkpoint, fix_seed
+import yaml
 
-fix_seed(523)
-git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
+workspace_path = os.path.join(os.path.expanduser("~"), "dir/NIA")
+sys.path.insert(0, workspace_path)
+os.chdir(workspace_path)
+
+sys.stderr = open(sys.stderr.fileno(), mode="w", buffering=1)
+
+from torch.utils.data import DataLoader
+from tool.utils import resume_checkpoint, fix_seed
+from tool.data_loader import CustomDataset
+from tool.logger import setup_logger
+from tool.model import Model_test
+from torchvision import models
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -29,9 +26,7 @@ def parse_args():
         type=str,
     )
 
-    parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
-
-    parser.add_argument("--stop_early", type=int, default=30)
+    parser.add_argument("--equ", type=int, nargs="+", default=[1], choices=[1, 2, 3])
 
     parser.add_argument(
         "--mode",
@@ -41,14 +36,20 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--output_dir",
-        default=f"checkpoint/{git_name}",
+        "--check_root",
+        default="",
         type=str,
     )
 
     parser.add_argument(
-        "--epoch",
-        default=300,
+        "--batch_size",
+        default=32,
+        type=int,
+    )
+
+    parser.add_argument(
+        "--seed",
+        default=1,
         type=int,
     )
 
@@ -59,37 +60,42 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--batch_size",
-        default=32,
-        type=int,
-    )
-
-    parser.add_argument(
         "--num_workers",
         default=8,
         type=int,
     )
-    
+
     args = parser.parse_args()
 
     return args
 
 
 def main(args):
-    args.check_path = os.path.join(args.output_dir, args.mode, args.name)
-
-    if os.path.isdir(os.path.join(args.check_path, "log", "eval")):
-        shutil.rmtree(os.path.join(args.check_path, "log", "eval"))
+    seed = args.name.split("st")[0]
+    if seed.isdigit():
+        ValueError, f"It's not correct name, {args.name} -> {seed}"
         
-    logger = setup_logger(
-        args.name,
-        os.path.join(args.check_path, "log", "eval"),
-        filename=args.name + ".txt",
+    args.seed = int(seed)
+    fix_seed(int(seed))
+
+    check_path = os.path.join(
+        args.check_root, "checkpoint", args.mode, args.name
     )
+
+    if os.path.isdir(os.path.join(check_path, "log", "eval")):
+        shutil.rmtree(os.path.join(check_path, "log", "eval"))
+
+    args.log_path = os.path.join(check_path, "log")
+
+    logger = setup_logger(args.name, os.path.join(args.log_path, "eval"))
     logger.info("Command Line: " + " ".join(sys.argv))
 
+    yaml_file_path = os.path.join(check_path, "code", "test_config.yaml")
+    with open(yaml_file_path, "w") as yaml_file:
+        yaml.dump(vars(args), yaml_file, default_flow_style=False)
+
     model_num_class = (
-        {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
+        {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 6, "wrinkle": 7}
         if args.mode == "class"
         else {
             "pigmentation": 1,
@@ -99,46 +105,48 @@ def main(args):
             "pore": 1,
         }
     )
-
+    
     model_list = {
-        key: models.resnet50(weights=models.ResNet50_Weights.DEFAULT, args=args)
-        for key, _ in model_num_class.items()
+        key: models.resnet50(num_classes=value)
+        for key, value in model_num_class.items()
     }
 
-    for key, model in model_list.items(): 
-        model.fc = nn.Linear(model.fc.in_features, model_num_class[key], bias = True)
-        model_list.update({key: model})
+    model_path = os.path.join(check_path, "save_model")
+    save_log_path = os.path.join(check_path, "log", "save-log")
 
-    model_path = os.path.join(
-        os.path.join(args.output_dir, args.mode, args.load_name), "save_model"
-    )
+    if os.path.isdir(save_log_path):
+        shutil.rmtree(save_log_path)
+
     if os.path.isdir(model_path):
         for path in os.listdir(model_path):
             dig_path = os.path.join(model_path, path)
             if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
                 print(f"\033[92mResuming......{dig_path}\033[0m")
-                model_list[path] = resume_checkpoint(
+                model_list[path], _, _, _ = resume_checkpoint(
                     args,
                     model_list[path],
                     os.path.join(dig_path, "state_dict.bin"),
                     path,
                     False,
                 )
+    else:
+        shutil.rmtree(check_path)
+        assert 0, "Incorrect checkpoint path"
 
     dataset = (
-        CustomDataset_class(args, logger, "test")
+        CustomDataset(args, logger, "test", special=True)
         if args.mode == "class"
-        else CustomDataset_regress(args, logger)
+        else CustomDataset(args, logger, "test", special=True)
     )
     resnet_model = Model_test(args, logger)
 
     model_area_dict = (
         {
             "dryness": ["dryness"],
-            "pigmentation": ["pigmentation_forehead", "pigmentation_cheek"],
+            "pigmentation": ["forehead_pigmentation", "cheek_pigmentation"],
             "pore": ["pore"],
             "sagging": ["sagging"],
-            "wrinkle": ["wrinkle_forehead", "wrinkle_glabellus", "wrinkle_perocular"],
+            "wrinkle": ["forehead_wrinkle", "glabellus_wrinkle", "perocular_wrinkle"],
         }
         if args.mode == "class"
         else {
@@ -157,8 +165,8 @@ def main(args):
     for key in model_list:
         model = model_list[key].cuda()
         for w_key in model_area_dict[key]:
-            testset, _ = dataset.load_dataset("test", w_key)
-            testset_loader = data.DataLoader(
+            testset, _ = dataset.load_dataset(w_key)
+            testset_loader = DataLoader(
                 dataset=testset,
                 batch_size=args.batch_size,
                 num_workers=args.num_workers,
@@ -166,8 +174,6 @@ def main(args):
             )
             resnet_model.test(model, testset_loader, w_key)
             resnet_model.print_test()
-        torch.cuda.empty_cache()
-        gc.collect()
     resnet_model.save_value()
 
 

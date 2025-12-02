@@ -1,10 +1,7 @@
-import copy
 import errno
-import random
 from PIL import Image
-import natsort
-import torch.nn.functional as F
 from torchvision import transforms
+from torchvision.transforms import InterpolationMode
 import os
 import numpy as np
 import cv2
@@ -12,6 +9,66 @@ import json
 from collections import defaultdict
 from tqdm import tqdm
 from torch.utils.data import Dataset
+
+
+AUGMENTATION_PRESETS = {
+    "none": {
+        "flip_prob": 0.0,
+        "color_jitter": 0.0,
+        "rotation": 0.0,
+        "translate": 0.0,
+        "scale": 0.0,
+        "shear": 0.0,
+        "perspective": 0.0,
+        "perspective_prob": 0.0,
+        "blur_prob": 0.0,
+        "sharp_prob": 0.0,
+        "erase_prob": 0.0,
+        "erase_scale": (0.0, 0.0),
+    },
+    "light": {
+        "flip_prob": 0.4,
+        "color_jitter": 0.15,
+        "rotation": 5.0,
+        "translate": 0.02,
+        "scale": 0.05,
+        "shear": 2.0,
+        "perspective": 0.03,
+        "perspective_prob": 0.15,
+        "blur_prob": 0.1,
+        "sharp_prob": 0.1,
+        "erase_prob": 0.05,
+        "erase_scale": (0.01, 0.06),
+    },
+    "medium": {
+        "flip_prob": 0.5,
+        "color_jitter": 0.25,
+        "rotation": 8.0,
+        "translate": 0.04,
+        "scale": 0.08,
+        "shear": 4.0,
+        "perspective": 0.04,
+        "perspective_prob": 0.2,
+        "blur_prob": 0.15,
+        "sharp_prob": 0.15,
+        "erase_prob": 0.1,
+        "erase_scale": (0.02, 0.12),
+    },
+    "heavy": {
+        "flip_prob": 0.6,
+        "color_jitter": 0.35,
+        "rotation": 10.0,
+        "translate": 0.05,
+        "scale": 0.1,
+        "shear": 6.0,
+        "perspective": 0.06,
+        "perspective_prob": 0.25,
+        "blur_prob": 0.2,
+        "sharp_prob": 0.2,
+        "erase_prob": 0.15,
+        "erase_scale": (0.03, 0.2),
+    },
+}
 
 
 def mkdir(path):
@@ -23,12 +80,116 @@ def mkdir(path):
         if e.errno != errno.EEXIST:
             raise
 
-class CustomDataset_class(Dataset):
-    def __init__(self, args, logger, mode):
+
+class CustomDataset(Dataset):
+    def __init__(self, args, logger, mode, special = False):
         self.args = args
+        self.mode = mode
         self.logger = logger
-        self.load_list(mode)
-        self.generate_datasets()
+        self.img_path = "dataset/img"
+        self.json_path = "dataset/label"
+        self.dataset_dict = defaultdict(list)
+        self.grade_num = defaultdict(lambda: defaultdict(int))
+        self.loading(special)
+        self._train_transform = self._build_transform(train=True)
+        self._eval_transform = self._build_transform(train=False)
+
+    def _build_transform(self, train: bool):
+        normalize = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        resize = transforms.Resize((self.args.res, self.args.res), antialias=True)
+        aug_level = getattr(self.args, "aug_level", "none")
+        config = AUGMENTATION_PRESETS.get(aug_level, AUGMENTATION_PRESETS["light"])
+
+        ops = [resize]
+        if train and aug_level != "none":
+            if getattr(self.args, "allow_hflip", False) and config["flip_prob"] > 0:
+                ops.append(transforms.RandomHorizontalFlip(p=config["flip_prob"]))
+
+            if any(
+                [
+                    config["rotation"] > 0,
+                    config["translate"] > 0,
+                    config["scale"] > 0,
+                    config["shear"] > 0,
+                ]
+            ):
+                translate = (
+                    (config["translate"], config["translate"])
+                    if config["translate"] > 0
+                    else None
+                )
+                scale = (
+                    (max(0.5, 1.0 - config["scale"]), 1.0 + config["scale"])
+                    if config["scale"] > 0
+                    else None
+                )
+                shear = (
+                    (-config["shear"], config["shear"])
+                    if config["shear"] > 0
+                    else None
+                )
+                ops.append(
+                    transforms.RandomAffine(
+                        degrees=(
+                            (-config["rotation"], config["rotation"])
+                            if config["rotation"] > 0
+                            else 0
+                        ),
+                        translate=translate,
+                        scale=scale,
+                        shear=shear,
+                        interpolation=InterpolationMode.BILINEAR,
+                        fill=0,
+                    )
+                )
+
+            if config["color_jitter"] > 0:
+                jitter = config["color_jitter"]
+                ops.append(
+                    transforms.ColorJitter(
+                        brightness=jitter,
+                        contrast=jitter,
+                        saturation=min(jitter * 1.5, 0.75),
+                        hue=min(jitter * 0.2, 0.15),
+                    )
+                )
+
+            if config["perspective_prob"] > 0 and config["perspective"] > 0:
+                ops.append(
+                    transforms.RandomPerspective(
+                        distortion_scale=config["perspective"],
+                        p=config["perspective_prob"],
+                    )
+                )
+
+            if config["blur_prob"] > 0:
+                kernel = 5 if self.args.res >= 384 else 3
+                ops.append(
+                    transforms.RandomApply(
+                        [transforms.GaussianBlur(kernel_size=kernel, sigma=(0.1, 1.5))],
+                        p=config["blur_prob"],
+                    )
+                )
+
+            if config["sharp_prob"] > 0:
+                ops.append(
+                    transforms.RandomAdjustSharpness(
+                        sharpness_factor=1.2, p=config["sharp_prob"]
+                    )
+                )
+
+        tensor_ops = [transforms.ToTensor()]
+        if train and config["erase_prob"] > 0:
+            tensor_ops.append(
+                transforms.RandomErasing(
+                    p=config["erase_prob"],
+                    scale=config["erase_scale"],
+                    value="random",
+                )
+            )
+        tensor_ops.append(normalize)
+
+        return transforms.Compose(ops + tensor_ops)
 
     def __len__(self):
         return len(self.sub_path)
@@ -36,135 +197,66 @@ class CustomDataset_class(Dataset):
     def __getitem__(self, idx):
         idx_list = list(self.sub_path.keys())
         return idx_list[idx], self.sub_path[idx_list[idx]], self.train_num
-
-    def generate_datasets(self):
-        self.train_list, self.val_list, self.test_list = (
-            defaultdict(lambda: defaultdict()),
-            defaultdict(lambda: defaultdict()),
-            defaultdict(lambda: defaultdict()),
-        )
-        for dig in sorted(self.json_dict.keys()):
-            class_dict = self.json_dict[dig]
-            for grade in sorted(class_dict.keys()):
-                grade_dict = class_dict[grade]
-                random_list = list(grade_dict.keys())
-                random.shuffle(random_list)
-
-                train_len, val_len = int(len(grade_dict) * 0.8), int(len(grade_dict) * 0.1)
-                train_idx, val_idx, test_idx = (
-                    random_list[:train_len],
-                    random_list[train_len : train_len + val_len],
-                    random_list[train_len + val_len :],
-                )
-                grade_dict = dict(grade_dict)
-
-                for dataset_idx, (idx_list, out_list) in enumerate(
-                    zip([train_idx, val_idx, test_idx], [self.train_list, self.val_list, self.test_list])
-                ):
-                    if dataset_idx == 0:
-                        in_list = [grade_dict[idx] for idx in idx_list]
-                    else:
-                        in_list = list()
-                        for idx in idx_list:
-                            tt_list = list()
-                            for each_value in grade_dict[idx]:
-                                if each_value.split("_")[-2] in ["F"]:
-                                    tt_list.append(each_value)
-                            in_list.append(tt_list)
-                    out_list[dig][grade] = in_list
-
-
-    def load_list(self, mode="train"):
-        self.mode = mode
-        target_list = [
-            "pigmentation",
-            "moisture",
-            "elasticity_R2",
-            "wrinkle_Ra",
-            "pore",
-        ]
-        self.img_path = "dataset/img"
-        self.json_path = "dataset/label"
-
-        sub_path_list = [
-            item
-            for item in natsort.natsorted(os.listdir(self.img_path))
-            if not item.startswith(".")
-        ]
-
-        self.json_dict = (
-            defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-        )
-        self.json_dict_train = copy.deepcopy(self.json_dict)
-
-        for equ_name in sub_path_list:
-            if equ_name.startswith(".") or int(equ_name) not in self.args.equ:
-                continue
-
-            for sub_fold in tqdm(
-                natsort.natsorted(os.listdir(os.path.join("dataset/label", equ_name))),
-                desc="path loading..",
-            ):
-                sub_path = os.path.join(equ_name, sub_fold)
-                folder_path = os.path.join("dataset/label", sub_path)
-
-                if sub_fold.startswith(".") or not os.path.exists(
-                    os.path.join(self.json_path, sub_path)
-                ):
-                    continue
-
-                for j_name in os.listdir(folder_path):
-                    if self.should_skip_image(j_name, equ_name):
-                        continue
-
-                    with open(os.path.join(folder_path, j_name), "r") as f:
-                        json_meta = json.load(f)
-                        self.process_json_meta(
-                            json_meta, j_name, sub_path, target_list, sub_fold
-                        )
-
-    def process_json_meta(
-        self, json_meta, j_name, sub_path, target_list, sub_fold
-    ):
-        if (
-            (
-                list(json_meta["annotations"].keys())[0] == "acne"
-                or json_meta["images"]["bbox"] is None
-            )
-            and self.args.mode == "class"
-        ) or (
-            (json_meta["equipment"] is None or json_meta["images"]["bbox"] is None)
-            and self.args.mode == "regression"
-        ):
-            return
-
-        if self.args.mode == "class":
-            for dig_n, grade in json_meta["annotations"].items():
-                dig, area = dig_n.split("_")[-1], dig_n.split("_")[-2]
-
-                if dig in ["wrinkle", "pigmentation"] and self.mode == "test":
-                    dig = f"{dig}_{area}"
-
-                self.json_dict[dig][str(grade)][sub_fold].append(
-                    os.path.join(sub_path, j_name.split(".")[0])
-                )
+    
+    def get_device_name(self, equ):
+        if equ == 1:
+            device = "digital_camera"
+        elif equ == 2:
+            device = "smart_pad"
         else:
-            for dig_n, value in json_meta["equipment"].items():
-                matching_dig = [
-                    dig_n for target_dig in target_list if target_dig in dig_n
-                ]
-                if matching_dig:
-                    dig = matching_dig[0]
-                    self.json_dict[dig][value][sub_fold].append(
-                        [
-                            os.path.join(sub_path, j_name.split(".")[0]),
-                            value,
-                        ]
-                    )
+            device = "smart_phone"
+            
+        return device
+
+    def _dataset_info_path(self, device, special):
+        return f"dataset/split/{self.args.mode}/{device}/{self.args.seed}_{self.mode}set_info.json"
+
+    def _load_device_dataset(self, equ, special):
+        device = self.get_device_name(equ)
+        with open(self._dataset_info_path(device, special), "r") as f:
+            return json.load(f)
+
+    def _merge_datasets(self, equ_list, special):
+        merged = defaultdict(list)
+        for equ in equ_list:
+            partial = self._load_device_dataset(equ, special)
+            for class_name, files in partial.items():
+                merged[class_name].extend(files)
+        return dict(merged)
+
+    def loading(self, special):
+        if len(self.args.equ) == 1:
+            dataset_list = self._load_device_dataset(self.args.equ[0], special)
+        else:
+            dataset_list = self._merge_datasets(self.args.equ, special)
+
+        for class_name, file_list in dataset_list.items():
+            for file_name in file_list:
+                sub, equ, angle, area = [file_name.split("_")[i] for i in [1, 3, 5, 7]]
+
+                with open(
+                    f"{self.json_path}/{equ}/{sub}/{sub}_{equ}_{angle}_{area}.json", "r"
+                ) as f:
+                    json_value = json.load(f)
+
+                if self.args.mode == "class":
+                    for full_name, value in json_value["annotations"].items():
+                        if class_name in full_name:
+                            self.dataset_dict[class_name].append(
+                                [f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value]
+                            )
+                            self.grade_num[class_name][value] += 1
+                else:
+                    for full_name, value in json_value["equipment"].items():
+                        if class_name in full_name:
+                            self.dataset_dict[class_name].append(
+                                [f"{equ}/{sub}/{sub}_{equ}_{angle}_{area}", value]
+                            )
 
     def save_dict(self, transform):
         ori_img = cv2.imread(os.path.join("dataset/cropped_img", self.i_path + ".jpg"))
         pil_img = cv2.cvtColor(ori_img, cv2.COLOR_BGR2RGB)
+        ori_img = cv2.resize(ori_img, (self.args.res, self.args.res))
 
         s_list = self.i_path.split("/")[-1].split("_")
         desc_area = (
@@ -181,100 +273,33 @@ class CustomDataset_class(Dataset):
         if self.args.mode == "class":
             label_data = int(self.grade)
         else:
-            norm_v = self.norm_reg(self.value)
+            norm_v = self.norm_reg(self.grade)
             label_data = norm_v
 
         pil = Image.fromarray(pil_img.astype(np.uint8))
         patch_img = transform(pil)
 
-        self.area_list.append(
-            [patch_img, label_data, desc_area]
-        )
+        self.area_list.append([patch_img, label_data, desc_area, self.dig, 0, ori_img])
 
-    def should_skip_image(self, j_name, equ_name):
-
-        # 왼쪽 눈가/볼 ->  좌 15 & 30도
-        # 오른쪽 눈가/볼 -> 우 15 & 30도
-        # 턱선 -> 위, 아래
-
-        if equ_name == "01":
-            return (
-                (
-                    j_name.split("_")[2] in ["Ft", "Fb"]
-                    and j_name.split("_")[3].split(".")[0]
-                    in ["08"]
-                )
-                or (
-                    j_name.split("_")[2] in ["R15", "R30"]
-                    and j_name.split("_")[3].split(".")[0] in ["04", "06"]
-                )
-                or (
-                    j_name.split("_")[2] in ["L15", "L30"]
-                    and j_name.split("_")[3].split(".")[0] in ["03", "05"]
-                )
-            )
-        else:
-            return (
-                     (
-                    j_name.split("_")[2] == "L"
-                    and j_name.split("_")[3].split(".")[0]
-                    in ["03", "05"]
-                )
-                or (
-                    j_name.split("_")[2] == "R"
-                    and j_name.split("_")[3].split(".")[0]
-                    in ["04", "06"]
-                )
-            )
-
-    def load_dataset(self, mode, dig):
-        data_list = (
-            self.train_list
-            if mode == "train"
-            else self.val_list if mode == "val" else self.test_list
-        )
+    def load_dataset(self, dig):
+        if self.args.mode == "class":
+            grade_num = [
+                self.grade_num[dig][key] for key in sorted(self.grade_num[dig].keys())
+            ]
         self.area_list = list()
         self.dig = dig
 
-        transform = transforms.Compose(
-            [
-                transforms.Resize((self.args.res, self.args.res), antialias=True),
-                transforms.ToTensor(),
-                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-            ]
+        transform = (
+            self._train_transform if self.mode == "train" else self._eval_transform
         )
-        
-        data_list = dict(data_list)
-        if self.args.mode == "class":
-            
 
-            grade_num = dict()
-            grade_num.update(
-                {key: len(value) for key, value in data_list[self.dig].items()}
-            )
-
-            # for cb loss
-            num_grade = [grade_num[num] for num in sorted(grade_num)]
-
-            for self.grade, class_dict in tqdm(
-                data_list[self.dig].items(), desc=f"{mode}_class"
-            ):
-                for self.idx, sub_folder in enumerate(
-                    tqdm(sorted(class_dict), desc=f"{self.dig}_{self.grade}")
-                ):
-                    for self.i_path in sub_folder:
-                        self.save_dict(transform)
-
-        else:
-            for full_dig in list(data_list.keys()):
-                if dig in full_dig:
-                    for self.i_path, self.value in tqdm(
-                        data_list[full_dig], desc=f"{self.dig}"
-                    ):
-                        self.save_dict(transform)
+        for self.i_path, self.grade in tqdm(self.dataset_dict[dig] , desc=f"{self.dig}"):
+            if not os.path.isfile(os.path.join("dataset/cropped_img", self.i_path + ".jpg")):
+                continue
+            self.save_dict(transform)
 
         if self.args.mode == "class":
-            return self.area_list, num_grade
+            return self.area_list, grade_num
         else:
             return self.area_list, 0
 
@@ -298,31 +323,3 @@ class CustomDataset_class(Dataset):
 
         else:
             assert 0, "dig_v is not here"
-
-
-class CustomDataset_regress(CustomDataset_class):
-    def __init__(self, args, logger):
-        self.args = args
-        self.logger = logger
-        self.load_list(args)
-        self.generate_datasets()
-
-    def generate_datasets(self):
-        self.train_list, self.val_list, self.test_list = dict(), dict(), dict()
-        for dig in sorted(self.json_dict):
-            train_sub, val_sub, test_sub = list(), list(), list()
-            key_index = sorted(self.json_dict[dig])
-            i = 0
-            for idx in key_index:
-                for _, value_list in self.json_dict[dig][idx].items():
-                    for value in value_list:
-                        if i % 10 == 8:
-                            if value[0].split("_")[-2] in ["F"]:
-                                val_sub.append(value)
-                        elif i % 10 == 9:
-                            if value[0].split("_")[-2] in ["F"]:
-                                test_sub.append(value)
-                        else:
-                            train_sub.append(value)
-                    i += 1
-            self.train_list[dig], self.val_list[dig], self.test_list[dig]  = train_sub, val_sub, test_sub

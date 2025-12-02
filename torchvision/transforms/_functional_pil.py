@@ -109,10 +109,12 @@ def adjust_hue(img: Image.Image, hue_factor: float) -> Image.Image:
     h, s, v = img.convert("HSV").split()
 
     np_h = np.array(h, dtype=np.uint8)
-    # uint8 addition take cares of rotation across boundaries
-    with np.errstate(over="ignore"):
-        np_h += np.uint8(hue_factor * 255)
-    h = Image.fromarray(np_h, "L")
+    # numpy>=2.0 disallows casting negative python ints to uint8, so perform the shift
+    # in a signed space and wrap manually before converting back to uint8.
+    shift = int(hue_factor * 255)
+    if shift != 0:
+        np_h = (np_h.astype(np.int16, copy=False) + shift) % 256
+    h = Image.fromarray(np_h.astype(np.uint8, copy=False), "L")
 
     img = Image.merge("HSV", (h, s, v)).convert(input_mode)
     return img

@@ -1,40 +1,43 @@
 import os
 import sys
+import uuid
+import math
 
-# Add a abs path for importing modules
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+workspace_path = os.path.join(os.path.expanduser("~"), "dir/NIA")
+sys.path.insert(0, workspace_path)
+os.chdir(workspace_path)
 
+sys.stderr = open(sys.stderr.fileno(), mode="w", buffering=1)
+
+from utils import load_checkpoint, fix_seed
 import torch
-import gc
-from torch.utils import data
 import shutil
-import torch.nn as nn
 import numpy as np
-from torchvision import models
-from tensorboardX import SummaryWriter
-from utils import  mkdir, resume_checkpoint, fix_seed, CB_loss
+
 from logger import setup_logger
-from tool.data_loader import CustomDataset_class, CustomDataset_regress
-from model import Model
+from tool.data_loader import CustomDataset
 import argparse
+from torch.utils.data import WeightedRandomSampler
 
-fix_seed(523)
-git_name = os.popen("git branch --show-current").readlines()[0].rstrip()
-
+from tool.model import Model
+from torchvision import models
 
 def parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
         "--name",
-        default="none",
+        default="1st_test",
         type=str,
     )
 
-    parser.add_argument("--equ", type=int, default=[1], choices=[1, 2, 3], nargs="+")
-
-    parser.add_argument("--stop_early", type=int, default=50)
+    parser.add_argument(
+        "--equ",
+        type=int,
+        nargs="+",
+        default=[1],
+        choices=[1, 2, 3],
+    )
 
     parser.add_argument(
         "--mode",
@@ -44,15 +47,57 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--output_dir",
-        default=f"checkpoint/{git_name}",
+        "--epoch",
+        default=100,
+        type=int,
+    )
+
+    parser.add_argument(
+        "--warmup_epochs",
+        default=5,
+        type=int,
+    )
+
+    parser.add_argument(
+        "--warmup_ratio",
+        default=0.1,
+        type=float,
+        help="Fallback ratio of total epochs to use for warmup when warmup_epochs <= 0",
+    )
+
+    parser.add_argument(
+        "--lr_min_scale",
+        default=0.01,
+        type=float,
+    )
+
+    parser.add_argument(
+        "--lr_min",
+        default=None,
+        type=float,
+        help="Absolute minimum learning rate; defaults to lr * lr_min_scale",
+    )
+
+    parser.add_argument(
+        "--lr_scheduler",
+        default="cosine",
+        choices=["cosine", "multistep"],
         type=str,
     )
 
     parser.add_argument(
-        "--epoch",
-        default=200,
+        "--decay_milestones",
         type=int,
+        nargs="+",
+        default=[5, 10, 15],
+        help="Epochs (0-indexed) at which to decay LR for multistep scheduler",
+    )
+
+    parser.add_argument(
+        "--decay_gamma",
+        default=0.5,
+        type=float,
+        help="Multiplicative gamma applied at each milestone for multistep scheduler",
     )
 
     parser.add_argument(
@@ -62,20 +107,39 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--gamma",
-        default=2,
-        type=int,
+        "--aug_level",
+        default="light",
+        choices=["none", "light", "medium", "heavy"],
+        help="Controls strength of train-time augmentations applied to cropped facial patches.",
     )
 
     parser.add_argument(
-        "--load_epoch",
-        default=0,
-        type=int,
+        "--allow_hflip",
+        action="store_true",
+        help="Enable horizontal flips during augmentation (disable if left/right areas differ).",
+    )
+
+    parser.add_argument(
+        "--gamma",
+        default=2,
+        type=float,
+    )
+    parser.add_argument(
+        "--distance_loss_weight",
+        default=1.0,
+        type=float,
+        help="Scales additional ordinal penalty so farther misclassifications incur higher loss.",
     )
 
     parser.add_argument(
         "--lr",
-        default=0.005,
+        default=0.0001,
+        type=float,
+    )
+
+    parser.add_argument(
+        "--patience",
+        default=5,
         type=float,
     )
 
@@ -86,24 +150,76 @@ def parse_args():
     )
     
     parser.add_argument(
-        "--num_workers",
-        default=8,
+        "--grad_accum_steps",
+        default=1,
+        type=int,
+        help="Accumulate gradients over this many mini-batches before each optimizer step.",
+    )
+    
+    parser.add_argument(
+        "--effective_batch_size",
+        default=None,
+        type=int,
+        help="Optional target batch size achieved via gradient accumulation (overrides grad_accum_steps).",
+    )
+
+    parser.add_argument(
+        "--stop_early",
+        default=10,
         type=int,
     )
 
+    parser.add_argument(
+        "--grad_clip",
+        default=1.0,
+        type=float,
+    )
+
+    parser.add_argument("--turn_epoch", action="store_true")
     parser.add_argument("--reset", action="store_true")
+    parser.add_argument("--ddp", action="store_true")
 
     args = parser.parse_args()
+    args.num_workers = 8
+
+    args.decay_milestones = sorted({m for m in args.decay_milestones if m >= 0})
+    args.decay_gamma = max(0.0, min(1.0, args.decay_gamma))
+    args.warmup_ratio = max(0.0, min(0.5, args.warmup_ratio))
+    args.distance_loss_weight = max(0.0, float(args.distance_loss_weight))
+
+    if args.warmup_epochs <= 0:
+        args.warmup_epochs = max(1, int(args.epoch * args.warmup_ratio))
+    args.warmup_epochs = min(args.warmup_epochs, max(1, args.epoch - 1))
+
+    if args.lr_min is None:
+        args.lr_min = max(1e-8, args.lr * args.lr_min_scale)
+    else:
+        args.lr_min = max(1e-8, args.lr_min)
+        args.lr_min_scale = args.lr_min / max(args.lr, 1e-12)
 
     return args
 
-
 def main(args):
-    check_path = os.path.join(args.output_dir, args.mode, args.name)
-    log_path = os.path.join("tensorboard", git_name, args.mode, args.name)
+    args.grad_accum_steps = max(1, int(getattr(args, "grad_accum_steps", 1)))
+    
+    if args.effective_batch_size is not None:
+        args.effective_batch_size = max(args.batch_size, int(args.effective_batch_size))
+        args.grad_accum_steps = max(
+            1, math.ceil(args.effective_batch_size / args.batch_size)
+        )
+    else:
+        args.effective_batch_size = args.batch_size * args.grad_accum_steps
 
+    seed = args.name.split("st")[0]
+    if seed.isdigit():
+        ValueError, f"It's not correct name, {args.name} -> {seed}"
+
+    fix_seed(int(seed))
+    args.seed = int(seed)
+
+    check_path = os.path.join("checkpoint", args.mode, args.name)
     model_num_class = (
-        {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 7, "wrinkle": 7}
+        {"dryness": 5, "pigmentation": 6, "pore": 6, "sagging": 6, "wrinkle": 7}
         if args.mode == "class"
         else {
             "pigmentation": 1,
@@ -118,110 +234,142 @@ def main(args):
     args.best_loss = {item: np.inf for item in model_num_class}
     args.load_epoch = {item: 0 for item in model_num_class}
 
+
     model_list = {
-        key: models.resnet50(weights=models.ResNet50_Weights.DEFAULT, args=args)
-        for key, _ in model_num_class.items()
+        key: models.resnet50(num_classes=value)
+        for key, value in model_num_class.items()
     }
 
     model_path = os.path.join(check_path, "save_model")
-        
-    for key, model in model_list.items(): 
-        model.fc = nn.Linear(model.fc.in_features, model_num_class[key], bias = True)
-        model_list.update({key: model})
-        
-
-    args.save_img = os.path.join(check_path, "save_img")
     args.pred_path = os.path.join(check_path, "prediction")
 
     if args.reset:
         print(f"\033[90mReseting......{check_path}\033[0m")
         if os.path.isdir(check_path):
             shutil.rmtree(check_path)
-        if os.path.isdir(log_path):
-            shutil.rmtree(log_path)
 
-    if os.path.isdir(model_path):
-        for path in os.listdir(model_path):
-            dig_path = os.path.join(model_path, path)
-            if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
-                print(f"\033[92mResuming......{dig_path}\033[0m")
-                model_list[path] = resume_checkpoint(
-                    args,
-                    model_list[path],
-                    os.path.join(model_path, f"{path}", "state_dict.bin"),
-                    path, 
-                )
-                if os.path.isdir(os.path.join(dig_path, "done")):
-                    print(f"\043[92mPassing......{dig_path}\043[0m")
-                    pass_list.append(path)
-
-    mkdir(model_path)
-    mkdir(log_path)
-    writer = SummaryWriter(log_path)
+    loading = False
+    if os.path.isdir(os.path.join(model_path, "pigmentation")):
+        loading, model_list, pass_list, info, global_step, _ = load_checkpoint(
+            args, model_path, model_list, pass_list, loading
+        )
 
     logger = setup_logger(
         args.name + args.mode, os.path.join(check_path, "log", "train")
     )
-    logger.info(args)
-    logger.info("Command Line: " + " ".join(sys.argv))
+    logger.info(f"Command Line: " + " ".join(sys.argv))
 
-    dataset = (
-        CustomDataset_class(args, logger, "train")
+    train_dataset = (
+        CustomDataset(args, logger, mode="train")
         if args.mode == "class"
-        else CustomDataset_regress(args, logger)
+        else CustomDataset(args, logger, mode="train")
+    )
+
+    val_dataset = (
+        CustomDataset(args, logger, mode="val")
+        if args.mode == "class"
+        else CustomDataset(args, logger, mode="val")
+    )
+
+    test_dataset = (
+        CustomDataset(args, logger, "test")
+        if args.mode == "class"
+        else CustomDataset(args, logger, "test")
     )
 
     for key in model_list:
         if key in pass_list:
             continue
-
+        
+        wandb_run = None
         model = model_list[key].cuda()
 
-        trainset, grade_num = dataset.load_dataset("train", key)
-        trainset_loader = data.DataLoader(
-            dataset=trainset,
-            batch_size=args.batch_size,
-            num_workers=args.num_workers,
-            shuffle=True,
+        train_data, _ = train_dataset.load_dataset(key)
+        val_data, _ = val_dataset.load_dataset(key)
+
+        merged_data = train_data + val_data
+
+        num_classes = model_num_class[key]
+        class_counts = [0] * num_classes
+
+        for sample in merged_data:
+            label_value = int(sample[1])
+            if label_value < 0 or label_value >= num_classes:
+                raise ValueError(
+                    f"Label value {label_value} for {key} out of range [0, {num_classes - 1}]"
+                )
+            class_counts[label_value] += 1
+
+        grade_num = [max(1, count) for count in class_counts]
+
+        class_weights = np.asarray(grade_num, dtype=np.float32)
+        class_weights = 1.0 / np.sqrt(class_weights)
+        class_weights /= np.sum(class_weights)
+        class_weights = np.nan_to_num(class_weights, nan=0.0, posinf=0.0, neginf=0.0)
+
+        sample_weights = [class_weights[int(sample[1])] for sample in merged_data]
+        sample_weights = torch.as_tensor(sample_weights, dtype=torch.double)
+
+        sampler = WeightedRandomSampler(
+            weights=sample_weights,
+            num_samples=len(merged_data),
+            replacement=True,
         )
 
-        valset, _ = dataset.load_dataset("valid", key)
-        valset_loader = data.DataLoader(
-            dataset=valset,
+        trainset_loader = torch.utils.data.DataLoader(
+            dataset=merged_data,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            shuffle=False,
+            sampler=sampler,
+        )
+
+        test_data, _ = test_dataset.load_dataset(key)
+        testset_loader = torch.utils.data.DataLoader(
+            dataset=test_data,
             batch_size=args.batch_size,
             num_workers=args.num_workers,
             shuffle=False,
         )
 
-        resnet_model = Model(
-            args,
-            model,
-            trainset_loader,
-            valset_loader,
-            logger,
-            check_path,
-            model_num_class,
-            writer,
-            key,
-            grade_num
+        each_model = Model(
+            args=args,
+            model=model,
+            temp_model=None,
+            train_loader=trainset_loader,
+            valid_loader=testset_loader,
+            logger=logger,
+            best_loss=args.best_loss,
+            check_path=check_path,
+            model_num_class=model_num_class,
+            wandb_run=wandb_run,
+            m_dig=key,
+            grade_num=grade_num,
+            info=info if loading else None,
+            global_step=global_step if loading else 0,
         )
 
         for epoch in range(args.load_epoch[key], args.epoch):
-            resnet_model.update_e(epoch + 1) if args.load_epoch else None
+            if args.load_epoch[key]:
+                each_model.update_e(epoch + 1, **info)
 
-            resnet_model.train()
-            resnet_model.valid()
+            if epoch == 10 and args.turn_epoch:
+                trainset_loader = torch.utils.data.DataLoader(
+                    dataset=merged_data,
+                    batch_size=args.batch_size,
+                    num_workers=args.num_workers,
+                    shuffle=True,
+                )
+                each_model.train_loader = trainset_loader
 
-            resnet_model.update_e(epoch + 1)
-            resnet_model.reset_log()
+            each_model.train()
+            each_model.valid()
+            each_model.reset_log()
 
-            if resnet_model.stop_early():
+            if each_model.stop_early():
                 break
 
-        del trainset_loader, valset_loader
-
-        torch.cuda.empty_cache()
-        gc.collect()
+        each_model.print_best()
 
 
 if __name__ == "__main__":

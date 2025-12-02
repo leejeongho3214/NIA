@@ -1,25 +1,44 @@
 import random
+import shutil
+import sys
 import cv2
 import numpy as np
 import torch
-import inspect
+from torch.utils import data
 import errno
 import os
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.utils import make_grid
-from torchvision import transforms
+import yaml
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
 else:
     device = torch.device("cpu")
 
-def collate_fn(data): # img, grade, img_name, dig, meta
+
+import torch
+import torch.nn as nn
+
+class CharbonnierLoss(nn.Module):
+    def __init__(self, eps=1e-6):
+        super(CharbonnierLoss, self).__init__()
+        self.eps = eps
+
+    def forward(self, prediction, target):
+        diff = prediction - target
+        loss = torch.sqrt(diff ** 2 + self.eps ** 2)
+        return torch.mean(loss)
+    
+    
+
+def collate_fn(data):  # img, grade, img_name, dig, meta
     # for img, grade, img_name, dig, meta in data:
-        
+
     #     data.append()
     pass
+
 
 def softmax(x):
     e_x = torch.exp(x - torch.max(x, dim=1, keepdim=True).values)
@@ -27,19 +46,32 @@ def softmax(x):
     return e_x / torch.sum(e_x, dim=1).unsqueeze(dim=1)
 
 
-def resume_checkpoint(args, model, path, dig, test = True):
-    state_dict = torch.load(path, map_location=device)
+def resume_checkpoint(args, model, path, dig, test=True):
+    state_dict = torch.load(path, map_location=device, weights_only=False)
     if state_dict["best_loss"][dig] != np.inf and test:
         args.best_loss[dig] = state_dict["best_loss"][dig]
-    if test: args.load_epoch[dig] = state_dict["epoch"]
-    if 'batch_size' in state_dict:
+
+    if test:
+        args.load_epoch[dig] = state_dict["epoch"] + 1
+        info = state_dict["info"]
+    else:
+        info = None
+
+    if "batch_size" in state_dict:
         args.batch_size = state_dict["batch_size"]
-        if args.batch_size != state_dict['batch_size']:
-            print(f"batch_size update 128 ->> {args.batch_size}")
+        if args.batch_size != state_dict["batch_size"]:
+            print(f"batch_size update {state_dict['batch_size']} ->> {args.batch_size}")
     model.load_state_dict(state_dict["model_state"], strict=False)
+
+    info = state_dict["info"]
+    if any(key not in info.keys() for key in ["global_step", "run_id"]):
+        step, id = 0, None
+    else:
+        step, id = info["global_step"], info["run_id"]
     del state_dict
 
-    return model
+    return model, info, step, id
+
 
 class LabelSmoothingCrossEntropy(nn.Module):
     def __init__(self, smoothing):
@@ -48,18 +80,18 @@ class LabelSmoothingCrossEntropy(nn.Module):
 
     def forward(self, x, target, dig):
         gt = target.item()
-        
+
         smoothing = 0.5
         dim = 0
-        if (dig == 'wrinkle' and gt == 1) or (dig == 'pigmentation' and gt ==1):
-            target = torch.tensor([0, 1, 2], device = "cuda")
-            
-        elif dig == 'sagging' and gt == 0:
-            target = torch.tensor([0, 1], device = "cuda")
-            
-        elif (dig == 'pore' and gt ==2) or (dig == 'dryness' and gt ==2):
-            target = torch.tensor([1, 2, 3], device = "cuda")
-            
+        if (dig == "wrinkle" and gt == 1) or (dig == "pigmentation" and gt == 1):
+            target = torch.tensor([0, 1, 2], device="cuda")
+
+        elif dig == "sagging" and gt == 0:
+            target = torch.tensor([0, 1], device="cuda")
+
+        elif (dig == "pore" and gt == 2) or (dig == "dryness" and gt == 2):
+            target = torch.tensor([1, 2, 3], device="cuda")
+
         else:
             smoothing = self.smoothing
             dim = 1
@@ -128,48 +160,45 @@ def pred_image(self, img):
 
     return pred
 
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class FocalLoss(nn.Module):
-    def __init__(self, epoch = 0, alpha=1, gamma=3, reduction='mean'):
+    def __init__(self, epoch=0, alpha=1, gamma=3, reduction="mean"):
         super(FocalLoss, self).__init__()
         self.alpha = alpha
-        self.gamma = gamma 
+        self.gamma = gamma
         self.reduction = reduction
-        
 
     def forward(self, inputs, targets):
-        # ce_loss = F.cross_entropy(inputs, targets, reduction='none')
-        ce_loss = F.cross_entropy(inputs, targets.long(), reduction='none')
+        ce_loss = F.cross_entropy(inputs, targets, reduction="none")
         pt = torch.exp(-ce_loss)
         focal_loss = self.alpha * (1 - pt) ** self.gamma * ce_loss
 
-        if self.reduction == 'mean':
+        if self.reduction == "mean":
             return focal_loss.mean()
-        elif self.reduction == 'sum':
+        elif self.reduction == "sum":
             return focal_loss.sum()
         else:
             return focal_loss
 
 
+import torch.nn.functional as F
+
 
 class CB_loss(nn.Module):
-    def __init__(self, samples_per_cls, no_of_classes,  beta = 0.999, gamma = 2):
+    def __init__(self, samples_per_cls, no_of_classes, beta=0.999, gamma=2):
         super(CB_loss, self).__init__()
         (
             self.samples_per_cls,
             self.no_of_classes,
             self.beta,
             self.gamma,
-        ) = (
-            samples_per_cls,
-            no_of_classes,
-            beta,
-            gamma
-        )
-        
+        ) = (samples_per_cls, no_of_classes, beta, gamma)
+
     def focal_loss(self, logits, labels, alpha):
         """Compute the focal loss between `logits` and the ground truth `labels`.
 
@@ -186,26 +215,29 @@ class CB_loss(nn.Module):
 
         Returns:
         focal_loss: A float32 scalar representing normalized total loss.
-        """    
-        BCLoss = F.binary_cross_entropy_with_logits(input = logits, target = labels, reduction = "none")
+        """
+        logits = logits.clamp(min=-20.0, max=20.0)
+        BCLoss = F.binary_cross_entropy_with_logits(
+            input=logits, target=labels, reduction="none"
+        )
 
         if self.gamma == 0.0:
-            modulator = 1.0
+            loss = BCLoss
         else:
-            modulator = torch.exp(-self.gamma * labels * logits - self.gamma * torch.log(1 + 
-                torch.exp(-1.0 * logits)))
-
-        loss = modulator * BCLoss
+            probs = torch.sigmoid(logits)
+            pt = probs * labels + (1 - probs) * (1 - labels)
+            focal_weight = (1 - pt).clamp(min=0.0, max=1.0).pow(self.gamma)
+            loss = focal_weight * BCLoss
 
         weighted_loss = alpha * loss
         focal_loss = torch.sum(weighted_loss)
+        denom = labels.sum().clamp_min(1.0)
+        focal_loss = focal_loss / denom
+        focal_loss = torch.nan_to_num(focal_loss, nan=0.0, posinf=1e4, neginf=-1e4)
 
-        focal_loss /= torch.sum(labels)
         return focal_loss
-        
 
     def forward(self, logits, labels):
-
         """Compute the Class Balanced Loss between `logits` and the ground truth `labels`.
 
         Class Balanced Loss: ((1-beta)/(1-beta^n))*Loss(labels, logits)
@@ -223,40 +255,47 @@ class CB_loss(nn.Module):
         Returns:
         cb_loss: A float tensor representing class balanced loss
         """
-        
-        effective_num = 1.0 - np.power(self.beta, self.samples_per_cls)
-        weights = (1.0 - self.beta) / np.array(effective_num)
-        weights = weights / np.sum(weights) * self.no_of_classes
 
-        labels_one_hot = F.one_hot(labels.to(torch.int64), self.no_of_classes).float()
+        samples = np.array(self.samples_per_cls, dtype=np.float32)
+        effective_num = 1.0 - np.power(self.beta, samples)
+        effective_num = np.where(samples > 0, effective_num, np.nan)
+        weights = (1.0 - self.beta) / effective_num
+        weights = np.where(np.isfinite(weights), weights, 0.0)
+        weight_sum = np.sum(weights)
+        if weight_sum > 0:
+            weights = weights / weight_sum * self.no_of_classes
 
-        weights = torch.tensor(weights).float().cuda()
+        labels_one_hot = F.one_hot(labels, self.no_of_classes).float()
+
+        labels_one_hot = labels_one_hot.to(logits.device, logits.dtype)
+
+        weights = torch.tensor(weights, device=logits.device, dtype=logits.dtype)
         weights = weights.unsqueeze(0)
-        weights = weights.repeat(labels_one_hot.shape[0],1) * labels_one_hot
+        weights = weights.repeat(labels_one_hot.shape[0], 1) * labels_one_hot
         weights = weights.sum(1)
         weights = weights.unsqueeze(1)
-        weights = weights.repeat(1,self.no_of_classes)
+        weights = weights.repeat(1, self.no_of_classes)
 
         cb_loss = self.focal_loss(logits, labels_one_hot, weights)
-        
-        
-        return cb_loss
-    
-class mape_loss(nn.Module):
-    def __init__(self):
-        super(mape_loss, self).__init__()
-    
-    def forward(self, input, target):
-        error = abs(input - target)
-        error = error / target
-        
-        return error.mean()
-        
-        
-    
+        cb_loss = torch.nan_to_num(cb_loss, nan=0.0, posinf=1e4, neginf=-1e4)
 
-def save_checkpoint(self):
-    checkpoint_dir = os.path.join(self.args.output_dir, self.args.mode, self.args.name, "save_model", str(self.m_dig))
+        # cb_loss = F.binary_cross_entropy_with_logits(input = logits,target = labels_one_hot, weights = weights)
+
+        # pred = logits.softmax(dim = 1)
+        # cb_loss = F.binary_cross_entropy(input = pred, target = labels_one_hot, weight = weights)
+
+        return cb_loss
+
+
+def save_checkpoint(self, correct_, all_, micro_precision, correlation):
+    checkpoint_dir = os.path.join(
+        "checkpoint",
+        self.args.mode,
+        self.args.name,
+        "save_model",
+        str(self.m_dig),
+    )
+
     mkdir(checkpoint_dir)
     model_to_save = self.model.module if hasattr(self.model, "module") else self.model
     torch.save(
@@ -264,7 +303,19 @@ def save_checkpoint(self):
             "model_state": model_to_save.state_dict(),
             "epoch": self.epoch,
             "best_loss": self.best_loss,
-            "batch_size": self.args.batch_size
+            "batch_size": self.args.batch_size,
+            "info": {
+                "correct_": correct_,
+                "all_": all_,
+                "micro_precision": micro_precision,
+                "correlation": correlation,
+                "global_step": self.global_step,
+                "optimizer_state_dict": self.optimizer.state_dict(),
+                "scheduler_state_dict": self.scheduler.state_dict(),
+                "acc_": micro_precision,
+                "corre_": correlation,
+            },
+            
         },
         os.path.join(checkpoint_dir, "temp_file.bin"),
     )
@@ -273,8 +324,26 @@ def save_checkpoint(self):
         os.path.join(checkpoint_dir, "temp_file.bin"),
         os.path.join(checkpoint_dir, "state_dict.bin"),
     )
-    
+
+    self.update_c = 0
+    self.best_epoch = self.epoch
+    self.correct_ = correct_
+    self.all_ = all_
+    self.acc_ = micro_precision
+    self.corre_ = correlation
+
     return checkpoint_dir
+
+
+class mape_loss(nn.Module):
+    def __init__(self):
+        super(mape_loss, self).__init__()
+
+    def forward(self, input, target):
+        error = abs(input - target)
+        error = error / target
+
+        return error.mean()
 
 
 def mkdir(path):
@@ -301,27 +370,44 @@ def save_value(args, self):
 
 
 def save_image(self, img):
-    c_img = make_grid(img, nrow = int(self.args.batch_size / 4)).permute(1, 2, 0).detach().cpu().numpy() 
+    c_img = (
+        make_grid(img, nrow=int(self.args.batch_size / 4))
+        .permute(1, 2, 0)
+        .detach()
+        .cpu()
+        .numpy()
+    )
     max_v, min_v = c_img.max(), c_img.min()
     if min_v > 0:
         min_v = -min_v
     s_img = (c_img - min_v) * (255.0 / (max_v - min_v))
 
-    path = os.path.join(self.args.save_img, self.m_dig)
+    path = os.path.join(self.args.save_img, self.m_dig, self.phase)
     mkdir(path)
     img_mat = cv2.UMat(s_img)
     j = self.args.batch_size // 4
     for i, name in enumerate(self.img_names):
         x, y = (i % j * (256 + 2) + 2, i // j * (256 + 2) + 20)  # 위치 조절
-        cv2.putText(img_mat, name, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.41, (255, 255, 255), 1, cv2.LINE_AA)
-    cv2.imwrite(os.path.join(path, f"epoch_{self.epoch}_iter_{self.iter}_{self.m_dig}.jpg"), img_mat.get()[:, :, (2, 1, 0)])
+        cv2.putText(
+            img_mat,
+            name,
+            (x, y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.41,
+            (255, 255, 255),
+            1,
+            cv2.LINE_AA,
+        )
+
+    saved_image = cv2.cvtColor(img_mat.get(), cv2.COLOR_RGB2BGR).astype(np.uint8)
+    cv2.imwrite(
+        os.path.join(path, f"epoch_{self.epoch}_iter_{self.iter}_{self.m_dig}.jpg"),
+        saved_image,
+    )
+
 
 def fix_seed(random_seed):
-    
-    torch.use_deterministic_algorithms(True)
-    os.environ['PYTHONHASHSEED'] = str(random_seed)
-    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':16:8'
-    
+
     torch.manual_seed(random_seed)
     torch.cuda.manual_seed(random_seed)
     torch.cuda.manual_seed_all(random_seed)  # if use multi-GPU
@@ -329,3 +415,44 @@ def fix_seed(random_seed):
     torch.backends.cudnn.benchmark = False
     np.random.seed(random_seed)
     random.seed(random_seed)
+
+def load_checkpoint(args, model_path, model_list, pass_list, loading):
+    for path in os.listdir(model_path):
+        dig_path = os.path.join(model_path, path)
+        if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
+            print(f"\033[92mResuming......{dig_path}\033[0m")
+            model_list[path], info, global_step, run_id = resume_checkpoint(
+                args,
+                model_list[path],
+                os.path.join(model_path, f"{path}", "state_dict.bin"),
+                path, 
+            )
+            loading = True
+            if os.path.isdir(os.path.join(dig_path, "done")):
+                print(f"\043[92mPassing......{dig_path}\043[0m")
+                pass_list.append(path)
+                    
+    return loading, model_list, pass_list, info, global_step, run_id
+
+
+def save_code_copy(args, check_path, model_path):
+    code_path = os.path.join(check_path, "code")
+    for path in [model_path, code_path]:
+        mkdir(path)
+
+    for code_name in [
+        "tool/main.py",
+        "tool/data_loader.py",
+        "tool/model.py",
+        "custom_model/resnet.py",
+        "custom_model/coatnet.py",
+    ]:
+        shutil.copy(
+            os.path.join(os.getcwd(), code_name),
+            os.path.join(code_path, os.path.basename(code_name)),
+        )
+    args_dict = vars(args)
+    yaml_file_path = os.path.join(code_path, "config.yaml")
+    with open(yaml_file_path, "w") as yaml_file:
+        yaml.dump(args_dict, yaml_file, default_flow_style=False)
+        

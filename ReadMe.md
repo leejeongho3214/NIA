@@ -60,11 +60,6 @@
 - 마지막 fc-layer 출력 크기 = 등급 수
 - Task별로 분리된 모델 학습 (예: 주름, 모공, 건조도 등)
 
-```bash
-python tool/main.py --name "저장할 체크포인트 이름" --mode class   # 육안평가
-python tool/main.py --name "저장할 체크포인트 이름" --mode regression  # 기기 측정값
-```
-
 <p align="center">
   <img src="assets/figure1.png" width="1000">
 </p>
@@ -123,6 +118,12 @@ https://gofile.me/7wbhv/6Sqrj3JW4
     ├── img_crop.py
     ├── main.py
     └── test.py
+```
+
+### 학습 코드
+```bash
+python tool/main.py --name "저장할 체크포인트 이름" --mode class   # 육안평가
+python tool/main.py --name "저장할 체크포인트 이름" --mode regression  # 기기 측정값
 ```
 
 ### 테스트 코드

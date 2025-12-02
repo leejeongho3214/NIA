@@ -35,5 +35,6 @@ IEC_korea_data
 cam_output
 cam.py
 
+wandb
 
 NIA.tar
