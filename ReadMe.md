@@ -95,20 +95,30 @@
     - 방법 1: bbox 중심 기준 정사각형 crop  
     - 방법 2: bbox에 zero-padding 추가
 
+- 아래 json 파일로, 안면 이미지에서 새롭게 만든 bbox의 위치값 기준으로 이미지를 crop하고 cropped_img 폴더가 생생
+
 ```bash
 python tool/img_crop.py
 ```
 
-### 처리된 Json 파일
+### 방법 1로 bbox를 수정한 json 파일 (dataset/label)
 https://gofile.me/7wbhv/6Sqrj3JW4
 
-위 코드의 실행결과 값 입니다. password는 메일로 문의주세요.
+password는 메일로 문의주세요.
+
+### 모델 checkpoint (checkpoint)
+https://gofile.me/7wbhv/ulS4DItdK
+
+### 데이터셋 분할 json 파일 (dataset/split)
+- 각 Facial sign별로 등급을 기준으로 8:1:1을 랜덤하게 분할
+- Seed 1-4개로 구성돼 있음
+
+https://gofile.me/7wbhv/9lHdNM1yU
 
 ### 폴더 구조
-
 ```
 {$ROOT}
-├── dataset
+├── checkpoint
 │   ├── class
 │   └── regression
 │      └── 1st_cnn
@@ -125,6 +135,12 @@ https://gofile.me/7wbhv/6Sqrj3JW4
     ├── main.py
     └── test.py
 ```
+
+### 전처리 과정
+1. AI-hub에서 다운받은 안면 이미지에서 "img_crop.py" 코드로 영역 이미지를 추출
+    - 기존 json 파일에 있는 bbox는 영역에 딱 맞는 크기라, 정사각형으로 resizing 필요
+2. 등급을 고르게 학습시키기 위해, split 폴더 안에 train/val/test로 분할한 이미지 정보들이 담김
+3. 위 폴더 구조를 만족하면 아래 코드가 정상 동작할 것임
 
 ### 학습 코드
 ```bash
