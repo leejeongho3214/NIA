@@ -124,11 +124,10 @@ python tool/img_crop.py
 ```
 
 ## ✔ 모델 Checkpoint
-
-https://gofile.me/7wbhv/ulS4DItdK
+👉 [📦 모델 Checkpoint 다운로드](https://gofile.me/7wbhv/ulS4DItdK)
 
 ## ✔ 데이터셋 분할 파일 (dataset/split)
-https://gofile.me/7wbhv/9lHdNM1yU
+👉 [🗂️ 데이터셋 Split 다운로드](https://gofile.me/7wbhv/9lHdNM1yU)
 
 password는 이메일로 문의해주세요.
 
