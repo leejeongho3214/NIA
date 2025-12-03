@@ -106,11 +106,6 @@
 python tool/img_crop.py
 ```
 
-### 방법 1로 bbox를 수정한 json 파일 (dataset/label)
-https://gofile.me/7wbhv/6Sqrj3JW4
-
-password는 메일로 문의주세요.
-
 ### 모델 checkpoint (checkpoint)
 https://gofile.me/7wbhv/ulS4DItdK
 
@@ -119,6 +114,8 @@ https://gofile.me/7wbhv/ulS4DItdK
 - Seed 1-4개로 구성돼 있음
 
 https://gofile.me/7wbhv/9lHdNM1yU
+
+password는 메일로 문의주세요.
 
 ### 폴더 구조
 ```
