@@ -8,6 +8,11 @@
 [![Contact](https://img.shields.io/badge/Contact-Email-informational?logo=gmail)](mailto:72210297@dankook.ac.kr)
 
 ---
+## 🆕 업데이트
+
+**[25/12/03]** 
+- 모델 체크포인트 및 데이터셋 분할 파일 제공
+- 학습 및 테스트 코드 수정
 
 ## 📌 소개
 
