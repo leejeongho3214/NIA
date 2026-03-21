@@ -107,13 +107,12 @@ python tool/img_crop.py
 ```
 
 ### 모델 checkpoint (checkpoint)
-[https://gofile.me/7wbhv/ulS4DItdK](https://gofile.me/7wbhv/Lvjirgia7)
+https://gofile.me/7wbhv/TaZgLsAag
 
 ### 데이터셋 분할 json 파일 (dataset/split)
 - 각 Facial sign별로 등급을 기준으로 8:1:1을 랜덤하게 분할
 - Seed 1-4개로 구성돼 있음
-
-[https://gofile.me/7wbhv/9lHdNM1yU](https://gofile.me/7wbhv/n2tH28tfK)
+https://gofile.me/7wbhv/cstOyfCWw
 
 password는 메일로 문의주세요.
 
