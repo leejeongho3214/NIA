@@ -7,6 +7,10 @@
 [![Paper 3 (2024 KSC)](https://img.shields.io/badge/Paper-2024_KSC-orange)](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE12041791)
 [![Contact](https://img.shields.io/badge/Contact-Email-informational?logo=gmail)](mailto:72210297@dankook.ac.kr)
 
+<p align="center">
+  <img src="assets/ai_skin_assessment_overview_figure_polished.png" width="1000">
+</p>
+
 ---
 ## 🆕 업데이트
 **[26/03/21]**
