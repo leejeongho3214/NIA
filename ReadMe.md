@@ -8,7 +8,7 @@
 [![Contact](https://img.shields.io/badge/Contact-Email-informational?logo=gmail)](mailto:72210297@dankook.ac.kr)
 
 <p align="center">
-  <img src="assets/ai_skin_assessment_overview_figure_polished.png" width="1000">
+  <img src="assets/overview.png" width="1000">
 </p>
 
 ---
