@@ -112,7 +112,7 @@
 python tool/img_crop.py
 ```
 
-### 모델 checkpoint (checkpoint)
+### 모델 checkpoint
 https://gofile.me/7wbhv/TaZgLsAag
 
 ### 데이터셋 분할 json 파일 (dataset/split)
