@@ -193,7 +193,7 @@ python tool/test.py --name "저장된 체크포인트 이름" --mode regression
 | 연도 | 학회/논문지 | 제목 링크 | 비고 |
 | --- | --- | --- | --- |
 | 2026 | Skin Research and Technology (SCIE) | [바로가기](https://doi.org/10.1111/srt.70375) | 대표 논문 |
-| 2025 | 정보과학회 컴퓨팅의 실제 논문지 (KTCP) | [바로가기](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE12252203) | — |
+| 2025 | 정보과학회 컴퓨팅의 실제 논문지 (KTCP) | [바로가기](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE12252203) | 초청논문 |
 | 2024 | 정보과학회 KSC | [바로가기](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE12041791) | 🏆 우수논문상 |
 | 2024 | 정보과학회 KCC | [바로가기](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE11862094) | 🏅 우수발표논문상 |
 
