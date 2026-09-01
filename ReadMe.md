@@ -7,7 +7,6 @@
 [![Project Page](https://img.shields.io/badge/Project-Homepage-brightgreen)](https://leejeongho3214.github.io/NIA)
 [![Dataset in AI-Hub](https://img.shields.io/badge/Dataset-AI--Hub-blue)](https://www.aihub.or.kr/aihubdata/data/view.do?currMenu=&topMenu=&aihubDataSe=data&dataSetSn=71645)
 [![Paper - SRT 2026](https://img.shields.io/badge/Paper-SRT_2026_(SCIE)-b31b1b)](https://doi.org/10.1111/srt.70375)
-[![DOI](https://img.shields.io/badge/DOI-10.1111%2Fsrt.70375-informational)](https://doi.org/10.1111/srt.70375)
 [![Contact](https://img.shields.io/badge/Contact-Email-informational?logo=gmail)](mailto:72210297@dankook.ac.kr)
 
 </div>
@@ -19,8 +18,8 @@
 > **Artificial Intelligence Based Skin Analysis Models for Predicting Visual Grades and Device Measured Physiological Values From Facial Images**
 >
 > Eunyoung Lee, **Jeongho Lee**, Nahee Kim, Junchae Na, Byungcheol Park, Sang-Il Choi
-> *Skin Research and Technology*, Vol. 32, No. 9, e70375 (2026)
-> [📄 Paper](https://doi.org/10.1111/srt.70375) · [🔗 DOI: 10.1111/srt.70375](https://doi.org/10.1111/srt.70375)
+> *Skin Research and Technology*, Vol. 32, No. 9, e70375 (2026) · Open Access (CC BY 4.0)
+> 📄 [https://doi.org/10.1111/srt.70375](https://doi.org/10.1111/srt.70375)
 
 본 저장소의 데이터셋과 모델을 기반으로, 얼굴 이미지로부터 **전문의 육안 등급**과 **기기 측정 생리값**을 동시에 예측하는 AI 프레임워크를 제안한 연구입니다. 한국인 1,099명(14–69세), 3가지 촬영 장비 환경에서 검증되었습니다.
 
@@ -194,7 +193,7 @@ python tool/test.py --name "저장된 체크포인트 이름" --mode regression
 | 연도 | 학회/논문지 | 제목 링크 | 비고 |
 | --- | --- | --- | --- |
 | 2026 | Skin Research and Technology (SCIE) | [바로가기](https://doi.org/10.1111/srt.70375) | 대표 논문 |
-| 2025 | 정보과학회 컴퓨팅의 실제 논문지 (KTCP) | [바로가기](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE12252203) | 초청논문 |
+| 2025 | 정보과학회 컴퓨팅의 실제 논문지 (KTCP) | [바로가기](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE12252203) | — |
 | 2024 | 정보과학회 KSC | [바로가기](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE12041791) | 🏆 우수논문상 |
 | 2024 | 정보과학회 KCC | [바로가기](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE11862094) | 🏅 우수발표논문상 |
 
