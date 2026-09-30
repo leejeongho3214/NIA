@@ -108,8 +108,8 @@
 | 리소스 | 링크 | 배치 위치 |
 | --- | --- | --- |
 | 원본 얼굴 이미지 · 라벨 | [AI-Hub](https://www.aihub.or.kr/aihubdata/data/view.do?currMenu=&topMenu=&aihubDataSe=data&dataSetSn=71645) | `dataset/img`, `dataset/label` |
-| 모델 checkpoint | [gofile.me/7wbhv/TaZgLsAag](https://gofile.me/7wbhv/TaZgLsAag) | `checkpoint/` |
-| 데이터셋 분할 json | [gofile.me/7wbhv/cstOyfCWw](https://gofile.me/7wbhv/cstOyfCWw) | `dataset/split` |
+| 모델 checkpoint | [Checkpoint](https://gofile.me/7wbhv/FpFhxyCZX) | `checkpoint/` |
+| 데이터셋 분할 json | [Split](https://gofile.me/7wbhv/hpeVMNNOg) | `dataset/split` |
 
 > 🔑 압축 파일 **Password는 이메일로 문의**해 주세요. → [72210297@dankook.ac.kr](mailto:72210297@dankook.ac.kr)
 >
