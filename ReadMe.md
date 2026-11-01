@@ -1,8 +1,8 @@
 <div align="center">
 
-# 🇰🇷 한국인 피부상태 측정 데이터
+# 🇰🇷 Korean Skin Condition Measurement Dataset
 
-**최초의 한국인 피부상태 AI 데이터셋 & 피부 진단 AI 모델**
+**The first AI dataset of Korean skin conditions & AI models for skin diagnosis**
 
 [![Project Page](https://img.shields.io/badge/Project-Homepage-brightgreen)](https://leejeongho3214.github.io/NIA)
 [![Dataset in AI-Hub](https://img.shields.io/badge/Dataset-AI--Hub-blue)](https://www.aihub.or.kr/aihubdata/data/view.do?currMenu=&topMenu=&aihubDataSe=data&dataSetSn=71645)
@@ -13,7 +13,7 @@
 
 ---
 
-## 📢 대표 논문
+## 📢 Main Paper
 
 > **Artificial Intelligence Based Skin Analysis Models for Predicting Visual Grades and Device Measured Physiological Values From Facial Images**
 >
@@ -21,101 +21,103 @@
 > *Skin Research and Technology*, Vol. 32, No. 9, e70375 (2026) · Open Access (CC BY 4.0)
 > 📄 [https://doi.org/10.1111/srt.70375](https://doi.org/10.1111/srt.70375)
 
-본 저장소의 데이터셋과 모델을 기반으로, 얼굴 이미지로부터 **전문의 육안 등급**과 **기기 측정 생리값**을 동시에 예측하는 AI 프레임워크를 제안한 연구입니다. 한국인 1,099명(14–69세), 3가지 촬영 장비 환경에서 검증되었습니다.
+Built on the dataset and models in this repository, this work proposes an AI framework that predicts both **dermatologists' visual grades** and **device-measured physiological values** from facial images. It was validated on 1,099 Korean participants (aged 14–69) across three capture-device settings.
 
 ---
 
-## 🆕 업데이트
+## 🆕 News
 
-| 날짜 | 내용 |
+| Date | Update |
 | --- | --- |
-| **26/09/01** | 🎉 *Skin Research and Technology* (SCIE) 논문 게재 — [10.1111/srt.70375](https://doi.org/10.1111/srt.70375) |
-| **26/03/21** | 모델 checkpoint 및 데이터셋 공유 링크 재업로드 |
-| **25/12/03** | 모델 체크포인트 및 데이터셋 분할 파일 제공, 학습·테스트 코드 수정 |
+| **2026-09-01** | 🎉 Paper published in *Skin Research and Technology* (SCIE) — [10.1111/srt.70375](https://doi.org/10.1111/srt.70375) |
+| **2026-03-21** | Re-uploaded the model checkpoint and dataset split download links |
+| **2025-12-03** | Released model checkpoints and dataset split files; updated training and test code |
 
 ---
 
-## 📌 소개
+## 📌 Overview
 
-- **최초의 한국인 피부상태 AI 데이터셋**
-- **참여자**: 남녀 1,100명, 연령 10대~60대 이상
-- **촬영 장비 3종**: 디지털 카메라(DSLR), 스마트패드, 스마트폰
-- **최대 7가지 각도**의 다각도 얼굴 이미지
-- 모든 이미지에 **8개 주요 얼굴 영역의 BBox** 포함
-- **전문의 육안 평가 + 정밀 기기 측정값** 동시 제공
+- **The first AI dataset of Korean skin conditions**
+- **Participants**: 1,100 men and women, from their teens to their 60s and older
+- **Three capture devices**: digital camera (DSLR), tablet, and smartphone
+- Multi-view facial images from **up to 7 angles**
+- **Bounding boxes for 8 key facial regions** on every image
+- Both **dermatologist visual assessments** and **precision instrument measurements**
 
 ---
 
-## 🗂️ 데이터 구성
+## 🗂️ Dataset Composition
 
-### 📷 이미지
+### 📷 Images
 
-| 장비 | 촬영 각도 | 비고 |
+| Device | Angles | Notes |
 | --- | --- | --- |
-| 디지털 카메라 | 7 각도 | 암막실, 얼굴 고정 장치 사용 |
-| 스마트패드 | 3 각도 | 배경·조명 조건 통제 |
-| 스마트폰 | 3 각도 | 배경·조명 조건 통제 |
+| Digital camera | 7 | Darkroom, with a face-fixing apparatus |
+| Tablet | 3 | Controlled background and lighting |
+| Smartphone | 3 | Controlled background and lighting |
 
-### 🏷️ 라벨링
+### 🏷️ Labels
 
-**① 전문의 육안 평가 (`class`)**
+**① Dermatologist visual assessment (`class`)**
 
-- 국내 피부과 전문의 5인 참여
-- 평가 항목: 색소침착, 입술건조도, 모공, 턱선처짐, 주름 등
-- 항목별 등급 범위 상이
+- Graded by 5 board-certified Korean dermatologists
+- Items: pigmentation, lip dryness, pores, jawline sagging, wrinkles, and more
+- The grade range differs by item
 
-**② 정밀 측정 장비값 (`regression`)**
+**② Precision instrument measurements (`regression`)**
 
-- SCI급 논문 및 식약처 인증 기반 장비 사용
-- 측정 항목: 모공, 색소침착, 주름, 수분, 탄력
+- Devices validated in SCI-indexed publications and certified by the Korean Ministry of Food and Drug Safety (MFDS)
+- Items: pores, pigmentation, wrinkles, hydration, and elasticity
 
-### 🧪 실험 환경
+### 🧪 Acquisition Protocol
 
-- 세면 후 **항온·항습실**에서 건조 → 촬영
-- 디지털 카메라 촬영은 **암막실**에서 얼굴 고정 장치를 활용
+- After face washing, participants acclimated in a **temperature- and humidity-controlled room** before capture
+- Digital camera images were taken in a **darkroom** using a face-fixing apparatus
 
 ---
 
-## 🧠 피부 진단 AI 모델
+## 🧠 Skin Diagnosis AI Models
 
-### 모델 구조
+### Architecture
 
 - **Backbone**: ResNet-50
-- 마지막 fc-layer 출력 크기 = 해당 task의 등급 수
-- Task(주름, 모공, 건조도 등)별로 **분리된 모델**을 각각 학습
+- The output size of the final fc layer equals the number of grades for the task
+- A **separate model** is trained for each task (wrinkles, pores, dryness, etc.)
 
-### 손실 함수
+### Loss Function
 
-- Cross-Entropy는 등급 불균형으로 과적합이 발생
-- → **Focal Loss** 또는 **Class-balanced Loss** 사용
+- Cross-entropy overfits due to grade imbalance
+- → We use **Focal Loss** or **Class-balanced Loss** instead
 
-### 학습 설정
+### Training Setup
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
 | Optimizer | Adam |
 | Learning rate | 0.005 |
-| Epoch | 100 |
+| Epochs | 100 |
 | Train / Val / Test | 8 : 1 : 1 |
-| Split 방식 | 등급 분포를 고려한 stratified split |
+| Split strategy | Stratified split based on grade distribution |
 
 ---
 
-## 🚀 시작하기
+## 🚀 Getting Started
 
-### 1. 리소스 내려받기
+### 1. Download Resources
 
-| 리소스 | 링크 | 배치 위치 |
+| Resource | Link | Location |
 | --- | --- | --- |
-| 원본 얼굴 이미지 · 라벨(AI-Hub) | [Link](https://www.aihub.or.kr/aihubdata/data/view.do?currMenu=&topMenu=&aihubDataSe=data&dataSetSn=71645) | `dataset/img`, `dataset/label` |
-| 모델 checkpoint | [Link](https://gofile.me/7wbhv/FpFhxyCZX) | `checkpoint/` |
-| 데이터셋 분할 json | [Link](https://gofile.me/7wbhv/hpeVMNNOg) | `dataset/split` |
+| Raw facial images & labels (AI-Hub) | [Link](https://www.aihub.or.kr/aihubdata/data/view.do?currMenu=&topMenu=&aihubDataSe=data&dataSetSn=71645) | `dataset/img`, `dataset/label` |
+| Model checkpoints | [Link](https://gofile.me/7wbhv/FpFhxyCZX) | `checkpoint/` |
+| Dataset split JSON | [Link](https://gofile.me/7wbhv/hpeVMNNOg) | `dataset/split` |
 
-> 🔑 압축 파일 **Password는 이메일로 문의**해 주세요. → [72210297@dankook.ac.kr](mailto:72210297@dankook.ac.kr)
+> 🔑 To get the **password** for the archives, please contact us by email → [72210297@dankook.ac.kr](mailto:72210297@dankook.ac.kr)
 >
-> 분할 json은 각 facial sign별로 등급을 기준으로 8:1:1을 랜덤 분할한 결과이며, **Seed 1–4** 총 4세트로 구성되어 있습니다.
+> The split JSON files contain random 8:1:1 splits stratified by grade for each facial sign, provided as four sets (**seeds 1–4**).
 
-### 2. 폴더 구조
+> ℹ️ The raw data is hosted on [AI-Hub](https://www.aihub.or.kr). Access may require an AI-Hub account and a data-use application; please check AI-Hub's policy for overseas users.
+
+### 2. Directory Structure
 
 ```
 {$ROOT}
@@ -126,10 +128,10 @@
 │           └── save_model
 │
 ├── dataset
-│   ├── img            # AI-Hub 원본 이미지
-│   ├── label          # AI-Hub 라벨(json)
-│   ├── split          # train/val/test 분할 json
-│   └── cropped_img    # img_crop.py 출력
+│   ├── img            # raw images from AI-Hub
+│   ├── label          # AI-Hub labels (json)
+│   ├── split          # train/val/test split json
+│   └── cropped_img    # output of img_crop.py
 │
 └── tool
     ├── img_crop.py
@@ -137,39 +139,39 @@
     └── test.py
 ```
 
-### 3. 전처리 — 이미지 Crop
+### 3. Preprocessing — Image Cropping
 
-CNN 입력을 위해 정사각형 이미지가 필요합니다. 원본 json의 bbox는 영역에 딱 맞는 크기이므로 정사각형으로 재조정해야 합니다.
+The CNN expects square inputs. Since the bboxes in the original JSON fit tightly around each region, they must be resized to squares, using either:
 
-- **방법 1**: bbox 중심 기준 정사각형 crop
-- **방법 2**: bbox에 zero-padding 추가
+- **Option 1**: a square crop centered on the bbox
+- **Option 2**: zero-padding the bbox
 
 ```bash
 python tool/img_crop.py
 ```
 
-### 4. 학습
+### 4. Training
 
 ```bash
-# 전문의 육안 평가 등급 예측
-python tool/main.py --name "저장할 체크포인트 이름" --mode class
+# Predict dermatologist visual grades
+python tool/main.py --name "CHECKPOINT_NAME" --mode class
 
-# 기기 측정값 예측
-python tool/main.py --name "저장할 체크포인트 이름" --mode regression
+# Predict instrument-measured values
+python tool/main.py --name "CHECKPOINT_NAME" --mode regression
 ```
 
-### 5. 테스트
+### 5. Testing
 
 ```bash
-python tool/test.py --name "저장된 체크포인트 이름" --mode class
-python tool/test.py --name "저장된 체크포인트 이름" --mode regression
+python tool/test.py --name "CHECKPOINT_NAME" --mode class
+python tool/test.py --name "CHECKPOINT_NAME" --mode regression
 ```
 
 ---
 
 ## 📚 Citation
 
-본 데이터셋 또는 코드를 사용하실 경우 아래 논문을 인용해 주세요.
+If you use this dataset or code, please cite:
 
 ```bibtex
 @article{lee2026skin,
@@ -188,19 +190,19 @@ python tool/test.py --name "저장된 체크포인트 이름" --mode regression
 
 ---
 
-## 📰 관련 발표 논문
+## 📰 Related Publications
 
-| 연도 | 학회/논문지 | 제목 링크 | 비고 |
+| Year | Venue | Link | Notes |
 | --- | --- | --- | --- |
-| 2026 | Skin Research and Technology (SCIE) | [바로가기](https://doi.org/10.1111/srt.70375) | 대표 논문 |
-| 2025 | 정보과학회 컴퓨팅의 실제 논문지 (KTCP) | [바로가기](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE12252203) | 초청논문 |
-| 2024 | 정보과학회 KSC | [바로가기](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE12041791) | 🏆 우수논문상 |
-| 2024 | 정보과학회 KCC | [바로가기](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE11862094) | 🏅 우수발표논문상 |
+| 2026 | Skin Research and Technology (SCIE) | [Paper](https://doi.org/10.1111/srt.70375) | Main paper |
+| 2025 | KIISE Transactions on Computing Practices (KTCP) | [Paper](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE12252203) | Invited paper |
+| 2024 | Korea Software Congress (KSC), KIISE | [Paper](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE12041791) | 🏆 Outstanding Paper Award |
+| 2024 | Korea Computer Congress (KCC), KIISE | [Paper](https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE11862094) | 🏅 Outstanding Presentation Award |
 
 ---
 
-## 📬 문의
+## 📬 Contact
 
-> 단국대학교 컴퓨터학과 박사과정
-> **이정호 (Jeongho Lee)**
+> Ph.D. Student, Department of Computer Science, Dankook University
+> **Jeongho Lee**
 > 📧 [72210297@dankook.ac.kr](mailto:72210297@dankook.ac.kr)
