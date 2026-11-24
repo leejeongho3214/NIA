@@ -3,7 +3,7 @@ import sys
 import uuid
 import math
 
-workspace_path = os.path.join(os.path.expanduser("~"), "dir/NIA")
+workspace_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, workspace_path)
 os.chdir(workspace_path)
 
@@ -125,10 +125,18 @@ def parse_args():
         type=float,
     )
     parser.add_argument(
-        "--distance_loss_weight",
-        default=1.0,
+        "--ordinal_loss_weight",
+        default=0.3,
         type=float,
-        help="Scales additional ordinal penalty so farther misclassifications incur higher loss.",
+        help="Class mode: weight of the smooth-L1 loss between the expected grade and the GT grade.",
+    )
+
+    parser.add_argument(
+        "--checkpoint_metric",
+        default="ordinal_mae",
+        choices=["loss", "corr", "ordinal_mae"],
+        type=str,
+        help="Class mode: validation metric used to select the best checkpoint.",
     )
 
     parser.add_argument(
@@ -165,8 +173,10 @@ def parse_args():
 
     parser.add_argument(
         "--stop_early",
-        default=10,
+        default=11,
         type=int,
+        help="Stop after this many consecutive epochs without validation improvement. "
+        "11 reproduces the released ResNet50 runs (their code used `> 10`).",
     )
 
     parser.add_argument(
@@ -185,7 +195,6 @@ def parse_args():
     args.decay_milestones = sorted({m for m in args.decay_milestones if m >= 0})
     args.decay_gamma = max(0.0, min(1.0, args.decay_gamma))
     args.warmup_ratio = max(0.0, min(0.5, args.warmup_ratio))
-    args.distance_loss_weight = max(0.0, float(args.distance_loss_weight))
 
     if args.warmup_epochs <= 0:
         args.warmup_epochs = max(1, int(args.epoch * args.warmup_ratio))
@@ -211,8 +220,10 @@ def main(args):
         args.effective_batch_size = args.batch_size * args.grad_accum_steps
 
     seed = args.name.split("st")[0]
-    if seed.isdigit():
-        ValueError, f"It's not correct name, {args.name} -> {seed}"
+    if not seed.isdigit():
+        raise ValueError(
+            f"Incorrect name: {args.name}. Expected a run name starting with the split seed, e.g. '1st_resnet50'."
+        )
 
     fix_seed(int(seed))
     args.seed = int(seed)
@@ -271,12 +282,6 @@ def main(args):
         else CustomDataset(args, logger, mode="val")
     )
 
-    test_dataset = (
-        CustomDataset(args, logger, "test")
-        if args.mode == "class"
-        else CustomDataset(args, logger, "test")
-    )
-
     for key in model_list:
         if key in pass_list:
             continue
@@ -287,12 +292,12 @@ def main(args):
         train_data, _ = train_dataset.load_dataset(key)
         val_data, _ = val_dataset.load_dataset(key)
 
-        merged_data = train_data + val_data
-
+        # train on the train split only; the val split is used for model selection
+        # (the test split is never touched during training)
         num_classes = model_num_class[key]
         class_counts = [0] * num_classes
 
-        for sample in merged_data:
+        for sample in train_data:
             label_value = int(sample[1])
             if label_value < 0 or label_value >= num_classes:
                 raise ValueError(
@@ -307,26 +312,27 @@ def main(args):
         class_weights /= np.sum(class_weights)
         class_weights = np.nan_to_num(class_weights, nan=0.0, posinf=0.0, neginf=0.0)
 
-        sample_weights = [class_weights[int(sample[1])] for sample in merged_data]
+        sample_weights = [class_weights[int(sample[1])] for sample in train_data]
         sample_weights = torch.as_tensor(sample_weights, dtype=torch.double)
 
         sampler = WeightedRandomSampler(
             weights=sample_weights,
-            num_samples=len(merged_data),
+            num_samples=len(train_data),
             replacement=True,
         )
 
         trainset_loader = torch.utils.data.DataLoader(
-            dataset=merged_data,
+            dataset=train_data,
             batch_size=args.batch_size,
             num_workers=args.num_workers,
             shuffle=False,
             sampler=sampler,
         )
 
-        test_data, _ = test_dataset.load_dataset(key)
-        testset_loader = torch.utils.data.DataLoader(
-            dataset=test_data,
+        if len(val_data) == 0:
+            raise RuntimeError(f"Empty validation set for {key}; check dataset/split and dataset/cropped_img")
+        valset_loader = torch.utils.data.DataLoader(
+            dataset=val_data,
             batch_size=args.batch_size,
             num_workers=args.num_workers,
             shuffle=False,
@@ -337,7 +343,7 @@ def main(args):
             model=model,
             temp_model=None,
             train_loader=trainset_loader,
-            valid_loader=testset_loader,
+            valid_loader=valset_loader,
             logger=logger,
             best_loss=args.best_loss,
             check_path=check_path,
@@ -355,7 +361,7 @@ def main(args):
 
             if epoch == 10 and args.turn_epoch:
                 trainset_loader = torch.utils.data.DataLoader(
-                    dataset=merged_data,
+                    dataset=train_data,
                     batch_size=args.batch_size,
                     num_workers=args.num_workers,
                     shuffle=True,

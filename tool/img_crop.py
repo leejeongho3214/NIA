@@ -1,6 +1,7 @@
 import errno
 import json 
 import cv2
+import numpy as np
 import os
 
 from tqdm import tqdm
@@ -40,6 +41,12 @@ for equ in os.listdir(folder_path):
                     width, height = bbox[3] - bbox[1], bbox[2] - bbox[0]
                     crop_length = int(max(width, height) / 2)
                     cropped_img = img[max(center_bbox[1] - crop_length, 0) : min(center_bbox[1] + crop_length, img.shape[0]), max(center_bbox[0] - crop_length, 0) : min(center_bbox[0] + crop_length, img.shape[1])]
+                    # Keep the window square: if it runs past the image border, paste the clipped crop
+                    # into the top-left of a black square instead of stretching it (as in the crops
+                    # used to train the released checkpoints).
+                    square = np.zeros((2 * crop_length, 2 * crop_length, 3), dtype=img.dtype)
+                    square[: cropped_img.shape[0], : cropped_img.shape[1]] = cropped_img
+                    cropped_img = square
                 
                 resized_img = cv2.resize(cropped_img, (256, 256))
                 cv2.imwrite(os.path.join("dataset/cropped_img", equ, sub, anno["info"]["filename"][:-4] + f'_{str(anno["images"]["facepart"]).zfill(2)}' + '.jpg'), resized_img)

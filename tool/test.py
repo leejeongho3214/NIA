@@ -1,17 +1,17 @@
-import shutil
 import sys
 import os
 import argparse
 import yaml
 
-workspace_path = os.path.join(os.path.expanduser("~"), "dir/NIA")
+workspace_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, workspace_path)
 os.chdir(workspace_path)
 
 sys.stderr = open(sys.stderr.fileno(), mode="w", buffering=1)
 
+import torch
 from torch.utils.data import DataLoader
-from tool.utils import resume_checkpoint, fix_seed
+from tool.utils import fix_seed
 from tool.data_loader import CustomDataset
 from tool.logger import setup_logger
 from tool.model import Model_test
@@ -65,16 +65,36 @@ def parse_args():
         type=int,
     )
 
+    parser.add_argument(
+        "--argmax",
+        action="store_true",
+        help="Class mode: score the argmax grade instead of the expected grade (paper uses the expected grade).",
+    )
+
     args = parser.parse_args()
 
     return args
 
 
+def load_weights(model, path):
+    """Load a checkpoint saved by tool/main.py ({'model_state': ...}) or a plain state_dict."""
+    try:  # weights-only files load without unpickling arbitrary objects
+        state = torch.load(path, map_location="cpu", weights_only=True)
+    except Exception:  # full training checkpoints also hold optimizer/scheduler/numpy state
+        state = torch.load(path, map_location="cpu", weights_only=False)
+    if isinstance(state, dict) and "model_state" in state:
+        state = state["model_state"]
+    model.load_state_dict(state, strict=True)
+    return model
+
+
 def main(args):
     seed = args.name.split("st")[0]
-    if seed.isdigit():
-        ValueError, f"It's not correct name, {args.name} -> {seed}"
-        
+    if not seed.isdigit():
+        raise ValueError(
+            f"Incorrect name: {args.name}. Expected a run name starting with the split seed, e.g. '1st_resnet50'."
+        )
+
     args.seed = int(seed)
     fix_seed(int(seed))
 
@@ -82,14 +102,16 @@ def main(args):
         args.check_root, "checkpoint", args.mode, args.name
     )
 
-    if os.path.isdir(os.path.join(check_path, "log", "eval")):
-        shutil.rmtree(os.path.join(check_path, "log", "eval"))
+    model_path = os.path.join(check_path, "save_model")
+    if not os.path.isdir(model_path):
+        raise FileNotFoundError(f"Incorrect checkpoint path: {model_path} does not exist")
 
     args.log_path = os.path.join(check_path, "log")
 
     logger = setup_logger(args.name, os.path.join(args.log_path, "eval"))
     logger.info("Command Line: " + " ".join(sys.argv))
 
+    os.makedirs(os.path.join(check_path, "code"), exist_ok=True)
     yaml_file_path = os.path.join(check_path, "code", "test_config.yaml")
     with open(yaml_file_path, "w") as yaml_file:
         yaml.dump(vars(args), yaml_file, default_flow_style=False)
@@ -111,27 +133,12 @@ def main(args):
         for key, value in model_num_class.items()
     }
 
-    model_path = os.path.join(check_path, "save_model")
-    save_log_path = os.path.join(check_path, "log", "save-log")
-
-    if os.path.isdir(save_log_path):
-        shutil.rmtree(save_log_path)
-
-    if os.path.isdir(model_path):
-        for path in os.listdir(model_path):
-            dig_path = os.path.join(model_path, path)
-            if os.path.isfile(os.path.join(dig_path, "state_dict.bin")):
-                print(f"\033[92mResuming......{dig_path}\033[0m")
-                model_list[path], _, _, _ = resume_checkpoint(
-                    args,
-                    model_list[path],
-                    os.path.join(dig_path, "state_dict.bin"),
-                    path,
-                    False,
-                )
-    else:
-        shutil.rmtree(check_path)
-        assert 0, "Incorrect checkpoint path"
+    for key in model_list:
+        ckpt = os.path.join(model_path, key, "state_dict.bin")
+        if not os.path.isfile(ckpt):
+            raise FileNotFoundError(f"Missing checkpoint: {ckpt}")
+        print(f"\033[92mLoading......{ckpt}\033[0m")
+        model_list[key] = load_weights(model_list[key], ckpt)
 
     dataset = (
         CustomDataset(args, logger, "test", special=True)
@@ -174,6 +181,7 @@ def main(args):
             )
             resnet_model.test(model, testset_loader, w_key)
             resnet_model.print_test()
+    resnet_model.print_pooled()
     resnet_model.save_value()
 
 

@@ -78,26 +78,30 @@ Built on the dataset and models in this repository, this work proposes an AI fra
 
 ## 🧠 Skin Diagnosis AI Models
 
+This repository releases the **ResNet-50** baseline of the paper (Table 6, visual-grade
+classification on the DSLR test set). The CoAtNet-4 models of the paper are not part of this release.
+
 ### Architecture
 
-- **Backbone**: ResNet-50
+- **Backbone**: ResNet-50 (torchvision, randomly initialised, no ImageNet pretraining), input 256×256
 - The output size of the final fc layer equals the number of grades for the task
-- A **separate model** is trained for each task (wrinkles, pores, dryness, etc.)
+  (dryness 5, pigmentation 6, pore 6, sagging 6, wrinkle 7)
+- A **separate model** is trained for each of the 5 visual-grade tasks
 
-### Loss Function
-
-- Cross-entropy overfits due to grade imbalance
-- → We use **Focal Loss** or **Class-balanced Loss** instead
-
-### Training Setup
+### Training Setup (the defaults of `tool/main.py`, which produced the released checkpoints)
 
 | Item | Value |
 | --- | --- |
-| Optimizer | Adam |
-| Learning rate | 0.005 |
-| Epochs | 100 |
-| Train / Val / Test | 8 : 1 : 1 |
-| Split strategy | Stratified split based on grade distribution |
+| Optimizer | Adam (β = 0.9, 0.999, no weight decay), gradient clipping 1.0 |
+| Learning rate | 1e-4, 5 linear warm-up epochs, cosine decay to 1e-6 |
+| Epochs | max. 100, early stopping after 11 epochs without validation improvement |
+| Batch size | 32, class-balanced `WeightedRandomSampler` (weights ∝ 1/√count) on the train split |
+| Loss | class-balanced focal loss (γ = 2, β = 0.999) + 0.3 × smooth-L1(expected grade, GT grade) |
+| Model selection | lowest validation MAE of the expected grade Σₖ softmaxₖ·k |
+| Augmentation | `light` preset (affine, colour jitter, perspective, blur/sharpen, erasing; no flip), softened for dryness/pore/wrinkle; sampled once per image when the train split is loaded |
+| Train / Val / Test | 7 : 1 : 2, split at the **participant level**, 4 random splits (seeds 1–4) |
+
+The test split is never used during training.
 
 ---
 
@@ -108,12 +112,12 @@ Built on the dataset and models in this repository, this work proposes an AI fra
 | Resource | Link | Location |
 | --- | --- | --- |
 | Raw facial images & labels (AI-Hub) | [Link](https://www.aihub.or.kr/aihubdata/data/view.do?currMenu=&topMenu=&aihubDataSe=data&dataSetSn=71645) | `dataset/img`, `dataset/label` |
-| Model checkpoints | [Link](https://gofile.me/7wbhv/FpFhxyCZX) | `checkpoint/` |
+| ResNet-50 checkpoints (seeds 1–4, `class`) | [Link](https://gofile.me/7wbhv/FpFhxyCZX) | `checkpoint/class/{1-4}st_resnet50/save_model/<task>/state_dict.bin` |
 | Dataset split JSON | [Link](https://gofile.me/7wbhv/hpeVMNNOg) | `dataset/split` |
 
 > 🔑 To get the **password** for the archives, please contact us by email → [72210297@dankook.ac.kr](mailto:72210297@dankook.ac.kr)
 >
-> The split JSON files contain random 8:1:1 splits stratified by grade for each facial sign, provided as four sets (**seeds 1–4**).
+> The split JSON files contain participant-level 7:1:2 train/val/test splits for each facial sign, provided as four sets (**seeds 1–4**), for each device (`digital_camera`, `smart_pad`, `smart_phone`) and label type (`class`, `regression`).
 
 > ℹ️ The raw data is hosted on [AI-Hub](https://www.aihub.or.kr). Access may require an AI-Hub account and a data-use application; please check AI-Hub's policy for overseas users.
 
@@ -122,10 +126,10 @@ Built on the dataset and models in this repository, this work proposes an AI fra
 ```
 {$ROOT}
 ├── checkpoint
-│   ├── class
-│   └── regression
-│       └── 1st_cnn
+│   └── class
+│       └── 1st_resnet50          # one folder per split seed (1st … 4st)
 │           └── save_model
+│               └── <task>/state_dict.bin
 │
 ├── dataset
 │   ├── img            # raw images from AI-Hub
@@ -141,10 +145,11 @@ Built on the dataset and models in this repository, this work proposes an AI fra
 
 ### 3. Preprocessing — Image Cropping
 
-The CNN expects square inputs. Since the bboxes in the original JSON fit tightly around each region, they must be resized to squares, using either:
+The CNN expects square inputs. Since the bboxes in the original JSON fit tightly around each region, they are made square before resizing:
 
-- **Option 1**: a square crop centered on the bbox
-- **Option 2**: zero-padding the bbox
+a square window centred on the bbox (side = the longer bbox side) is cut out and resized to
+256×256; where the window runs past the image border, the clipped crop is placed in the top-left
+corner of a black square (zero padding) instead of being stretched.
 
 ```bash
 python tool/img_crop.py
@@ -152,20 +157,41 @@ python tool/img_crop.py
 
 ### 4. Training
 
-```bash
-# Predict dermatologist visual grades
-python tool/main.py --name "CHECKPOINT_NAME" --mode class
+The run name must start with the split seed (`1st_…` uses `dataset/split/*/1_*set_info.json`).
+Checkpoints are written to `checkpoint/<mode>/<name>/`.
 
-# Predict instrument-measured values
-python tool/main.py --name "CHECKPOINT_NAME" --mode regression
+```bash
+# Predict dermatologist visual grades (ResNet-50 recipe of the paper), seeds 1-4
+for s in 1 2 3 4; do python tool/main.py --name ${s}st_resnet50 --mode class; done
+
+# Predict instrument-measured values (not part of the released results)
+python tool/main.py --name 1st_resnet50 --mode regression
 ```
 
 ### 5. Testing
 
 ```bash
-python tool/test.py --name "CHECKPOINT_NAME" --mode class
-python tool/test.py --name "CHECKPOINT_NAME" --mode regression
+for s in 1 2 3 4; do python tool/test.py --name ${s}st_resnet50 --mode class --equ 1; done
+python tool/summarize.py --mode class --names 1st_resnet50 2st_resnet50 3st_resnet50 4st_resnet50
 ```
+
+`test.py` scores each seed the way the paper does: the predicted grade is the expected grade
+Σₖ softmaxₖ·k, MAE and Pearson r are computed on it, and the accuracies (%MAE = 0, ≤ 1, ≤ 2) on
+the expected grade rounded to the nearest integer and clipped to the GT grade range. The
+`[POOLED over tasks]` line pools all test images of all tasks of one seed; `summarize.py`
+averages it over the four seeds. Use `--argmax` to score the argmax grade instead. For
+regression, NMAE = MAE / (max GT − min GT).
+
+Expected result with the released checkpoints (DSLR test set, mean of seeds 1–4, paper Table 6):
+
+| Model | MAE | Pearson r | %MAE = 0 | %MAE ≤ 1 | %MAE ≤ 2 |
+| --- | --- | --- | --- | --- | --- |
+| ResNet-50 | 0.63 | 0.79 | 50.90 | 91.52 | 98.86 |
+
+The table was produced with the crops used during training. About 1 in 5 of those crops differ
+slightly from what `img_crop.py` produces (a few pixels of black margin at the window edge), so
+crops regenerated with `img_crop.py` give marginally different numbers. Measured with the released
+checkpoints on regenerated crops: MAE 0.63, r 0.79, %MAE = 0 50.96, ≤ 1 91.45, ≤ 2 98.84.
 
 ---
 

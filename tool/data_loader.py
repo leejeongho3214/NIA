@@ -1,4 +1,6 @@
+import copy
 import errno
+from typing import Optional
 from PIL import Image
 from torchvision import transforms
 from torchvision.transforms import InterpolationMode
@@ -91,14 +93,36 @@ class CustomDataset(Dataset):
         self.dataset_dict = defaultdict(list)
         self.grade_num = defaultdict(lambda: defaultdict(int))
         self.loading(special)
-        self._train_transform = self._build_transform(train=True)
-        self._eval_transform = self._build_transform(train=False)
 
-    def _build_transform(self, train: bool):
+    def _augmentation_config(self, dig: Optional[str]):
+        # Per-task softening of the preset, as used to train the released ResNet50 checkpoints.
+        aug_level = getattr(self.args, "aug_level", "none")
+        config = copy.deepcopy(AUGMENTATION_PRESETS.get(aug_level, AUGMENTATION_PRESETS["light"]))
+
+        if dig is None:
+            return aug_level, config
+
+        if "dryness" in dig:
+            config["color_jitter"] = min(config["color_jitter"], 0.05)
+            config["blur_prob"] = 0.0
+            config["erase_prob"] = 0.0
+            config["perspective_prob"] = min(config["perspective_prob"], 0.05)
+        elif "pore" in dig:
+            config["color_jitter"] = min(config["color_jitter"], 0.08)
+            config["blur_prob"] = 0.0
+            config["erase_prob"] = min(config["erase_prob"], 0.02)
+            config["rotation"] = min(config["rotation"], 4.0)
+            config["translate"] = min(config["translate"], 0.02)
+        elif "wrinkle" in dig:
+            config["blur_prob"] = min(config["blur_prob"], 0.05)
+            config["erase_prob"] = min(config["erase_prob"], 0.03)
+
+        return aug_level, config
+
+    def _build_transform(self, train: bool, dig: Optional[str] = None):
         normalize = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         resize = transforms.Resize((self.args.res, self.args.res), antialias=True)
-        aug_level = getattr(self.args, "aug_level", "none")
-        config = AUGMENTATION_PRESETS.get(aug_level, AUGMENTATION_PRESETS["light"])
+        aug_level, config = self._augmentation_config(dig)
 
         ops = [resize]
         if train and aug_level != "none":
@@ -289,9 +313,10 @@ class CustomDataset(Dataset):
         self.area_list = list()
         self.dig = dig
 
-        transform = (
-            self._train_transform if self.mode == "train" else self._eval_transform
-        )
+        # NOTE: the (random) train transform is applied once here, when the split is loaded,
+        # so every training image keeps one fixed augmented view for all epochs. This is how
+        # the released ResNet50 checkpoints were trained; it is kept for faithful reproduction.
+        transform = self._build_transform(train=self.mode == "train", dig=dig)
 
         for self.i_path, self.grade in tqdm(self.dataset_dict[dig] , desc=f"{self.dig}"):
             if not os.path.isfile(os.path.join("dataset/cropped_img", self.i_path + ".jpg")):
